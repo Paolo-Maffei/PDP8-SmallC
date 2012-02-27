@@ -5,7 +5,7 @@
 /*
 ** machine dependent parameters
 */
-#define BPW     2   /* bytes per word */
+#define BPW     1   /* bytes per word (PDP8) */
 #define LBPW    1   /* log2(BPW) */
 #define SBPC    1   /* stack bytes per character */
 #define ERRCODE 7   /* op sys return code */
