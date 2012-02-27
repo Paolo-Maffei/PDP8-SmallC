@@ -230,110 +230,130 @@ int code[PCODES];
 setcodes() {
   setseq();
 /* BEGIN PDP8 */
-  code[ADD12]   = "\211TAD _BX\n";
-  code[ADD1n]   = "\010?TAD [<n>\n??";
-  code[ADD21]   = "\211DCA _AX\nTAD _BX\nDCA _BX\nTAD _AX\n";
-  code[ADD2n]   = "\010?DCA _AX, TAD _BX\nTAD [<n>\nDCA _BX\nTAD AX\n??";
-  code[ADDbpn]  = "\001DCA _AX, TAD [<n>\n DCA I _BX\nTAD _AX\n";
-  code[ADDwpn]  = "\001DCA _AX, TAD [<n>\n DCA I _BX\nTAD _AX\n";
-  code[ADDm_]   = "\000TAD <m>";
-  code[ADDSP]   = "\000?DCA _AX\nTAD [<n>\nTAD _SP\nDCA _SP\nTAD _AX\n??";
-  code[AND12]   = "\211AND _BX\n";
-  code[ANEG1]   = "\010CIA\n";
-  code[ARGCNTn] = "\000DCA _AX\nTAD [<n>\nDCA _CL\nTAD _AX\n";
+  code[ADD12]   = "\211TAD _AX\nTAD _BX\nDCA _AX\n";
+  code[ADD1n]   = "\010?TAD _AX\nTAD [<n>\nDCA _AX\n??";
+  code[ADD21]   = "\211TAD _AX\nTAD _BX\nDCA _BX\n";
+  code[ADD2n]   = "\010?TAD _BX\nTAD [<n>\nDCA _BX\n??";
+  code[ADDbpn]  = "\001TAD [<n>\nTAD I _BX\nDCA I _BX\n";
+  code[ADDwpn]  = "\001TAD [<n>\nTAD I _BX\nDCA I _BX\n";
+/* BUGBUG: Check the _ suffix rules to see what gets added later */
+  code[ADDm_]   = "\000TAD _AX\nTAD <m>\nDCA _AX";
+  code[ADDSP]   = "\000?TAD [<n>\nTAD _SP\nDCA _SP\n??";
+  code[AND12]   = "\211TAD _AX\nAND _BX\nDCA _AX\n";
+  code[ANEG1]   = "\010TAD _AX\nCIA\nDCA _AX\n";
+  code[ARGCNTn] = "\000TAD [<n>\nDCA _CL\n";
   code[ASL12]   = "\011JMS __asl\n";
   code[ASR12]   = "\011JMS __asr\n";
-  code[CALL1]   = "\010DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD [.+4\nDCA I _SP\nTAD _AX\nJMP I _AX\n";
-  code[CALLm]   = "\020DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD [.+4\nDCA I _SP\nTAD _AX\nJMP <m>\n";
-  code[BYTE_]   = "\000 DW ";
-  code[BYTEn]   = "\000 DW <n>\n";
-  code[BYTEr0]  = "\000 DW <n> DUP(0)\n";
-  code[COM1]    = "\010CMA\n";
+  code[CALL1]   = "\010CLA CMA\nTAD _SP\nDCA _SP\nTAD [.+3\nDCA I _SP\nJMP I _AX\n";
+  code[CALLm]   = "\020CLA CMA\nTAD _SP\nDCA _SP\nTAD [.+3\nDCA I _SP\nJMP <m>\n";
+  code[BYTE_]   = "\000  ";
+  code[BYTEn]   = "\000  <n>\n";
+  code[BYTEr0]  = "\000  <n> DUP(0)\n";
+  code[COM1]    = "\010TAD _AX\nCMA\nDCA _AX\n";
+/* BUGBUG: Users of COMMAn are likely broken */
   code[COMMAn]  = "\000,<n>\n";
-  code[DBL1]    = "\010CLL RAL\n";
-  code[DBL2]    = "\001DCA _AX\nTAD _BX\nCLL RAL\nDCA _BX\nTAD _AX\n";
-  code[DECbp]   = "\001DCA _AX\nCLA CMA\nTAD I _BX\nDCA I _BX\nTAD _AX\n";
-  code[DECwp]   = "\001DCA _AX\nCLA CMA\nTAD I _BX\nDCA I _BX\nTAD _AX\n";
+  code[DBL1]    = "\010TAD _AX\nCLL RAL\nDCA _AX\n";
+  code[DBL2]    = "\001TAD _BX\nCLL RAL\nDCA _BX\n";
+  code[DECbp]   = "\001CLA CMA\nTAD I _BX\nDCA I _BX\n";
+  code[DECwp]   = "\001CLA CMA\nTAD I _BX\nDCA I _BX\n";
   code[DIV12]   = "\011JMS __div\n";            /* see gen() */
   code[DIV12u]  = "\011JMS __divu\n";           /* see gen() */
-  code[ENTER]   = "\100DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD _BP\nDCA I _SP\nTAD _SP\nDCA _BP\nTAD _AX\n";
-  code[EQ10f]   = "\010SZA\nJMP _<n>\n";
+  code[ENTER]   = "\100CLA CMA\nTAD _SP\nDCA _SP\nTAD _BP\nDCA I _SP\nTAD _SP\nDCA _BP\n";
+  code[EQ10f]   = "\010TAD _AX\nSZA CLA\nJMP _<n>\n";
   code[EQ12]    = "\211JMS __eq\n";
-  code[GE10f]   = "\010SPA\nJMP _<n>\n";
+  code[GE10f]   = "\010TAD _AX\nSPA CLA\nJMP _<n>\n";
   code[GE12]    = "\011JMS __ge\n";
   code[GE12u]   = "\011JMS __uge\n";
-  code[GETb1m]  = "\020CLA\nTAD <m>\n";
-  code[GETb1mu] = "\020CLA\nTAD <m>\n";
-  code[GETb1p]  = "\021CLA\nTAD ?<n>??[_BX]\n"; /* see gen() */
-  code[GETb1pu] = "\021CLA\nTAD ?<n>??[_BX]\n"; /* see gen() */
-  code[GETb1s]  = "\020CLA\nTAD [<n>\nTAD _BP\nDCA _AX\n TAD I AX\n";
-  code[GETb1su] = "\020CLA\nTAD [<n>\nTAD _BP\nDCA _AX\n TAD I AX\n";
-  code[GETw1m]  = "\020CLA\nTAD <m>\n";
-  code[GETw1m_] = "\020CLA\nTAD <m>";
-  code[GETw1n]  = "\020?CLA\nTAD [<n>?CLA?\n";
-  code[GETw1p]  = "\021CLA\nTAD ?[<n>??I _BX\n";            /* see gen() */
-  code[GETw1s]  = "\020CLA\nTAD [<n>\nTAD _BP\nDCA _AX\nTAD I _AX\n";
-  code[GETw2m]  = "\002DCA _AX\nTAD <m>\nDCA _BX\nTAD _AX\n";
-  code[GETw2n]  = "\002DCA _AX\n?TAD [<n>\n??DCA _BX\nTAD _AX\n";
-  code[GETw2p]  = "\021CLA\nTAD ?[<n>??I _BX\n";            /* see gen() */
-  code[GETw2s]  = "\020DCA _AX\nTAD [<n>\nTAD _BP\nDCA _AX\nTAD I _AX\nDCA _BX\nTAD _AX\n";
-  code[GT10f]   = "\010OR AX,AX\nJG $+5\nJMP _<n>\n";
+  code[GETb1m]  = "\020TAD <m>\nDCA _AX\n";
+  code[GETb1mu] = "\020TAD <m>\nDCA _AX\n";
+  code[GETb1p]  = "\021?TAD [<n>\nTAD _BX\nDCA _AX\nTAD I _AX\n?TAD I _BX\n?DCA _AX\n"; /* see gen() */
+  code[GETb1pu] = "\021?TAD [<n>\nTAD _BX\nDCA _AX\nTAD I _AX\n?TAD I _BX\n?DCA _AX\n"; /* see gen() */
+  code[GETb1s]  = "\020TAD [<n>\nTAD _BP\nDCA _AX\n TAD I AX\nDCA _AX\n";
+  code[GETb1su] = "\020TAD [<n>\nTAD _BP\nDCA _AX\n TAD I AX\nDCA _AX\n";
+  code[GETw1m]  = "\020TAD <m>\nDCA _AX\n";
+
+/* BUGBUG: How does this get used?? */
+  code[GETw1m_] = "\020TAD <m>\nDCA _AX";
+
+  code[GETw1n]  = "\020?TAD [<n>??\nDCA _AX\n";
+  code[GETw1p]  = "\021?TAD [<n>\nTAD _BX\nDCA _AX\nTAD I _AX\n?TAD I _BX\n?DCA _AX\n"; /* see gen() */
+  code[GETw1s]  = "\020TAD [<n>\nTAD _BP\nDCA _AX\nTAD I _AX\nDCA _AX";
+  code[GETw2m]  = "\002TAD <m>\nDCA _BX\n";
+  code[GETw2n]  = "\002?TAD [<n>\n??DCA _BX\n";
+  code[GETw2p]  = "\021?TAD [<n>\nTAD _BX\nDCA _BX??TAD I _BX\n"; /* see gen() */
+  code[GETw2s]  = "\020?TAD [<n>\nTAD _BP\nDCA _BX\nTAD I _BX\n?TAD I _BP\n?DCA _BX\n";
+  code[GT10f]   = "\010TAD _AX\nSPA SNA CLA\nJMP _<n>\n";
   code[GT12]    = "\010JMS __gt\n";
   code[GT12u]   = "\011JMS __ugt\n";
   code[INCbp]   = "\001ISZ I _BX\nNOP\n";
   code[INCwp]   = "\001ISZ I _BX\nNOP\n";
-  code[WORD_]   = "\000 DW ";
-  code[WORDn]   = "\000 DW <n>\n";
-  code[WORDr0]  = "\000 DW <n> DUP(0)\n";
+  code[WORD_]   = "\000  ";
+  code[WORDn]   = "\000  <n>\n";
+  code[WORDr0]  = "\000  <n> DUP(0)\n";
   code[JMPm]    = "\000JMP _<n>\n";
   code[LABm]    = "\000_<n>:\n";
-  code[LE10f]   = "\010SMA SZA\nJMP _<n>\n";
+  code[LE10f]   = "\010TAD _AX\nSMA SZA CLA\nJMP _<n>\n";
   code[LE12]    = "\011JMS __le\n";
   code[LE12u]   = "\011JMS __ule\n";
-  code[LNEG1]   = "\010CJMS __lneg\n";
-  code[LT10f]   = "\010SMA\nJMP _<n>\n";
+  code[LNEG1]   = "\010JMS __lneg\n";
+  code[LT10f]   = "\010TAD _AX\nSMA CLA\nJMP _<n>\n";
   code[LT12]    = "\011JMS __lt\n";
   code[LT12u]   = "\011JMS __ult\n";
   code[MOD12]   = "\011JMS __mod\n";    /* see gen() */
   code[MOD12u]  = "\011JMS __modu\n";   /* see gen() */
-  code[MOVE21]  = "\012DCA _BX\nTAD _BX\n";
+  code[MOVE21]  = "\012TAD _AX\nDCA _BX\n";
   code[MUL12]   = "\211JMS __imul\n";
   code[MUL12u]  = "\211JMS __umulu\n";
-  code[NE10f]   = "\010SNA\nJMP _<n>\n";
+  code[NE10f]   = "\010TAD _AX\nSNA CLA\nJMP _<n>\n";
   code[NE12]    = "\211JMS __ne\n";
-  code[NEARm]   = "\000 DW _<n>\n";
-  code[OR12]    = "\211CMA\nDCA _AX\nTAD _BX\nCMA\nAND _AX\nCMA\n";
+
+  code[NEARm]   = "\000  _<n>\n";
+  code[OR12]    = "\211TAD _AX\nCMA\nDCA _AX\nTAD _BX\nCMA\nAND _AX\nCMA\nDCA _AX\n";
+
+/* BUGBUG: User of this is surely broken */
   code[PLUSn]   = "\000?+<n>??\n";
-  code[POINT1l] = "\020CLA\nTAD [_<l>+<n>\n";
-  code[POINT1m] = "\020CLA\nTAD [<m>\n";
-  code[POINT1s] = "\020CLA\nTAD [<n>\nTAD _BP\n";
-  code[POINT2m] = "\002DCA _AX\nTAD [<m>\nDCA _BP\nTAD _AX";
-  code[POINT2m_]= "\002DCA _AX\nTAD [<m>";
-  code[POINT2s] = "\002DCA _AX\nTAD [<n>\nTAD _BP\nDCA _BX\nTAD I _BX\nDCA _BX\nTAD _AX\n";
-  code[POP2]    = "\002DCA _AX\nTAD I _SP\nISZ _SP\nDCA BX\nTAD _AX\n";
-  code[PUSH1]   = "\110DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD _AX\nDCA I _SP\nTAD _AX\n";
-  code[PUSH2]   = "\101DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD _BX\nDCA I _SP\nTAD _AX\n";
-  code[PUSHm]   = "\100DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\nTAD <m>\nDCA I _SP\nTAD _AX\n";
-  code[PUSHp]   = "\100DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\n?TAD [<n>\nTAD _BX\nDCA _CL\nTAD I _CL?TAD I _BX\n?DCA I _SP\nTAD _AX\n";
-  code[PUSHs]   = "\100DCA _AX\nCLA CMA\nTAD _SP\nDCA _SP\n?TAD [<n>\nTAD _BP\nDCA _CL\nTAD I _CL?TAD I _BP\n?DCA I _SP\nTAD _AX\n";
-  code[PUT_m_]  = "\000DCA <m>\nTAD <m>";
-  code[PUTbm1]  = "\010DCA <m>\nTAD <m>\n";
-  code[PUTbp1]  = "\011DCA I _BX\nTAD I _BX\n";
-  code[PUTwm1]  = "\010DCA <m>\nTAD <m>\n";
-  code[PUTwp1]  = "\011DCA I _BX\nTAD I _BX\n";
-  code[rDEC1]   = "\010#CIA\nCMA\n#";
-  code[rDEC2]   = "\010#DCA _AX\nCLA CMA\nTAD _BX\nDCA _BX\nTAD _AX\n#";
+
+  code[POINT1l] = "\020TAD [_<l>+<n>\nDCA _AX\n";
+  code[POINT1m] = "\020TAD [<m>\nDCA _AX\n";
+  code[POINT1s] = "\020TAD [<n>\nTAD _BP\nDCA _AX\n";
+  code[POINT2m] = "\002TAD [<m>\nDCA _BX\n";
+
+/* BUGBUG: How can this be used? */
+  code[POINT2m_]= "\002TAD [<m>\nDCA _BX";
+
+  code[POINT2s] = "\002TAD [<n>\nTAD _BP\nDCA _BX\nTAD I _BX\nDCA _BX\n";
+  code[POP2]    = "\002TAD I _SP\nISZ _SP\nDCA BX\n";
+  code[PUSH1]   = "\110CLA CMA\nTAD _SP\nDCA _SP\nTAD _AX\nDCA I _SP\n";
+  code[PUSH2]   = "\101CLA CMA\nTAD _SP\nDCA _SP\nTAD _BX\nDCA I _SP\n";
+  code[PUSHm]   = "\100CLA CMA\nTAD _SP\nDCA _SP\nTAD <m>\nDCA I _SP\n";
+  code[PUSHp]   = "\100CLA CMA\nTAD _SP\nDCA _SP\n?TAD [<n>\nTAD _BX\nDCA _CL\nTAD I _CL?TAD I _BX\n?DCA I _SP\n";
+  code[PUSHs]   = "\100CLA CMA\nTAD _SP\nDCA _SP\n?TAD [<n>\nTAD _BP\nDCA _CL\nTAD I _CL?TAD I _BP\n?DCA I _SP\n";
+
+
+/* BUGBUG: How is this used? */
+  code[PUT_m_]  = "\000TAD _AX\nDCA <m>";
+
+  code[PUTbm1]  = "\010TAD _AX\nDCA <m>\n";
+  code[PUTbp1]  = "\011TAD _AX\nDCA I _BX\n";
+  code[PUTwm1]  = "\010TAD _AX\nDCA <m>\n";
+  code[PUTwp1]  = "\011TAD _AX\nDCA I _BX\n";
+  code[rDEC1]   = "\010#CLA CMA\nTAD _AX\nDCA _AX\n#";
+  code[rDEC2]   = "\010#CLA CMA\nTAD _BX\nDCA _BX\n#";
   code[REFm]    = "\000_<n>";
-  code[RETURN]  = "\000DCA _AX\n?TAD _BP\nDCA _SP\n??TAD I _SP\nISZ _SP\nDCA _BP\nTAD I _SP\nISZ _SP\nDCA _CL\nTAD _AX\nJMP I _CL\n";
-  code[rINC1]   = "\010#IAC\n#";
+  code[RETURN]  = "\000?TAD _BP\nDCA _SP\n??TAD I _SP\nISZ _SP\nDCA _BP\nTAD I _SP\nISZ _SP\nDCA _CL\nJMP I _CL\n";
+  code[rINC1]   = "\010#ISZ _AX\nNOP\n#";
   code[rINC2]   = "\010#ISZ _BX\nNOP\n#";
-  code[SUB_m_]  = "\000DCA _AX\nTAD <m>\nCIA\nTAD _AX";
-  code[SUB12]   = "\011DCA _AX\nTAD _BX\nCIA\nTAD _AX\n"; /* see gen() */
-  code[SUB1n]   = "\010?TAD [-<n>\n??";
-  code[SUBbpn]  = "\001DCA _AX\nTAD [<n>\nCIA\nTAD I _BX\nDCA I _BX\nTAD _AX\n";
-  code[SUBwpn]  = "\001DCA _AX\nTAD [<n>\nCIA\nTAD I _BX\nDCA I _BX\nTAD _AX\n";
-  code[SWAP12]  = "\011DCA _CL\nTAD _BX\nDCA _AX\nTAD _CL\nDCA _BX\nTAD _AX\n";
-  code[SWAP1s]  = "\012DCA _AX\nTAD I _SP\nDCA _BX\nTAD _AX\nDCA I _SP\nTAD _BX\n";
+
+/* BUGBUG: use? */
+  code[SUB_m_]  = "\000TAD <m>\nCIA\nTAD _AX\nDCA _AX";
+
+  code[SUB12]   = "\011TAD _BX\nCIA\nTAD _AX\nDCA _AX\n"; /* see gen() */
+  code[SUB1n]   = "\010TAD _AX\n?TAD [-<n>\n??\nDCA _AX\n";
+  code[SUBbpn]  = "\001TAD [<n>\nCIA\nTAD I _BX\nDCA I _BX\n";
+  code[SUBwpn]  = "\001TAD [<n>\nCIA\nTAD I _BX\nDCA I _BX\n";
+  code[SWAP12]  = "\011TAD _AX\nDCA _CL\nTAD _BX\nDCA _AX\nTAD _CL\nDCA _BX\n";
+
+  code[SWAP1s]  = "\012TAD I _SP\nDCA _BX\nTAD _AX\nDCA I _SP\nTAD _BX\nDCA _AX\n";
   code[SWITCH]  = "\012JMS __switch\n";
   code[XOR12]   = "\211JMS __xor\n";
 /* END PDP8 */
