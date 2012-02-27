@@ -1,0 +1,66 @@
+
+
+
+                           Small C Compiler Version 2.2
+                                         
+         The  Small C compiler translates a subset of the C language into
+         assembly language. It runs under PC/MS-DOS 2.1 and later.  Small
+         C  is  compatible  with  both  Small Assembler and the Microsoft
+         assembler MASM. Small C supports a small memory model  with  one
+         code and one data/stack segment.
+         
+         Small  C  supports  arrays  of  one  dimension. Functions always
+         return integer  values.  External  functions  are  automatically
+         declared.  Initialization  of global variables is supported. The
+         preprocessor supports #include, #define, #ifdef, #ifndef, #else,
+         #endif,  #asm,  #endasm  commands  .   The   following   control
+         statements  are  supported:  if,  switch,  case, default, break,
+         continue, while, for, and do/while. All expression operators are
+         supported. Only signed and unsigned integer and  character  data
+         types  are  supported. The following standard C features are not
+         supported: structures, fields, unions, arrays of  pointers,  and
+         casts.
+         
+         Small  C  supports  UNIX-like  I/O  redirection and command-line
+         argument passing. The Small C library includes over 80 functions
+         -- a nearly complete set  of  the  standard  UNIX/C  repertoire.
+         Binary  as  well  as  character  stream  I/O  is  supported. The
+         formatted I/O  functions  printf()  and  scanf()  are  included.
+         Random  access  to  files  is  provided.  Programs  can  request
+         additional file buffering.
+         
+         The compiler itself is written in Small  C  and  is  distributed
+         with  both  object  and source code. As a self compiler, Small C
+         can be modified to  work  in  other  environments  and  to  meet
+         special   needs.   Since   everything   is  revealed  and  fully
+         documented, Small C  has  tremendous  value  as  an  educational
+         device.  Small  C  uses a single pass, recursive descent parsing
+         algorithm. It generates p-codes for internal use, and  optimizes
+         its output.
+         
+         The  Small  C  language  and  compiler are fully described in "A
+         Small C Compiler: Language, Usage, Theory, and Design" by  James
+         E. Hendrix. Copies are available from:
+         
+                              M&T Publishing, Inc.
+                              501 Galveston Dr.
+                              Redwood City, CA 94063
+                              Phone: 1 (800) 533-4372
+         
+                                  J. E. Hendrix
+                                  P.O. Box 1435
+                                Oxford, MS  38655
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
