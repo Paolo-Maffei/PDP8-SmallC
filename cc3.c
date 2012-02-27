@@ -48,6 +48,7 @@ constexpr(val) int *val; {
 
 expression(con, val) int *con, *val;  {
   int is[7];
+  is[0] = is[1] = is[2] = is[3] = is[4] = is[5] = is[6] = 0;
   if(level1(is)) fetch(is);
   *con = is[TC];
   *val = is[CV];
@@ -56,6 +57,7 @@ expression(con, val) int *con, *val;  {
 test(label, parens)  int label, parens;  {
   int is[7];
   int *before, *start;
+  is[0] = is[1] = is[2] = is[3] = is[4] = is[5] = is[6] = 0;
   if(parens) need("(");
   while(1) {
     setstage(&before, &start);
@@ -101,6 +103,7 @@ zerojump(oper, label, is) int oper, label, is[]; {
 
 level1(is) int is[];  {
   int k, is2[7], is3[2], oper, oper2;
+  is2[0] = is2[1] = is2[2] = is2[3] = is2[4] = is2[5] = is2[6] = 0;
   k = down1(level2, is);
   if(is[TC]) gen(GETw1n, is[CV]);
        if(match("|="))  {oper =        oper2 = OR12;}
@@ -145,6 +148,8 @@ level1(is) int is[];  {
 
 level2(is1)  int is1[]; {
   int is2[7], is3[7], k, flab, endlab, *before, *after;
+  is2[0] = is2[1] = is2[2] = is2[3] = is2[4] = is2[5] = is2[6] = 0;
+  is3[0] = is3[1] = is3[2] = is3[3] = is3[4] = is3[5] = is3[6] = 0;
   k = down1(level3, is1);                   /* expression 1 */
   if(match("?") == 0) return k;
   dropout(k, NE10f, flab = getlabel(), is1);
@@ -297,6 +302,7 @@ level14(is)  int *is; {
   blanks();
   if(ch == '[' || ch == '(') {
     int is2[7];                     /* allocate only if needed */
+    is2[0] = is2[1] = is2[2] = is2[3] = is2[4] = is2[5] = is2[6] = 0;
     while(1) {
       if(match("[")) {              /* [subscript] */
         if(ptr == 0) {
@@ -422,7 +428,7 @@ callfunc(ptr)  char *ptr; {      /* symbol table entry or 0 */
     if(match(",") == 0) break;
     }
   need(")");
-  if(streq(ptr + NAME, "CCARGC") == 0) gen(ARGCNTn, nargs >> LBPW);
+  if(ptr && streq(ptr + NAME, "CCARGC") == 0) gen(ARGCNTn, nargs >> LBPW);
   if(ptr) gen(CALLm, ptr);
   else    gen(CALL1, 0);
   gen(ADDSP, csp + nargs);
@@ -624,6 +630,7 @@ down(opstr, opoff, level, is)
   while(1) {
     if(nextop(opstr)) {
       int is2[7];     /* allocate only if needed */
+      is2[0] = is2[1] = is2[2] = is2[3] = is2[4] = is2[5] = is2[6] = 0;
       bump(opsize);
       opindex += opoff;
       down2(op[opindex], op2[opindex], level, is, is2);

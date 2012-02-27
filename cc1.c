@@ -776,7 +776,7 @@ openfile() {        /* entire function revised */
       }
     if(!ext) strcpy(pline + i, ".C");
     input = mustopen(pline, "r");
-    if(!files && iscons(stdout)) {
+    if(!files && iscons(fileno(stdout))) {
       strcpy(outfn + j, ".ASM");
       output = mustopen(outfn, "w");
       }
