@@ -1,0 +1,43 @@
+The linker situation is a mess.  Currently, you have to compile the 
+module by itself, run resolve.pl to get the command you should have 
+used to compile the module and relevant library routines, then run 
+that, re-order the output code so that the stuff from vm.c is first, 
+then feed the result to the assembler.  Which will then barf all 
+over it, since only vm.c has had page packing done.  You can fiddle 
+with the .ASM and the assembler, re-packing the pages, until you 
+get something that works.  Except getting something that actually
+works hasn't happened yet.
+
+vm.c really needs to be loaded first, not just sort of at random.
+
+_CCARGC unresolved (not including call.asm).
+
+Assembler inline in parse() in csyslib.c needs rework.
+Assembler inline in __bdos2 in csyslib.c needs rework.
+Assembler inline in __hitkey in csyslib.c needs rework.
+Assembler inline in __getkey in csyslib.c needs rework.
+Assembler inline in __strlen in strlen.c needs rework.
+Assembler inline in __iscons in iscons.c needs rework.
+Assembler inline in _abort in exit.c needs rework.
+Assembler inline in _isatty in isatty.c needs rework.
+
+Page packing is a total hash.  Could probably work around it with 
+changes to the code generator.  (Eliminate use of [foo].)
+
+Uncommented lowercase "public" for _fputc (inline assembler?).
+
+Files with #asm directives:
+  csyslib.c exit.c fgetc.c fputc.c
+  free.c isatty.c iscons.c rename.c
+  strlen.c unlink.c
+
+Anything still marked BUGBUG: in the code:
+;BUGBUG __asl, __asr are missing!
+; BUGBUG: __div is missing!
+; BUGBUG: __imul is missing!
+; BUGBUG: __mod is missing!
+
+The compiler is doing name munging to add a single '_' to identifiers.
+We should reserve the single underscore prefix for that, and use "__" 
+or nothing at all for library/implementation stuff.  In particular, 
+the virtual machine in "vm.c" needs to get cleaned up.

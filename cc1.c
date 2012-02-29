@@ -776,6 +776,9 @@ openfile() {        /* entire function revised */
       }
     if(!ext) strcpy(pline + i, ".C");
     input = mustopen(pline, "r");
+    macptr = 0; /* VRS forget macros between input files */
+    free(macn); /* VRS Toss old macro names */
+    macn    = calloc(MACNSIZE, 1); /* VRS Get new macro name buffer */
     if(!files && iscons(fileno(stdout))) {
       strcpy(outfn + j, ".ASM");
       output = mustopen(outfn, "w");
