@@ -240,7 +240,7 @@ setcodes() {
   code[ADDSP]   = "\000?JMS @__addsp\n <n>\n??";
   code[AND12]   = "\211JMS @__and12\n";
   code[ANEG1]   = "\010JMS @__aneg1\n";
-  code[ARGCNTn] = "\000TAD [<n>]\nDCA _CX\n";
+  code[ARGCNTn] = "\000JMS @__argcntn\n <n>\n";
   code[ASL12]   = "\011JMS @__asl\n";
   code[ASR12]   = "\011JMS @__asr\n";
   code[CALL1]   = "\010JMS @__call1\n";
@@ -262,19 +262,19 @@ setcodes() {
   code[GE10f]   = "\010JMS @__ge10f\n _<n>\n";
   code[GE12]    = "\011JMS __ge\n";
   code[GE12u]   = "\011JMS @__uge\n";
-  code[GETb1m]  = "\020TAD <m>\nDCA _AX\n";
-  code[GETb1mu] = "\020TAD <m>\nDCA _AX\n";
+  code[GETb1m]  = "\020JMS @__getb1m\n <m>\n";
+  code[GETb1mu] = "\020JMS @__getb1mu\n <m>\n";
   code[GETb1p]  = "\021JMS @__getb1p\n? <n>? 0?\n"; /* see gen() */
   code[GETb1pu] = "\021JMS @__getb1pu\n? <n>? 0?\n"; /* see gen() */
   code[GETb1s]  = "\020JMS @__getb1s\n <n>\n";
   code[GETb1su] = "\020JMS @__getb1su\n <n>\n";
-  code[GETw1m]  = "\020TAD <m>\nDCA _AX\n";
+  code[GETw1m]  = "\020JMS @__getw1m\n <m>\n";
   code[GETw1m_] = "\020JMS @__getw1m\n <m>"; /* only with PLUSn! */
-  code[GETw1n]  = "\020?TAD [<n>]??\nDCA _AX\n";
+  code[GETw1n]  = "\020JMS @__getw1n\n <n>\n";
   code[GETw1p]  = "\021JMS @__getw1p\n? <n>? 0?\n"; /* see gen() */
   code[GETw1s]  = "\020JMS @__getw1s\n <n>\n";
-  code[GETw2m]  = "\002TAD <m>\nDCA _BX\n";
-  code[GETw2n]  = "\002?TAD [<n>]\n??DCA _BX\n";
+  code[GETw2m]  = "\020JMS @__getw2m\n <m>\n";
+  code[GETw2n]  = "\020JMS @__getw2n\n <n>\n";
   code[GETw2p]  = "\021JMS @__getw2p\n? <n>? 0?\n"; /* see gen() */
   code[GETw2s]  = "\020JMS @__getw2s\n? <n>? 0?\n";
   code[GT10f]   = "\010JMS @__gt10f\n _<n>\n";
@@ -317,9 +317,9 @@ setcodes() {
   code[PUSHp]   = "\100JMS @__pushp\n? <n>? 0?\n";
   code[PUSHs]   = "\100JMS @__pushs\n? <n>? 0?\n";
   code[PUT_m_]  = "\000JMS @__put_m\n <m>\n"; /* only with COMMAn! */
-  code[PUTbm1]  = "\010TAD _AX\nDCA <m>\n";
+  code[PUTbm1]  = "\010JMS @__putbm1\n <m>\n";
   code[PUTbp1]  = "\011TAD _AX\nDCA @_BX\n";
-  code[PUTwm1]  = "\010TAD _AX\nDCA <m>\n";
+  code[PUTwm1]  = "\010JMS @__putwm1\n <m>\n";
   code[PUTwp1]  = "\011TAD _AX\nDCA @_BX\n";
   code[rDEC1]   = "\010#JMS @__rdec1\n#";
   code[rDEC2]   = "\010#JMS @__rdec2\n#";
@@ -348,79 +348,14 @@ setcodes() {
 header()  {
   toseg(CODESEG);
 /* BEGIN PDP8 */
-  outline(";extrn __add12: near");
-  outline(";extrn __add21: near");
-  outline(";extrn __add1n: near");
-  outline(";extrn __add2n: near");
-  outline(";extrn __addbpn: near");
-  outline(";extrn __addwpn: near");
-  outline(";extrn __addm_: near");
-  outline(";extrn __addsp: near");
-  outline(";extrn __and12: near");
-  outline(";extrn __aneg1: near");
-  outline(";extrn __asl: near");
-  outline(";extrn __asr: near");
-  outline(";extrn __call1: near");
-  outline(";extrn __callm: near");
-  outline(";extrn __com1: near");
-  outline(";extrn __dbl1: near");
-  outline(";extrn __dbl2: near");
-  outline(";extrn __decbp: near");
-  outline(";extrn __decwp: near");
-  outline(";extrn __div: near");
-  outline(";extrn __enter: near");
-  outline(";extrn __eq: near");
-  outline(";extrn __eq10f: near");
-  outline(";extrn __ge: near");
-  outline(";extrn __ge10f: near");
-  outline(";extrn __getb1pu: near");
-  outline(";extrn __getb1p: near");
-  outline(";extrn __getw1m: near");
-  outline(";extrn __getw1p: near");
-  outline(";extrn __getw2m: near");
-  outline(";extrn __getw2p: near");
-  outline(";extrn __getb1su: near");
-  outline(";extrn __getb1s: near");
-  outline(";extrn __getw2s: near");
-  outline(";extrn __gt: near");
-  outline(";extrn __gt10f: near");
-  outline(";extrn __imul: near");
-  outline(";extrn __le: near");
-  outline(";extrn __le10f: near");
-  outline(";extrn __lneg: near");
-  outline(";extrn __lt: near");
-  outline(";extrn __lt10f: near");
-  outline(";extrn __mod: near");
-  outline(";extrn __ne: near");
-  outline(";extrn __ne10f: near");
-  outline(";extrn __or12: near");
-  outline(";extrn __point1l: near");
-  outline(";extrn __point1m: near");
-  outline(";extrn __point1s: near");
-  outline(";extrn __point2m: near");
-  outline(";extrn __point2s: near");
-  outline(";extrn __pop2: near");
-  outline(";extrn __push1: near");
-  outline(";extrn __push2: near");
-  outline(";extrn __pushm: near");
-  outline(";extrn __pushp: near");
-  outline(";extrn __pushs: near");
-  outline(";extrn __put_m: near");
-  outline(";extrn __rdec1: near");
-  outline(";extrn __rdec2: near");
-  outline(";extrn __return: near");
-  outline(";extrn __rets: near");
-  outline(";extrn __sub_m: near");
-  outline(";extrn __sub12: near");
-  outline(";extrn __sub1n: near");
-  outline(";extrn __subwpn: near");
-  outline(";extrn __swap12: near");
-  outline(";extrn __swap1s: near");
-  outline(";extrn __switch: near");
-  outline(";extrn __ule: near");
-  outline(";extrn __ult: near");
-  outline(";extrn __uge: near");
-  outline(";extrn __ugt: near");
+  /*
+   * These encode the absolute addresses of the page zero stuff.
+   * These can't be EXT because the assembler doesn't know how 
+   * to do an MRI relative to a symbol that is neither absolute, 
+   * nor relative to ".".
+   * NOTE: Be sure to keep these matched up with vm.c!!
+  */
+#include "vm.h"
 
   outline(" 0"); /* force non-zero code pointers, word alignment */
   toseg(DATASEG);
@@ -442,7 +377,7 @@ trailer()  {
   if((cp = findglb("main")) && cp[CLASS]==STATIC)
     external("_main", 0, FUNCTION);
   toseg(NULL);
-  outline(".END"); /* PDP8 */
+  outline("END"); /* PDP8 */
 #ifdef DISOPT
     {
     int i, *count;
@@ -558,7 +493,7 @@ public(ident) int ident;{
   if(ident == FUNCTION)
        toseg(CODESEG);
   else toseg(DATASEG);
-  outstr(";PUBLIC ");
+  outstr("INT ");
   outname(ssname);
   newline();
   outname(ssname);
@@ -576,10 +511,12 @@ external(name, size, ident) char *name; int size, ident; {
   if(ident == FUNCTION)
        toseg(CODESEG);
   else toseg(DATASEG);
-  outstr(";EXTRN ");
+  outstr("EXT ");
   outname(name);
+#if 0
   colon();
   outsize(size, ident);
+#endif
   newline();
   }
 

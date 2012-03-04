@@ -1,4 +1,10 @@
 #asm
+; BUGBUG: This is assembler code, not C code.  The C compiler
+; emits duplicate extern definitions for everything on page 0.
+; BUGBUG: There is a kind of circular dependency here, since the
+; C compiler uses vm.h, which is computed from the code below.
+; That should be fixed by just writing this in assembler to begin
+; with.
         .ORG 0
         0       ; Reserve location zero
 ;PUBLIC _AX
@@ -32,7 +38,12 @@ __addsp:  _addsp
 __and12:  _and12
 ;PUBLIC __aneg1
 __aneg1:  _aneg1
-;BUGBUG __asl, __asr are missing!
+;PUBLIC __argcntn
+__argcntn:_argcntn
+;PUBLIC __asl
+__asl:    _asl
+;PUBLIC __asr
+__asr:    _asr
 ;PUBLIC __call1
 __call1:  _call1
 ;PUBLIC __callm
@@ -47,7 +58,10 @@ __dbl2:   _dbl2
 __decbp:
 ;PUBLIC __decwp
 __decwp:  _decwp
-; BUGBUG: __div is missing!
+;PUBLIC __div
+__div:  _div
+;PUBLIC __divu
+__divu: _divu
 ;PUBLIC __enter
 __enter:  _enter
 ;PUBLIC __eq10f
@@ -60,12 +74,16 @@ __getb1pu:
 __getb1p:
 ;PUBLIC __getw1m
 __getw1m: _getw1m
+;PUBLIC __getw1n
+__getw1n: _getw1n
 ;PUBLIC __getw1p
 __getw1p: _getw1p
 ;PUBLIC __getw1s
 __getw1s: _getw1s
 ;PUBLIC __getw2m
 __getw2m: _getw2m
+;PUBLIC __getw2n
+__getw2n: _getw2n
 ;PUBLIC __getw2p
 __getw2p: _getw2p
 ;PUBLIC __getb1su
@@ -78,12 +96,14 @@ __getw2s: _getw2s
 __gt:   _gt
 ;PUBLIC __gt10f
 __gt10f:  _gt10f
-; BUGBUG: __imul is missing!
+;PUBLIC __imul
+__imul: _imul
 ;PUBLIC __le10f
 __le10f:  _le10f
 ;PUBLIC __lt10f
 __lt10f:  _lt10f
-; BUGBUG: __mod is missing!
+;PUBLIC __mod
+__mod:  _mod
 ;PUBLIC __ne10f
 __ne10f:  _ne10f
 ;PUBLIC __or12
@@ -112,6 +132,10 @@ __pushp:  _pushp
 __pushs:  _pushs
 ;PUBLIC __put_m
 __put_m:  _put_m
+;PUBLIC __putbm1
+__putbm1:_putbm1
+;PUBLIC __putwm1
+__putwm1:_putwm1
 ;PUBLIC __rdec1
 __rdec1:  _rdec1
 ;PUBLIC __rdec2
@@ -140,6 +164,8 @@ __ult:  _ult
 __uge:  _uge
 ;PUBLIC __ugt
 __ugt:  _ugt
+;PUBLIC __umulu
+__umulu:_umulu
 ;PUBLIC __eq
 __eq:   0
         TAD _BX
@@ -206,7 +232,7 @@ __switch:0
         SZA CLA
         JMP __switch+1
         JMP @_CX
-        .PAGE
+        PAGE
         ;EXTRN __main: near
         JMP @__start    ; Make start at 0200 work
 __start:__main
@@ -340,7 +366,7 @@ _getw2m:0               ; One operand
         TAD @_ge10f
         DCA _AX
         JMP @_getw2m
-        .PAGE
+        PAGE
 _getb1pu:
 _getb1p:
 _getw1p:0
@@ -487,7 +513,7 @@ _push2: 0
         TAD _BX
         DCA @_SP
         JMP @_push1
-        .PAGE
+        PAGE
 _pushm: 0
         CLA CMA
         TAD _SP
@@ -520,7 +546,15 @@ _pushs: 0
         TAD @_pushp
         DCA @_SP
         JMP @_pushs
-; _putbm1, _putbp1, _putwm1, _pugwp1 are implemented inline.
+; _putbp1, _pugwp1 are implemented inline.
+_putbm1:
+_putwm1:0
+        TAD @_putwm1
+        ISZ _putwm1
+        DCA _put_m
+        TAD _AX
+        DCA @_put_m
+        JMP @_putwm1
 _put_m: 0               ; Two operands, destination first
         TAD @_put_m
         ISZ _put_m
@@ -630,5 +664,5 @@ _ugt:   0
         IAC     ; _AX-_BX > 0
         DCA _AX
         JMP @__ugt
-        .END
+        END
 #endasm
