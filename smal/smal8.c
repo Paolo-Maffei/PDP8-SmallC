@@ -459,7 +459,7 @@ static void objsufx()
 			putc('R', obj);
 			writesym(obj, WITH->id);
 			putc('=', obj);
-			genval( 4L, WITH->val.offset, WITH->val.base);
+			genval( 2L, WITH->val.offset, WITH->val.base);
 		}
 	}
 }
@@ -1323,7 +1323,7 @@ static void putobj(int form, uint32_t offset, poolref base)
 		    objloc.base != loc.base) {
 			objloc = loc;
 			fputs(".=", obj);
-			genval( 4L, loc.offset, loc.base);
+			genval( 2L, loc.offset, loc.base);
 		}
 		/* now objloc = loc */
 
@@ -1340,7 +1340,7 @@ static void putobj(int form, uint32_t offset, poolref base)
 		}
 		/* then generate correct object code */
 		switch (form) {
-			case 1: putc('B', obj); break;
+			case 1: break;
 			case 2: putc('H', obj); break;
 			case 3: putc('T', obj); break;
 			case 4: putc('W', obj); break;
@@ -3108,7 +3108,7 @@ static void onepass()
                              * the current page, or it isn't addressible.
                             */
                             if ((loc.offset & 077600) == (expr.offset & 077600)) {
-                                putobj(1L, opval + indir + (expr.offset & 0177), abssym);
+                                putobj(1L, opval + indir + 0200 + (expr.offset & 0177), abssym);
                             } else {
                                 errmsg(bounds, exprpos, exprlim);
                             }
@@ -3174,12 +3174,12 @@ static void onepass()
 	/* make sure object code ends at maxrel */
 	if (loc.base != relsym || loc.offset != maxrel) {
 		fputs(".=", obj);
-		genval( 4L, maxrel, relsym);
+		genval( 2L, maxrel, relsym);
 	}
 	/* put starting address out */
 	if (seenstart) {
 		putc('S', obj);
-		genval( 4L, startloc.offset, startloc.base);
+		genval( 2L, startloc.offset, startloc.base);
 	}
 	if (!permitlisting) return;
 
