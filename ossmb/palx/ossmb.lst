@@ -1,0 +1,783 @@
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   1
+                                                                                            ossmb.pa
+
+
+   1             6046	TLS=6046
+   2             6041	TSF=6041
+   3                 	; Parameter Definition:
+   4                 	
+   5             5000	        OUBUF=5000      ; Output buffer starts at 05000.
+   6             4200	        OUCTL=4200      ; and is 2 pages long.
+   7             6600	        OUDEVH=6600     ; Output handler gets loaded at 06600.  We
+   8                 	                        ; allow 2 page handlers.
+   9             5400	        INBUF=5400      ; Input buffer starts at 05400
+  10             0200	        INCTL=0200      ; also 2 pages long.
+  11             0001	        INRECS=1        ; 2 pages = 1 record
+  12             7000	        INDEVH=7000     ; Allow 2 page intput handler at 07000.
+  13             6600	        ORIGIN=6600     ; The subroutines reside at 16600.
+  14             7760	        DCB=7760        ; Device Control Table
+  15                 	
+  16    10200        	        .FIELD 1
+  17    16600        	        .ORG ORIGIN
+  18             0000	        INFLD=INCTL&70  ; Input Buffer Field
+  19             0000	        OUFLD=OUCTL&70  ; Output Buffer Field
+  20                 	
+  21    16600    7400	IN7400: 7400
+  22    16601    0000	IOPEN:  0               ; Initialize Input
+  23    16602    7240	        CLA CMA
+  24    16603    3333	        DCA INCHCT      ; Set to read from new device
+  25    16604    2210	        ISZ INEOF       ; Force a new input file.
+  26    16605    1377	        TAD [7617]      ; Point to CD Input List.
+  27    16606    3211	        DCA INFPTR
+  28    16607    5601	        JMP @IOPEN
+  29    16610    0000	INEOF:  0
+  30    16611    0000	INFPTR: 0
+  31    16612    0000	INPTR:  0
+  32                 	
+  33    16613    0000	ICHAR:  0               ; Input a character.
+  34    16614    7600	IN7600: 7600
+  35    16615    6214	        RDF             ; Save calling field for return.
+  36    16616    1245	        TAD INCDIF
+  37    16617    3331	        DCA INRTRN
+  38    16620    6201	INCHAR: CDF INFLD       ; Data field to field of buffer
+  39    16621    2300	        ISZ INJMP       ; 3 - way unpacking switch
+  40    16622    2333	        ISZ INCHCT      ; Input buffer exhausted?
+  41    16623    5300	INJMPP: JMP INJMP       ; No..unpack the next char.
+  42    16624    1210	        TAD INEOF       ; Did last read give EOF on this device?
+  43    16625    7650	        SNA CLA
+  44    16626    5231	        JMP INGBUF      ; No.  Continue Reading.
+  45    16627    4333	GETNEW: JMS INNEWF      ; Yes..get next input if it exists.
+  46    16630    5277	        JMP EOFERR      ; Take EOF exit from ICHAR.
+  47    16631    1201	INGBUF: TAD INCTR       ; INCTR holds the current length of
+  48                 	                        ; the input file.  When the amount remaining
+  49                 	                        ; to read is less than the size of the
+  50                 	                        ; input buffer, an EOF is signalled.
+  51    16632    7100	        CLL
+  52    16633    1376	        TAD [INRECS]
+  53    16634    7420	        SNL
+  54    16635    3201	        DCA INCTR       ; Update remaining length
+  55    16636    7430	        SZL
+  56    16637    2210	        ISZ INEOF       ; and signal EOF for next read.
+  57    16640    7172	        CLL CML CMA RTR ; Construct a control word for this
+  58    16641    7012	        RTR             ; read from the overflow, if any.
+  59    16642    7012	        RTR             ; and the standard control word.
+  60    16643    1375	        TAD [INCTL+1]
+  61    16644    3250	        DCA INCTLW
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   2
+                                                                                            ossmb.pa
+
+
+  62                 	
+  63    16645    6203	INCDIF: CXF 0           ; Now do a call to the input handler
+  64    16646    6211	        CDF 1           ; We are in field 1, handler in field 0
+  65    16647    4744	        JMS @INHNDL
+  66    16650    0000	INCTLW: 0               ; Input Control Word
+  67    16651    5400	INBUFP: INBUF           ; Input buffer address
+  68    16652    0000	INREC:  0               ; Pointer to input record
+  69    16653    5273	        JMP INERRX
+  70    16654    1252	INBREC: TAD INREC
+  71    16655    1376	        TAD [INRECS]    ; Update pointer into file
+  72    16656    3252	        DCA INREC
+  73    16657    1250	        TAD INCTLW      ; Now compute the number of characters
+  74    16660    0214	        AND IN7600      ; in this input buffer
+  75    16661    7104	        CLL RAL
+  76    16662    1250	        TAD INCTLW
+  77    16663    0214	        AND IN7600
+  78    16664    7040	        CMA
+  79    16665    3333	        DCA INCHCT      ; New number of characters.
+  80    16666    1223	        TAD INJMPP      ; Reset 3 way switch
+  81    16667    3300	        DCA INJMP
+  82    16670    1251	        TAD INBUFP
+  83    16671    3212	        DCA INPTR       ; and buffer pointer
+  84    16672    5220	        JMP INCHAR      ; Now read the buffer
+  85    16673    2210	INERRX: ISZ INEOF       ; Set EOF just in case
+  86    16674    7700	        SMA CLA         ; If < 0, a physical error
+  87    16675    5254	        JMP INBREC      ; EOF on input
+  88    16676    7330	INERR:  CLA CLL CML RAR ; Fatal
+  89    16677    5331	EOFERR: JMP INRTRN      ; Get out
+  90    16700    7402	INJMP:  HLT             ; 3 way unpack switch
+  91    16701    5322	        JMP ICHAR1      ; Get 1st of 3
+  92    16702    5316	        JMP ICHAR2      ; Second
+  93    16703    1223	ICHAR3: TAD INJMPP
+  94    16704    3300	        DCA INJMP       ; Set for first char, next
+  95    16705    1612	        TAD @INPTR      ; The third word is made of the high
+  96    16706    0200	IN200:  AND IN7400      ; order four bits of the first
+  97    16707    7112	        CLL RTR         ; two.
+  98    16710    7012	        RTR
+  99    16711    1250	        TAD INCTLW
+ 100    16712    7012	        RTR
+ 101    16713    7012	        RTR
+ 102    16714    2212	        ISZ INPTR       ; Point to next word
+ 103    16715    5323	        JMP INCOMN      ; Get out with char in AC
+ 104    16716    1612	ICHAR2: TAD @INPTR
+ 105    16717    0200	        AND IN7400      ; Save high order for third word
+ 106    16720    3250	        DCA INCTLW
+ 107    16721    2212	        ISZ INPTR
+ 108    16722    1612	ICHAR1: TAD @INPTR
+ 109    16723    0374	INCOMN: AND [377]
+ 110    16724    1373	        TAD [-232]      ; Is it a ^Z (EOF)?
+ 111    16725    7450	        SNA
+ 112    16726    5227	        JMP GETNEW      ; Yes..look at next input
+ 113    16727    1372	        TAD [232]
+ 114    16730    2213	        ISZ ICHAR       ; Take normal return
+ 115    16731    0000	INRTRN: 0               ; CIF CDF n.
+ 116    16732    5613	        JMP @ICHAR
+ 117    16733    7777	INNEWF: -1
+ 118             6733	INCHCT=INNEWF
+ 119    16734    6211	        CDF 1 
+ 120    16735    1371	        TAD [INDEVH+1]  ; Initialize in case we need a new
+ 121    16736    3344	        DCA INHNDL      ; More input?
+ 122    16737    1611	        TAD @INFPTR
+ 123    16740    7450	        SNA
+ 124    16741    5733	        JMP @INNEWF     ; Nope
+ 125    16742    4706	        JMS @IN200      ; Call monitor to get handler
+ 126    16743    0001	        1
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   3
+                                                                                            ossmb.pa
+
+
+ 127    16744    0000	INHNDL: 0
+ 128    16745    7402	        HLT             ; Very bad!
+ 129    16746    1611	        TAD @INFPTR
+ 130    16747    0370	        AND [7760]      ; Get input file length
+ 131    16750    7440	        SZA
+ 132    16751    1367	        TAD [17]
+ 133    16752    7132	        CLL CML RTR
+ 134    16753    7012	        RTR             ; Negative of file length
+ 135    16754    3201	        DCA INCTR
+ 136    16755    2211	        ISZ INFPTR      ; Point to starting block
+ 137    16756    1611	        TAD @INFPTR
+ 138    16757    3252	        DCA INREC       ; Store in handler call
+ 139    16760    2211	        ISZ INFPTR      ; Next input.
+ 140    16761    3210	        DCA INEOF       ; Clear EOF flag.
+ 141    16762    2333	        ISZ INNEWF
+ 142    16763    5733	        JMP @INNEWF
+ 143             6601	INCTR=IOPEN
+        16767    0017
+        16770    7760
+        16771    7001
+        16772    0232
+        16773    7546
+        16774    0377
+        16775    0201
+        16776    0001
+        16777    7617
+ 144    17000        	        .PAGE
+ 145    17000    0000	OOPEN:  0               ; Open output file
+ 146    17001    7600	OU7600: 7600
+ 147    17002    1347	        TAD OU7601      ; Point to output file name in CD
+ 148    17003    3221	        DCA OUBLK       ; area
+ 149    17004    1377	        TAD [OUDEVH+1]
+ 150    17005    3214	        DCA OUHNDL      ; Initialize output device handler
+ 151    17006    1601	        TAD @OU7600     ; Pick up output device number
+ 152    17007    0376	        AND [17]
+ 153    17010    7450	        SNA             ; Is there one?
+ 154    17011    5244	        JMP ONOFIL      ; No..Inhibit output
+ 155    17012    4775	        JMS @[200]      ; Fetch output handler
+ 156    17013    0001	        1
+ 157    17014    0000	OUHNDL: 0
+ 158    17015    7402	        HLT             ; Bad thing
+ 159    17016    1601	OUENTR: TAD @OU7600
+ 160    17017    4775	        JMS @[200]      ; Enter the output file
+ 161    17020    0003	        3
+ 162    17021    7601	OUBLK:  7601            ; Gets starting block of hole
+ 163    17022    0000	OUELEN: 0               ; Gets size of hole available
+ 164    17023    5232	        JMP OEFAIL      ; Failure.  See what we did.
+ 165    17024    3350	        DCA OUCCNT      ; Clear closing length
+ 166    17025    3774	        DCA @[OUTINH]   ; Clear output inhibit
+ 167    17026    4773	        JMS @[OUSETP]   ; Set up pointers
+ 168    17027    2200	        ISZ OOPEN
+ 169    17030    6213	OORETN: CXF 1 
+ 170    17031    5600	        JMP @OOPEN      ; Return O.K.
+ 171    17032    1601	OEFAIL: TAD @OU7600     ; If length=0, give open error
+ 172    17033    0372	        AND [7760]      ; If not, make it 0 and try again
+ 173    17034    7650	        SNA CLA
+ 174    17035    5242	        JMP ONTERR      ; Was 0, failed
+ 175    17036    1601	        TAD @OU7600
+ 176    17037    0376	        AND [17]        ; Make it 0
+ 177    17040    3601	        DCA @OU7600
+ 178    17041    5216	        JMP OUENTR      ; and try again
+ 179    17042    7330	ONTERR: CLA CLL CML RAR
+ 180    17043    5230	        JMP OORETN
+ 181    17044    2774	ONOFIL: ISZ @[OUTINH]   ; Inhibit output
+ 182    17045    5230	        JMP OORETN
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   4
+                                                                                            ossmb.pa
+
+
+ 183    17046    0000	OUTDMP: 0               ; Dump output buffer
+ 184    17047    3300	        DCA OUCTLW      ; Store control word
+ 185    17050    6211	        CDF 1 
+ 186    17051    1774	        TAD @[OUTINH]   ; Is output inhibited?
+ 187    17052    7640	        SZA CLA
+ 188    17053    5304	        JMP OUNOWR      ; Yep.
+ 189    17054    1350	        TAD OUCCNT      ; If this is first write, start the
+ 190    17055    7450	        SNA             ; search forward on DECtape
+ 191    17056    2300	        ISZ OUCTLW
+ 192    17057    1221	        TAD OUBLK       ; Get starting block of this
+ 193    17060    3302	        DCA OUREC       ; transfer
+ 194    17061    1300	        TAD OUCTLW
+ 195    17062    7106	        CLL RTL
+ 196    17063    7006	        RTL
+ 197    17064    7006	        RTL             ; Compute  of records to output
+ 198    17065    0376	        AND [17]
+ 199    17066    1350	        TAD OUCCNT      ; Update closing length
+ 200    17067    3350	        DCA OUCCNT
+ 201    17070    1350	        TAD OUCCNT      ; See if closing length will be
+ 202    17071    7120	        CLL CML         ; bigger than the output hole
+ 203    17072    1222	        TAD OUELEN
+ 204    17073    7660	        SNL SZA CLA
+ 205    17074    5646	        JMP @OUTDMP     ; Will be too big
+ 206    17075    6203	OUCDIF: CXF 0
+ 207    17076    6211	        CDF 1 
+ 208    17077    4614	        JMS @OUHNDL     ; Do the write
+ 209    17100    0000	OUCTLW: 0
+ 210    17101    5000	        OUBUF
+ 211    17102    0000	OUREC:  0
+ 212    17103    7410	        SKP             ; Error
+ 213    17104    2246	OUNOWR: ISZ OUTDMP      ; Take normal return
+ 214    17105    5646	        JMP @OUTDMP
+ 215             0020	        PTP=0020
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   5
+                                                                                            ossmb.pa
+
+
+ 216                 	
+ 217    17106    0000	OCLOSE: 0               ; Close output file
+ 218    17107    6211	        CDF 1 
+ 219    17110    1774	        TAD @[OUTINH]   ; If output inhibited, close is a NOP.
+ 220    17111    7640	        SZA CLA
+ 221    17112    5352	        JMP OCISZ       ; A NOP
+ 222    17113    4771	        JMS @[OTYPE]    ; Determine if output is to PTP
+ 223    17114    0370	        AND [770]       ; If it is, don't output a ^Z.
+ 224    17115    1372	        TAD [-PTP]
+ 225    17116    7640	        SZA CLA
+ 226    17117    1367	        TAD [232]       ; Not PTP, output ^Z as EOF
+ 227    17120    4766	        JMS @[OCHAR]
+ 228    17121    5353	        JMP OCRET       ; Error return
+ 229    17122    4766	        JMS @[OCHAR]    ; Fill with 0 characters
+ 230    17123    5353	        JMP OCRET
+ 231    17124    4766	FILLIP: JMS @[OCHAR]    ; Fill to boundary with 0
+ 232    17125    5353	        JMP OCRET
+ 233    17126    4771	        JMS @[OTYPE]    ; If output is directory device, fill
+ 234    17127    7710	        SPA CLA         ; whole record, else half record
+ 235    17130    1365	        TAD [100]
+ 236    17131    1364	        TAD [77]
+ 237    17132    0763	        AND @[OUDWCT]   ; Are we up to boundary yet?
+ 238    17133    7640	        SZA CLA
+ 239    17134    5324	        JMP FILLIP      ; No
+ 240    17135    1763	        TAD @[OUDWCT]
+ 241    17136    1375	        TAD [OUCTL&3700]; Is there a full write left?
+ 242    17137    7450	        SNA
+ 243    17140    5344	        JMP NODUMP      ; Yes, but don't do it, as ^Z is out.
+ 244    17141    1362	        TAD [4000+OUFLD]
+ 245    17142    4246	        JMS OUTDMP      ; Dump last buffer
+ 246    17143    5353	        JMP OCRET
+ 247    17144    1601	NODUMP: TAD @OU7600     ; Get device number
+ 248    17145    4775	        JMS @[200]      ; Close the output file
+ 249    17146    0004	        4
+ 250    17147    7601	OU7601: 7601            ; Pointer to file name
+ 251    17150    0000	OUCCNT: 0               ; Closing file length here
+ 252    17151    7410	        SKP             ; Error
+ 253    17152    2306	OCISZ:  ISZ OCLOSE      ; Normal return
+ 254    17153    6213	OCRET:  CXF 1           ; Restore calling fields
+ 255    17154    5706	        JMP @OCLOSE
+        17162    4000
+        17163    7272
+        17164    0077
+        17165    0100
+        17166    7211
+        17167    0232
+        17170    0770
+        17171    7274
+        17172    7760
+        17173    7200
+        17174    7273
+        17175    0200
+        17176    0017
+        17177    6601
+ 256    17200        	        .PAGE
+ 257    17200    0000	OUSETP: 0               ; Initialize output pointers
+ 258    17201    1377	        TAD [OUCTL&3700]
+ 259    17202    7041	        CIA
+ 260    17203    3272	        DCA OUDWCT      ; Double word output count
+ 261    17204    1376	        TAD [OUBUF]     ; Initialize word pointer
+ 262    17205    3270	        DCA OUPTR
+ 263    17206    1271	        TAD OUJMPE
+ 264    17207    3224	        DCA OUJMP       ; 3 way unpack switch
+ 265    17210    5600	        JMP @OUSETP
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   6
+                                                                                            ossmb.pa
+
+
+ 266                 	
+ 267    17211    0000	OCHAR:  0               ; Output character routine
+ 268    17212    0375	        AND [377]       ; Isolate eight bits
+ 269    17213    3266	        DCA OUTEMP
+ 270    17214    6214	        RDF             ; Get field we were called
+ 271    17215    1374	        TAD [CXF 0]     ; from
+ 272    17216    3264	        DCA OUCRET
+ 273    17217    1273	        TAD OUTINH      ; Output inhibited?
+ 274    17220    7640	        SZA CLA
+ 275    17221    5263	        JMP OUCOMN      ; Yes, NOP.
+ 276    17222    6201	OUCHAR: CDF OUFLD       ; Go to data field of buffer
+ 277    17223    2224	        ISZ OUJMP       ; Bump character switch
+ 278    17224    7402	OUJMP:  HLT             ; Get JMP ., JMP .+1, etc.
+ 279    17225    5261	        JMP OCHAR1
+ 280    17226    5256	        JMP OCHAR2
+ 281    17227    1266	OCHAR3: TAD OUTEMP      ; Third char
+ 282    17230    7106	        CLL RTL         ; High order bits go into the
+ 283    17231    7006	        RTL             ; high order 4 bits or the
+ 284    17232    0373	        AND [7400]      ; first of two words
+ 285    17233    1667	        TAD @OUPOLD
+ 286    17234    3667	        DCA @OUPOLD
+ 287    17235    1266	        TAD OUTEMP      ; The second double word gets
+ 288    17236    7112	        CLL RTR         ; the low order bits of
+ 289    17237    7012	        RTR             ; the third char
+ 290    17240    7010	        RAR
+ 291    17241    0373	        AND [7400]
+ 292    17242    1670	        TAD @OUPTR
+ 293    17243    3670	        DCA @OUPTR
+ 294    17244    1271	        TAD OUJMPE      ; Reset character switch
+ 295    17245    3224	        DCA OUJMP
+ 296    17246    2270	        ISZ OUPTR       ; Point to next buffer word
+ 297    17247    2272	        ISZ OUDWCT      ; Bump double count after
+ 298                 	                        ; 2 chars.
+ 299    17250    5263	        JMP OUCOMN      ; Get out
+ 300    17251    1372	        TAD [OUCTL]     ; Ready to output a buffer
+ 301    17252    4771	        JMS @[OUTDMP]   ; Output it
+ 302    17253    5264	        JMP OUCRET      ; An error
+ 303    17254    4200	        JMS OUSETP      ; Reset output pointers
+ 304    17255    5263	        JMP OUCOMN
+ 305    17256    1270	OCHAR2: TAD OUPTR       ; Point to first double word
+ 306    17257    3267	        DCA OUPOLD
+ 307    17260    2270	        ISZ OUPTR       ; Point OUPTR to second
+ 308    17261    1266	OCHAR1: TAD OUTEMP
+ 309    17262    3670	        DCA @OUPTR
+ 310    17263    2211	OUCOMN: ISZ OCHAR       ; Normal exit
+ 311    17264    7402	OUCRET: HLT
+ 312    17265    5611	        JMP @OCHAR
+ 313    17266    0000	OUTEMP: 0
+ 314    17267    0000	OUPOLD: 0
+ 315    17270    0000	OUPTR:  0
+ 316    17271    5224	OUJMPE: JMP OUJMP
+ 317    17272    0000	OUDWCT: 0
+ 318    17273    0000	OUTINH: 0
+ 319    17274    0000	OTYPE:  0               ; Otype looks at the output device ,
+ 320    17275    6214	        RDF
+ 321    17276    1374	        TAD [CXF 0]
+ 322    17277    3306	        DCA OTRTN
+ 323    17300    6211	        CDF 1 
+ 324    17301    1770	        TAD @[7600]     ; and looks up the DCB word for
+ 325    17302    0367	        AND [17]        ; that device
+ 326    17303    1366	        TAD [DCB-1]
+ 327    17304    3266	        DCA OUTEMP
+ 328    17305    1666	        TAD @OUTEMP     ; Get DCB entry
+ 329    17306    7402	OTRTN:  HLT
+ 330    17307    5674	        JMP @OTYPE
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   7
+                                                                                            ossmb.pa
+
+
+ 331                 	
+        17366    7757
+        17367    0017
+        17370    7600
+        17371    7046
+        17372    4200
+        17373    7400
+        17374    6203
+        17375    0377
+        17376    5000
+        17377    0200
+ 332    10200        	        .FIELD 1
+ 333    12000        	        .ORG 2000
+ 334    12000    4777	        JMS @[7700]     ; Lock monitor into core
+ 335    12001    0010	        10
+ 336    12002    4776	CALLCD: JMS @[200]      ; Call the command decoder
+ 337    12003    0005	        5
+ 338    12004    0000	        0
+ 339    12005    4775	        JMS @[IOPEN]    ; Set up input pointers
+ 340    12006    4774	        JMS @[OOPEN]    ; Open output file
+ 341    12007    7700	        SMA CLA         ; Error.  If AC < 0, it was fatal
+ 342    12010    5220	        JMP OK          ; Non file structured output
+ 343    12011    4263	        JMS TERR
+ 344    12012        	        .SIXBIT /OPEN FAILED/
+ 345    12020    4773	OK:     JMS @[ICHAR]    ; Read a character
+ 346    12021    5227	        JMP TSTEOF      ; Error, see if EOF.
+ 347    12022    7450	        SNA             ; Ignore nulls
+ 348    12023    5220	        JMP OK
+ 349    12024    4772	        JMS @[OCHAR]    ; and output the character
+ 350    12025    5243	        JMP OUTERR
+ 351    12026    5220	        JMP OK          ; Continue until EOF.
+ 352    12027    7700	TSTEOF: SMA CLA         ; Was it fatal?
+ 353    12030    5240	        JMP CLOSE       ; No..EOF.  Close output
+ 354    12031    4263	        JMS TERR
+ 355    12032        	        .SIXBIT /READ ERROR/
+ 356    12037    0000	        0
+ 357    12040    4771	CLOSE:  JMS @[OCLOSE]
+ 358    12041    5253	        JMP CLERR       ; File close failed
+ 359    12042    5202	        JMP CALLCD      ; New input.
+ 360                 	
+ 361    12043    4263	OUTERR: JMS TERR
+ 362    12044        	        .SIXBIT /OUTPUT ERROR/
+ 363    12052    0000	        0
+ 364                 	
+ 365    12053    4263	CLERR:  JMS TERR        ; Close failure
+ 366    12054        	        .SIXBIT /CLOSE FAILED/
+ 367    12062    0000	        0
+ 368                 	
+ 369    12063    0000	TERR:   0               ; Routine to print error messages
+ 370    12064    1663	        TAD @TERR
+ 371    12065    7012	        RTR
+ 372    12066    7012	        RTR
+ 373    12067    7012	        RTR
+ 374    12070    4275	        JMS TYPIT       ; Type the character
+ 375    12071    1663	        TAD @TERR
+ 376    12072    4275	        JMS TYPIT
+ 377    12073    2263	        ISZ TERR
+ 378    12074    5264	        JMP TERR+1
+ 379                 	
+ 380    12075    0000	TYPIT:  0
+ 381    12076    0370	        AND [77]        ; Isolate the character
+ 382    12077    7450	        SNA
+ 383    12100    5304	        JMP CRLF        ; 0 terminates it
+ 384    12101    1367	        TAD [300]
+ 385    12102    4311	        JMS TTYOUT
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   8
+                                                                                            ossmb.pa
+
+
+ 386    12103    5675	        JMP @TYPIT
+ 387    12104    1366	CRLF:   TAD [215]
+ 388    12105    4311	        JMS TTYOUT
+ 389    12106    1365	        TAD [212]
+ 390    12107    4311	        JMS TTYOUT
+ 391    12110    5202	        JMP CALLCD
+ 392                 	
+ 393    12111    0000	TTYOUT: 0
+ 394    12112    6046	        TLS
+ 395    12113    6041	        TSF
+ 396    12114    5313	        JMP .-1
+ 397    12115    7200	        CLA
+ 398    12116    5711	        JMP @TTYOUT
+ 399                 	
+        12165    0212
+        12166    0215
+        12167    0300
+        12170    0077
+        12171    7106
+        12172    7211
+        12173    6613
+        12174    7000
+        12175    6601
+        12176    0200
+        12177    7700
+ 400                 	        .END
+ 401                 	;$$$$$$$$$$
+
+
+
+PALX - Program break is 12200
+PALX - No errors detected
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page   9
+Memory Map                                                                                  ossmb.pa
+
+
+10000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+10100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+10200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+10300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+10400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+10500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+10600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+10700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+11000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+11100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+11200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+11300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+11400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+11500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+11600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+11700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+12000/ 11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+12100/ 11111111 11111110 00000000 00000000 00000000 00000000 00000111 11111111
+
+12200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+12300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+12400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+12500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+12600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+12700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+13000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+13100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+13200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+13300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+13400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+13500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+13600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+13700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  10
+Memory Map                                                                                  ossmb.pa
+
+
+14000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+14100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+14200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+14300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+14400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+14500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+14600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+14700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+15000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+15100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+15200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+15300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+15400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+15500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+15600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+15700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+16000/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+16100/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+16200/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+16300/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+16400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+16500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+16600/ 11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+16700/ 11111111 11111111 11111111 11111111 11111111 11111111 11110001 11111111
+
+17000/ 11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+17100/ 11111111 11111111 11111111 11111111 11111111 11111000 00111111 11111111
+
+17200/ 11111111 11111111 11111111 11111111 11111111 11111111 11111111 11111111
+17300/ 11111111 00000000 00000000 00000000 00000000 00000000 00000011 11111111
+
+17400/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+17500/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+17600/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+17700/ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+
+
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  11
+Symbol Table                                                                                ossmb.pa
+
+
+.END       -POP-       400 
+.FIELD     -POP-        16    332 
+.ORG       -POP-        17    333 
+.PAGE      -POP-       144    256 
+.SIXBIT    -POP-       344    355    362    366 
+AND         0000        74     77     96    105    109    130    152 
+                       172    176    198    223    237    268    284    291 
+                       325    381 
+CALLCD     12002       336*   359    391 
+CDF         6201        38     64    119    185    207    218    276 
+                       323 
+CIA         7041       259 
+CLA         7200        23     43     86     88    173    179    187 
+                       204    220    225    234    238    274    341    352 
+                       397 
+CLERR      12053       358    365*
+CLL         7100        51     57     75     88     97    133    179 
+                       195    202    282    288 
+CLOSE      12040       353    357*
+CMA         7040        23     57     78 
+CML         7020        57     88    133    179    202 
+CRLF       12104       383    387*
+CXF         6203        63    169    206    254    271    321 
+DCA         3000        24     27     37     54     61     72     79 
+                        81     83     94    106    121    135    138    140 
+                       148    150    165    166    177    184    193    200 
+                       260    262    264    269    272    286    293    295 
+                       306    309    322    327 
+DCB         7760        14*   326 
+EOFERR     16677        46     89*
+FILLIP     17124       231*   239 
+GETNEW     16627        45*   112 
+HLT         7402        90    128    158    278    311    329 
+ICHAR      16613        33*   114    116    345 
+ICHAR1     16722        91    108*
+ICHAR2     16716        92    104*
+ICHAR3     16703        93*
+IN200      16706        96*   125 
+IN7400     16600        21*    96    105 
+IN7600     16614        34*    74     77 
+INBREC     16654        70*    87 
+INBUF       5400         9*    67 
+INBUFP     16651        67*    82 
+INCDIF     16645        36     63*
+INCHAR     16620        38*    84 
+INCHCT      6733        24     40     79    118*
+INCOMN     16723       103    109*
+INCTL       0200        10*    18     60 
+INCTLW     16650        61     66*    73     76     99    106 
+INCTR       6601        47     54    135    143*
+INDEVH      7000        12*   120 
+INEOF      16610        25     29*    42     56     85    140 
+INERR      16676        88*
+INERRX     16673        69     85*
+INFLD       0000        18*    38 
+INFPTR     16611        27     30*   122    129    136    137    139 
+INGBUF     16631        44     47*
+INHNDL     16744        65    121    127*
+INJMP      16700        39     41     81     90*    94 
+INJMPP     16623        41*    80     93 
+INNEWF     16733        45    117*   118    124    141    142 
+INPTR      16612        31*    83     95    102    104    107    108 
+INREC      16652        68*    70     72    138 
+INRECS      0001        11*    52     71 
+INRTRN     16731        37     89    115*
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  12
+Symbol Table                                                                                ossmb.pa
+
+
+IOPEN      16601        22*    28    143    339 
+ISZ         2000        25     39     40     56     85    102    107 
+                       114    136    139    141    168    181    191    213 
+                       253    277    296    297    307    310    377 
+JMP         5000        28     41     44     46     69     84     87 
+                        89     91     92    103    112    116    124    142 
+                       154    164    170    174    178    180    182    188 
+                       205    214    221    228    230    232    239    243 
+                       246    255    265    275    279    280    299    302 
+                       304    312    316    330    342    346    348    350 
+                       351    353    358    359    378    383    386    391 
+                       396    398 
+JMS         4000        45     65    125    155    160    167    208 
+                       222    227    229    231    233    245    248    301 
+                       303    334    336    339    340    343    345    349 
+                       354    357    361    365    374    376    385    388 
+                       390 
+NODUMP     17144       243    247*
+OCHAR      17211       227    229    231    267*   310    312    349 
+OCHAR1     17261       279    308*
+OCHAR2     17256       280    305*
+OCHAR3     17227       281*
+OCISZ      17152       221    253*
+OCLOSE     17106       217*   253    255    357 
+OCRET      17153       228    230    232    246    254*
+OEFAIL     17032       164    171*
+OK         12020       342    345*   348    351 
+ONOFIL     17044       154    181*
+ONTERR     17042       174    179*
+OOPEN      17000       145*   168    170    340 
+OORETN     17030       169*   180    182 
+ORIGIN      6600        13*    17 
+OTRTN      17306       322    329*
+OTYPE      17274       222    233    319*   330 
+OU7600     17001       146*   151    159    171    175    177    247 
+OU7601     17147       147    250*
+OUBLK      17021       148    162*   192 
+OUBUF       5000         5*   210    261 
+OUCCNT     17150       165    189    199    200    201    251*
+OUCDIF     17075       206*
+OUCHAR     17222       276*
+OUCOMN     17263       275    299    304    310*
+OUCRET     17264       272    302    311*
+OUCTL       4200         6*    19    241    258    300 
+OUCTLW     17100       184    191    194    209*
+OUDEVH      6600         7*   149 
+OUDWCT     17272       237    240    260    297    317*
+OUELEN     17022       163*   203 
+OUENTR     17016       159*   178 
+OUFLD       0000        19*   244    276 
+OUHNDL     17014       150    157*   208 
+OUJMP      17224       264    277    278*   295    316 
+OUJMPE     17271       263    294    316*
+OUNOWR     17104       188    213*
+OUPOLD     17267       285    286    306    314*
+OUPTR      17270       262    292    293    296    305    307    309 
+                       315*
+OUREC      17102       193    211*
+OUSETP     17200       167    257*   265    303 
+OUTDMP     17046       183*   205    213    214    245    301 
+OUTEMP     17266       269    281    287    308    313*   327    328 
+OUTERR     12043       350    361*
+OUTINH     17273       166    181    186    219    273    318*
+PTP         0020       215*   224 
+RAL         7004        75 
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  13
+Symbol Table                                                                                ossmb.pa
+
+
+RAR         7010        88    179    290 
+RDF         6214        35    270    320 
+RTL         7006       195    196    197    282    283 
+RTR         7012        57     58     59     97     98    100    101 
+                       133    134    288    289    371    372    373 
+SKP         7410       212    252 
+SMA         7500        86    341    352 
+SNA         7450        43    111    123    153    173    190    242 
+                       347    382 
+SNL         7420        53    204 
+SPA         7510       234 
+SZA         7440       131    187    204    220    225    238    274 
+SZL         7430        55 
+TAD         1000        26     36     42     47     52     60     70 
+                        71     73     76     80     82     93     95     99 
+                       104    108    110    113    120    122    129    132 
+                       137    147    149    151    159    171    175    186 
+                       189    192    194    199    201    203    219    224 
+                       226    235    236    240    241    244    247    258 
+                       261    263    271    273    281    285    287    292 
+                       294    300    305    308    321    324    326    328 
+                       370    375    384    387    389 
+TERR       12063       343    354    361    365    369*   370    375 
+                       377    378 
+TLS         6046         1*   394 
+TSF         6041         2*   395 
+TSTEOF     12027       346    352*
+TTYOUT     12111       385    388    390    393*   398 
+TYPIT      12075       374    376    380*   386 
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  14
+                                                                                            ossmb.pa
+
+
+
+PALX - IM6100/HM6120 Assembly Language V3.32 RLA                      08-MAR-12  17:01:58   Page  15
+Table of Contents                                                                           ossmb.pa
+
+
+	Memory Map . . . . . . . . . . . . . . . . . . . . . . . . . . .   9
+	Symbol Table . . . . . . . . . . . . . . . . . . . . . . . . . .  11
