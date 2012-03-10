@@ -230,6 +230,8 @@ typedef enum {
 	/* add machine instruction types here */
         ,opmri    /* memory reference instruction */
         ,opopr    /* non-mri instruction */
+        ,opcxf    /* CDF/CIF style instruction */
+        ,opsixbit /* CDF/CIF style instruction */
 } optypes;
 
 /* all textual information stored by the assembler is in the string pool */
@@ -602,13 +604,15 @@ static void opinit()
 	op("TLS     ", opopr, 06046L, &i);
 
         /* These define the PDP-8 MMU instructions */
-	op("CDF     ", opopr, 06201L, &i);
-	op("CIF     ", opopr, 06202L, &i);
-	op("CXF     ", opopr, 06203L, &i);
+	op("CDF     ", opcxf, 06201L, &i);
+	op("CIF     ", opcxf, 06202L, &i);
+	op("CXF     ", opcxf, 06203L, &i);
 	op("RDF     ", opopr, 06214L, &i);
 	op("RIF     ", opopr, 06224L, &i);
 	op("RIB     ", opopr, 06234L, &i);
 	op("RMF     ", opopr, 06244L, &i);
+
+	op("SIXBIT  ", opsixbit, 0L, &i);
 }
 
 
@@ -3144,6 +3148,43 @@ static void onepass()
                 /* Calculate and emit value */
                 putobj(1L, expr.offset, abssym);
 		break;
+	case opcxf:
+                /* Get the referenced address */
+                expresbal();
+                if ((expr.base != abssym) || (expr.offset > 077)) {
+                    errmsg(bounds, exprpos, exprlim);
+                    break;
+                }
+                if (expr.offset > 07) {
+                    if (expr.offset & 07) {
+                        errmsg(bounds, exprpos, exprlim);
+                    }
+                } else {
+                    expr.offset <<= 3;
+                }
+                putobj(1L, opval + expr.offset, abssym);
+		break;
+	case opsixbit: /* packed ascii string */
+		while (lex.typ != eol) {
+                    if (lex.typ == quote) {
+                            int i, w;
+                            for (i = lex.pos+1; i < lex.lim-1; i+=2) {
+                                w  = 07700 & (line[i-1] << 6);
+                                if (i+2 < lex.lim)
+                                    w |= 077 & line[i];
+                                putobj(1L, w, abssym);
+                            }
+                            nextlex();
+                    } else {
+                            expresbal();
+                            boundval(&expr.offset, 0L, 4095L);
+                            putobj(1L, expr.offset, expr.base);
+                    }
+                    if (lex.typ != eol)
+			getcomma();
+		}
+		break;
+        
 	}
 /* ---------------------------- */
 			}
