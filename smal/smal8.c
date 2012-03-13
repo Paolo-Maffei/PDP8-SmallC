@@ -231,7 +231,7 @@ typedef enum {
         ,opmri    /* memory reference instruction */
         ,opopr    /* non-mri instruction */
         ,opcxf    /* CDF/CIF style instruction */
-        ,opsixbit /* CDF/CIF style instruction */
+        ,optext   /* CDF/CIF style instruction */
 } optypes;
 
 /* all textual information stored by the assembler is in the string pool */
@@ -612,7 +612,7 @@ static void opinit()
 	op("RIB     ", opopr, 06234L, &i);
 	op("RMF     ", opopr, 06244L, &i);
 
-	op("SIXBIT  ", opsixbit, 0L, &i);
+	op("TEXT    ", optext, 0L, &i);
 }
 
 
@@ -3164,7 +3164,7 @@ static void onepass()
                 }
                 putobj(1L, opval + expr.offset, abssym);
 		break;
-	case opsixbit: /* packed ascii string */
+	case optext: /* packed ascii string */
 		while (lex.typ != eol) {
                     if (lex.typ == quote) {
                             int i, w;

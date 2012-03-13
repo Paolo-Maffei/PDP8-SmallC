@@ -1,3 +1,182 @@
+The profusion of PDP-8 assemblers is pretty bad, as each has 
+a different set of features and syntax, even for common operations.
+Here's a list of some of the differences:
+
+SMAL8 pseudo-ops:
+W defines word values, similar to PALX DATA.
+ASCII does 1 character per word
+IF
+ELSEIF
+ENDIF
+INT defines an external symbol
+EXT references an external symbol
+COMMON
+MACRO declares a macro
+ENDMAC ends a macro
+USE does a file include
+LIST
+ERROR
+TITLE
+SUBTITLE
+EJECT
+S
+END
+PAGE
+SIXBIT implemented like PAL-D TEXT, but requires "".
+All MRI and OPR instructions, and base IOTs are implemented as pseudo-ops.
+Uses ":" to define labels, ";" for comments, "@" for indirect.
+"=", "<", ">", "<=", ">=" for comparison
+">>", ">>>", "<<" for shifts
+"\\", "&", "!" for not, and, or
+"(" and ")" are parenthesis, overrides precedence free left-to-right evaluation.
+Doubleqote starts and ends a string.
+Functions to detect forward references, etc.
+
+PALX pseudo-ops:
+END
+ORG
+DATA
+TITLE
+ASCIZ does 1 character per word
+TEXT does 3 character every 2 words
+BLOCK doesn't zero the space reserved
+SIXBIT packs 2 characters per word, offset by 040
+OPDEF similar to FIXMRI
+PAGE
+FIELD
+IM6100
+HM6120
+VECTOR
+STACK
+PUSH
+POP
+PUSHJ
+POPJ
+NOWARN
+Uses [] syntax for current page literals.  Closing bracket required.
+No page zero literals.
+No dot arithmetic.
+Pseudo-op names all start with ".".
+Uses ":" to define labels, ";" for comments, "@" for indirect.
+
+PAL (Doug Jones) pseudo-ops:
+DECIMA
+OCTAL
+ZBLOCK
+PAGE
+TEXT
+EJECT
+FIELD
+NOPUNC
+ENPUNC
+XLIST
+IFZERO
+IFNZRO
+IFDEF
+IFNDEF
+RELOC
+SEGMNT
+BANK
+FIXMRI
+FIXTAB
+DEVICE
+FILENA
+I
+Z
+
+
+PAL-III pseudo-ops:
+I
+Z
+DECIMAL
+OCTAL
+FIELD
+PAUSE
+$
+EXPUNGE
+FIXTAB
+*
+Uses "," to define labels, "/" for comments, ";" for multiple statements/line
+Has FADD/FSUB/FMPY/FDIV/FGET/FPUT predefined.
+No literals.
+
+MACRO pseudo-ops:
+DECIMAL
+OCTAL
+PAUSE
+FIELD
+Z
+I
+EXPUNGE
+FIXTAB
+DEFINE
+TEXT stores 2 characters per word, by truncation
+FLTG
+DUBL
+PAGE
+*
+$
+Uses "," to define labels, "/" for comments, ";" for multiple statements/line
+&, !, operators
+" to quote a single character
+() for current page literals
+[] for page zero literals
+<> encloses macros
+Will generate links for off-page direct accesses.
+
+4K PAL-D pseudo-ops:
+FIELD
+PAUSE
+DECIMAL
+OCTAL
+Z
+I
+FIXTAB
+EXPUNGE
+TEXT
+PAGE
+XLIST
+$
+Compatible with both PAL-III and MACRO, but without macros, DUBL, or FLTG.
+
+8K PAL-D pseudo-ops:
+ZBLOCK
+IFDEF symbol <statements>
+IFZERO expression <statements>
+NOPUNCH
+ENPUNCH
+EJECT
+Compatible with 4K PAL-D.
+
+SABR pseudo-ops:
+ABSYM
+ARG
+BLOCK does zero the space reserved
+CALL
+COMMN
+CPAGE
+DECIM
+DUMMY
+EAP
+END
+ENTRY
+FORTR
+IF name, skipcount
+LAP
+OCTAL
+OPDEF
+PAGE
+PAUSE
+REORG
+RETRN
+SKPDF
+TEXT
+Current page literals only.
+Address arithmetic generally disallowed.
+Postfix # to increment an address.
+
+
+Here's a partial list of pseudo-ops we still probably need:
 FIELD
 OPDEF
 DEVICE
@@ -6,19 +185,3 @@ ASCIZ
 TEXT
 BLOCK
 LIST/XLIST
-
-
-CPAGE
-ORG
-DATA
-BLOCK
-IM6100
-HM6120
-VECTOR
-STACK
-PUSH
-PUSHJ
-POP
-POPJ
-
-SABR stuff?
