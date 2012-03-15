@@ -37,7 +37,7 @@
    rev 6/7/11 switch to C-99 stdint.h types, add java style >> vs >>> shifts
    rev 8/14/11 fix macro expansion listing so object code listed with call
    rev 9/9/11 upgrade symbol-table dump format
-   rev 3/1/12 modufy for PDP-8
+   rev 3/1/12 modify for PDP-8, using PAL-III conventions.
 
   When you add to the above list, change the define for SMALversion to match
 
@@ -71,10 +71,10 @@
    files will typically be object files.
 
    COMMAND LINE OPTIONS:
+     -I -- specifies an alternate directory to search for INCLUDE file inclusion
      -L -- suppresses generation of listing file
      -D -- enable symbol table dump
      -P -- specify the number of lines to list, per page in the listing file
-     -U -- specifies an alternate directory to search for USE file inclusion
 */
 
 /* This assembler is written assuming that it will run on a
@@ -157,7 +157,7 @@
 /* characters per textual file name */
 #define filelen         40
 
-/* break character in file system path names.  used for implementation of USE
+/* break character in file system path names.  used for implementation of INCLUDE
    in hierarchic file systems.  it is assumed in procedure insert that path
    names starting with pathbrk are absolute, while those starting with other
    characters are relative */
@@ -222,17 +222,25 @@ typedef enum {
 	opeject, /* page eject directive */
 	opstart, /* starting address specification */
 	opend,   /* end of file */
-        oppage,  /* force page alignment */
 
 	/* macro call type */
 	opmcall  /* macro call */
 
 	/* add machine instruction types here */
-        ,opmri    /* memory reference instruction */
-        ,opopr    /* non-mri instruction */
-        ,opcxf    /* CDF/CIF style instruction */
-        ,optext   /* CDF/CIF style instruction */
+        ,oppage  /* force page alignment */
+        ,opmri   /* memory reference instruction */
+        ,opopr   /* non-mri instruction */
+        ,opcxf   /* CDF/CIF style instruction */
+// TODO: PAL-III compatibility issues:
+// EXPUNGE, FIXMRI, FIXTAB
+        ,opdecim /* DECIMAL pseudo-op */
+        ,opoctal /* OCTAL pseudo-op */
+        ,opfield /* FIELD pseudo-op */
+        ,oppause /* PAUSE pseudo-op */
+        ,optext  /* TEXT pseudo-op */
 } optypes;
+
+static int radix = 8;
 
 /* all textual information stored by the assembler is in the string pool */
 static char strpool[poolsize - relsym + 1];
@@ -526,18 +534,18 @@ static void opinit()
 	poolpos = relsym;
 	strpool[poolpos - relsym] = pooldel;
 	/* null symbol at start of pool is default relocation base */
-	op("DW      ", opw, 0L, &i);
+	op("DATA    ", opw, 0L, &i);
 	op("ASCII   ", opascii, 0L, &i);
 	op("IF      ", opif, 0L, &i);
 	op("ELSEIF  ", opelseif, 0L, &i);
 	op("ELSE    ", opelse, 0L, &i);
 	op("ENDIF   ", opendif, 0L, &i);
-	op("INT     ", opint, 0L, &i);
-	op("EXT     ", opext, 0L, &i);
+	op("GLOBAL  ", opint, 0L, &i);
+	op("EXTERNAL", opext, 0L, &i);
 	op("COMMON  ", opcomon, 0L, &i);
 	op("MACRO   ", opmac, 0L, &i);
-	op("ENDMAC  ", opendm, 0L, &i);
-	op("USE     ", opuse, 0L, &i);
+	op("ENDM    ", opendm, 0L, &i);
+	op("INCLUDE ", opuse, 0L, &i);
 	op("LIST    ", oplist, 0L, &i);
 	op("ERROR   ", operror, 0L, &i);
 	op("TITLE   ", opttl, 0L, &i);
@@ -545,7 +553,11 @@ static void opinit()
 	op("EJECT   ", opeject, 0L, &i);
 	op("S       ", opstart, 0L, &i);
 	op("END     ", opend, 0L, &i);
+	op("DECIMAL ", opdecim, 0L, &i);
+	op("OCTAL   ", opoctal, 0L, &i);
+	op("FIELD   ", opfield, 0L, &i);
 	op("PAGE    ", oppage, 0L, &i);
+	op("$       ", opend, 0L, &i);
 	/* note: when adding to this list, be sure to adjust the constant
 	'opcodes' to reflect the additions; the local procedure
 	'op' used above assumes that the opcode table will always
@@ -559,6 +571,7 @@ static void opinit()
 	funcrl = putpool("REL     ");
 	funcle = putpool("LEN     ");
 
+        /* From PAL-III */
         /* These define the PDP-8 base instruction set */
 	op("AND     ", opmri, 00000L, &i);
 	op("TAD     ", opmri, 01000L, &i);
@@ -566,6 +579,15 @@ static void opinit()
 	op("DCA     ", opmri, 03000L, &i);
 	op("JMS     ", opmri, 04000L, &i);
 	op("JMP     ", opmri, 05000L, &i);
+	op("AND     ", opmri, 00000L, &i);
+	op("FEXT    ", opmri, 00000L, &i);
+	op("FADD    ", opmri, 01000L, &i);
+	op("FSUB    ", opmri, 02000L, &i);
+	op("FMPY    ", opmri, 03000L, &i);
+	op("FDIV    ", opmri, 04000L, &i);
+	op("FGET    ", opmri, 05000L, &i);
+	op("FPUT    ", opmri, 06000L, &i);
+	op("FNOR    ", opmri, 06000L, &i);
 	op("NOP     ", opopr, 07000L, &i);
 	op("IAC     ", opopr, 07001L, &i);
 	op("BSW     ", opopr, 07002L, &i);
@@ -575,7 +597,6 @@ static void opinit()
 	op("RTR     ", opopr, 07012L, &i);
 	op("CML     ", opopr, 07020L, &i);
 	op("CMA     ", opopr, 07040L, &i);
-	op("CIA     ", opopr, 07041L, &i);
 	op("CLL     ", opopr, 07100L, &i);
 	op("STL     ", opopr, 07120L, &i);
 	op("CLA     ", opopr, 07200L, &i);
@@ -589,19 +610,37 @@ static void opinit()
 	op("SMA     ", opopr, 07500L, &i);
 	op("SPA     ", opopr, 07510L, &i);
 
+        /* These define the combined operate instructions */
+	op("CIA     ", opopr, 07041L, &i);
+	op("STL     ", opopr, 07120L, &i);
+	op("GLK     ", opopr, 07204L, &i);
+	op("STA     ", opopr, 07240L, &i);
+	op("LAS     ", opopr, 07604L, &i);
+
         /* These define the PDP-8 base IOT instructions */
 	op("ION     ", opopr, 06001L, &i);
 	op("IOF     ", opopr, 06002L, &i);
 
         /* These define the PDP-8 TTY IOT instructions */
 	op("KSF     ", opopr, 06031L, &i);
-	op("KCF     ", opopr, 06032L, &i);
+	op("KCC     ", opopr, 06032L, &i);
 	op("KRS     ", opopr, 06034L, &i);
 	op("KRB     ", opopr, 06036L, &i);
 	op("TSF     ", opopr, 06041L, &i);
 	op("TCF     ", opopr, 06042L, &i);
 	op("TPC     ", opopr, 06044L, &i);
 	op("TLS     ", opopr, 06046L, &i);
+
+        /* These define the High-speed Reader IOT instructions */
+	op("RSF     ", opopr, 06011L, &i);
+	op("RRB     ", opopr, 06012L, &i);
+	op("RFC     ", opopr, 06014L, &i);
+
+        /* These define the High-speed Punch IOT instructions */
+	op("PSF     ", opopr, 06021L, &i);
+	op("PCF     ", opopr, 06022L, &i);
+	op("PPC     ", opopr, 06024L, &i);
+	op("PLS     ", opopr, 06026L, &i);
 
         /* These define the PDP-8 MMU instructions */
 	op("CDF     ", opcxf, 06201L, &i);
@@ -612,7 +651,33 @@ static void opinit()
 	op("RIB     ", opopr, 06234L, &i);
 	op("RMF     ", opopr, 06244L, &i);
 
+        /* These define DECtape IOT instructions */
+	op("DTRA    ", opopr, 06761L, &i);
+	op("DTCA    ", opopr, 06762L, &i);
+	op("DTXA    ", opopr, 06764L, &i);
+	op("DTLA    ", opopr, 06766L, &i);
+	op("DTSF    ", opopr, 06771L, &i);
+	op("DTRB    ", opopr, 06772L, &i);
+	op("DTLB    ", opopr, 06774L, &i);
+
+        /* These define DF32 IOT instructions */
+	op("DCMA    ", opopr, 06601L, &i);
+	op("DMAR    ", opopr, 06603L, &i);
+	op("DMAW    ", opopr, 06605L, &i);
+	op("DCEA    ", opopr, 06611L, &i);
+	op("DSAC    ", opopr, 06612L, &i);
+	op("DEAL    ", opopr, 06615L, &i);
+	op("DEAC    ", opopr, 06616L, &i);
+	op("DFSE    ", opopr, 06621L, &i);
+	op("DFSC    ", opopr, 06622L, &i);
+	op("DMAC    ", opopr, 06626L, &i);
+
+        /* These define PDP-8/L memory parity IOT instructions */
+	op("SMP     ", opopr, 06101L, &i);
+	op("CMP     ", opopr, 06104L, &i);
+
 	op("TEXT    ", optext, 0L, &i);
+	op("PAUSE   ", oppause, 0L, &i);
 }
 
 
@@ -705,6 +770,7 @@ typedef enum {
 	bpar,  /* ( */
 	epar,  /* ) */
         atsign,/* @ */
+        star,  /* * */
 	eol,   /* end of line and start of comment */
 	junk   /* string of unclassified characters */
 } lextypes;
@@ -959,7 +1025,7 @@ static void makeend()
 	line[1] = 'N';
 	line[2] = 'D';
 	length = 3;
-	line[3] = ';';   /* char beyond end must be initialized */
+	line[3] = '/';   /* char beyond end must be initialized */
 }
 
 static void getmac()
@@ -1015,7 +1081,7 @@ static void getmac()
 		makeend();
 	} else {
 		length = i;
-		line[i] = ';';   /* this char must be initialized */
+		line[i] = '/';   /* this char must be initialized */
 	}
 }
 
@@ -1024,11 +1090,13 @@ static void get(FILE *f)
 	/* read one line from appropriate input file */
 	int i;
 	int ch;
+        static int increment = 1;
 
 	i = 0;
 	for (;;) {
 		ch = getc(f);
 		if ((ch == EOF) || (ch == '\n')) break;
+                if (ch == ';') break;
 		if (i >= (linelen - 1)) break;
 		if (ch == pooldel)
 			ch = pdelrep;
@@ -1042,13 +1110,16 @@ static void get(FILE *f)
 			i++;
 		}
 	}
+        /* lines are only counted at the bottom level! */
+        if (getlevel == 1) lineno += increment;
+        increment = (ch != ';');
 	if (i >= (linelen - 1))
 		errmsg(notfit, 0, 0);
 	if ((ch == EOF) & (i == 0)) {
 		makeend();
 	} else {
 		length = i;
-		line[i] = ';';   /* this char must be initialized */
+		line[i] = '/';   /* this char must be initialized */
 	}
 }
 
@@ -1063,7 +1134,6 @@ static void getlin()
 		getmac();
 	} else {
 		/* lines are only counted at the bottom level! */
-		if (getlevel == 1) lineno++;
 		get(inp[getlevel - 1]);
 	}
 	pos = 1;
@@ -1370,10 +1440,10 @@ inbufptr pos, lim;
 
 /* procedures used only by nextlex */
 
-static uint32_t number10()
+static uint32_t number10() /* Read a number in the default radix */
 {
 	uint32_t acc; /* accumulates the value */
-	uint32_t maxdiv10 = UINT32_MAX / 10;
+	uint32_t maxdiv10 = UINT32_MAX / radix;
 	unsigned int digit; /* the value of one digit */
 	boolean ok; /* is it OK so far? */
 
@@ -1386,9 +1456,9 @@ static uint32_t number10()
 		pos++;
 		ch = line[pos - 1];
 			
-		/* acc = (acc * 10) + digit; but detect overflows */
+		/* acc = (acc * radix) + digit; but detect overflows */
 		if (acc <= maxdiv10) {
-			acc = acc * 10;
+			acc = acc * radix;
 			if (acc <= (UINT32_MAX - digit)) {
 				acc = acc + digit;
 			} else {
@@ -1474,7 +1544,7 @@ static void nextlex()
 	while (line[pos - 1] == ' ') pos++;
 	ch = line[pos - 1];
 	next.pos = pos;
-	if (ch == ';')
+	if (ch == '/')
 		next.typ = eol;
 	else if (charclass[ch] & ispunc) {
 		switch (ch) {   /* case */
@@ -1495,6 +1565,7 @@ static void nextlex()
 		case '(': next.typ = bpar; break;
 		case ')': next.typ = epar; break;
 		case '@': next.typ = atsign; break;
+		case '*': next.typ = star; break;
 
 		}
 		pos++;
@@ -2201,6 +2272,7 @@ static void labeldef()
 
 	/* labeldef */
 	/* assume that (lex.typ = id) and (next.typ = colon) */
+	/* or     that (lex.typ = id) and (next.typ = comma) */
 	symbol = lookup(lex.pos, lex.lim);
 	if (symbol > 0) {  /* the symbol is in the table */
 		association *WITH = &symtab[symbol - 1];
@@ -2217,7 +2289,7 @@ static void labeldef()
 		WITH->use |= (1L << lab) | (1L << setyet);
 	}
 	nextlex();   /* read over id */
-	nextlex();   /* read over colon */
+	nextlex();   /* read over colon or comma */
 }
 
 static void definition()
@@ -2286,8 +2358,9 @@ static void getop()
 	   used in scanning macro bodies and conditional assembly */
 	startup();
 
-	while (lex.typ == id && next.typ == colon) {   /* skip id */
-		nextlex();   /* skip colon */
+	while ((lex.typ == id && next.typ == colon)
+	||     (lex.typ == id && next.typ == comma)) {   /* skip id */
+		nextlex();   /* skip colon or comma */
 		nextlex();
 	}
 	if (lex.typ == id) {
@@ -2598,7 +2671,7 @@ static void getbody()
 					if (line[pos - 1] == '\'') {
 						/* squeeze out quote marks */
 						pos++;
-						/* assert line[length+1]=';' */
+						/* assert line[length+1]='/' */
 						while (line[pos - 1] == '\'') {
 						    putch('\'');
 						    pos++;
@@ -2931,11 +3004,13 @@ static void onepass()
 		listing = (listlevel > 0 && allowlist);
 		startup(); /* setup for processing a line */
 
-		while (lex.typ == id && next.typ == colon) {
+		while ((lex.typ == id && next.typ == colon)
+		||     (lex.typ == id && next.typ == comma)) {
 			labeldef();
 		}
 
 		/* now know that if lex.typ = id, then next.typ <> colon */
+		/*                                and  next.typ <> comma */
 		if (lex.typ == id) {
 			if (next.typ == eq)  /* process definitions */
 				definition();
@@ -3079,6 +3154,26 @@ static void onepass()
 		maccall((int)opval);
 		break;
 
+	case opdecim:    /* default numbers to decimal */
+		radix = 10;
+		break;
+
+	case opoctal:    /* default numbers to octal */
+		radix = 8;
+		break;
+
+	case opfield:    /* force a particular field */
+                /* Get the referenced field */
+                expresbal();
+                if ((expr.base != abssym) || (expr.offset > 07)) {
+                    errmsg(bounds, exprpos, exprlim);
+                    break;
+                }
+                loc.base = abssym;
+                /* Also forces offset 0200 in that field */
+                loc.offset = (expr.offset<<12) + 0200;
+		break;
+
 	case oppage:    /* force page alignment */
                 /*
                  * NB: This is a NOP if you are already at the top
@@ -3095,6 +3190,18 @@ static void onepass()
                     if (lex.typ == atsign) {
                         indir = 0400;
                         nextlex();
+                    } else if (lex.typ == id) {
+                        /* Check for I or Z, handle specially */
+                        if (lex.pos+1 == lex.lim) { /* single character */
+                            if (line[lex.pos-1] == 'I') {
+                                indir = 0400;
+                                nextlex();
+                            } else if (line[lex.pos-1] == 'Z') {
+                                /* Don't bother to check Z reference */
+                                /* for page zero */
+                                nextlex();
+                            }
+                        }
                     }
 
                     /* Get the referenced address */
@@ -3133,6 +3240,7 @@ static void onepass()
                     putobj(1L, expr.offset, expr.base);
                 }
 		break;
+
 	case opopr:
                 /* Start with the value or the current OPR */
                 expr.offset = opval;
@@ -3148,6 +3256,10 @@ static void onepass()
                 /* Calculate and emit value */
                 putobj(1L, expr.offset, abssym);
 		break;
+                
+        case oppause:
+		break;
+
 	case opcxf:
                 /* Get the referenced address */
                 expresbal();
@@ -3190,7 +3302,15 @@ static void onepass()
 			}
 		} else if (lex.typ == dot && next.typ == eq)
 			origin();
-		else if (lex.typ != eol) {
+		else if (lex.typ == star) {
+                        nextlex(); /* Skip the star */
+                        /* Get the address */
+                        expresbal();
+                        /* Preserve field info, if it still makes sense. */
+                        if ((loc.base ==  expr.base) && (expr.offset < 010000))
+                            expr.offset += loc.offset & 070000;
+                        loc = expr;
+		} else if (lex.typ != eol) {
                         /* Random junk, treat as if "DW" */
                         expresbal();
                         putobj(1L, expr.offset, expr.base);
@@ -3280,12 +3400,12 @@ static void getfiles(int argc, char *argv[])
 						stderr);
 					exit(-1); /* error */
 				}
-			} else if ((argv[i][1] == 'U')&&(argv[i][2] == '\0')) {
+			} else if ((argv[i][1] == 'I')&&(argv[i][2] == '\0')) {
 				i++;
 				if (i < argc) {
 					usedirectory = argv[i];
 				} else {
-					fputs( "** missing -U argument **\n",
+					fputs( "** missing -I argument **\n",
 						stderr);
 					exit(-1); /* error */
 				}
@@ -3296,10 +3416,10 @@ static void getfiles(int argc, char *argv[])
 				fputs( " ** \n"
 					"   for " SMALversion "\n"
 					"   valid options are\n"
+					"   -I nnn  set default include directory\n"
 					"   -L      turns off listing\n"
 					"   -D      ask for symbol table dump\n"
 					"   -P nnn  set listing page size\n"
-					"   -U nnn  set default use directory\n"
 					, stderr );
 				exit(-1); /* error */
 			}
@@ -3371,10 +3491,10 @@ main(int argc, char *argv[])
 		int i;
 		for (i = 0; i < 256; i++) charclass[i] = 0;
 	}
-	classchar( "abcdefghijklmnopqrstuvwxyz", islower | isvalid );
+	classchar( "abcdefghijklmnopqrstuvwxyz$", islower | isvalid );
 	classchar( "ABCDEFGHIJKLMNOPQRSTUVWXYZ_", isupper | isvalid );
 	classchar( "0123456789", isdigit | isvalid );
-	classchar( ":.,=><+-\\@&!()[]|~", ispunc | isvalid );
+	classchar( ":.,=><+-\\@&!()[]|~*", ispunc | isvalid );
 	classchar( "'\"", isquote | isvalid );
 	classchar( " ;#", isvalid );
 

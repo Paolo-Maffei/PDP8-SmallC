@@ -160,7 +160,7 @@ in_line() {           /* numerous revisions */
     *line = NULL;
     }
   else if(listfp) {
-    if(listfp == output) fputc(';', output);
+    if(listfp == output) fputc('/', output);
     fputs(line, listfp);
     }
   bump(0);

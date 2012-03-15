@@ -1,422 +1,421 @@
-; Parameter Definition:
+/ Parameter Definition:
 
-        OUBUF=#5000     ; Output buffer starts at 05000.
-        OUCTL=#4200     ; and is 2 pages long.
-        OUDEVH=#6600    ; Output handler gets loaded at 06600.  We
-                        ; allow 2 page handlers.
-        INBUF=#5400     ; Input buffer starts at 05400
-        INCTL=#0200     ; also 2 pages long.
-        INRECS=1        ; 2 pages = 1 record
-        INDEVH=#7000    ; Allow 2 page intput handler at 07000.
-        ORIGIN=#16600   ; The subroutines reside at 16600.
-        DCB=#7760       ; Device Control Table
+        OUBUF=5000      / Output buffer starts at 05000.
+        OUCTL=4200      / and is 2 pages long.
+        OUDEVH=6600     / Output handler gets loaded at 06600.  We
+                        / allow 2 page handlers.
+        INBUF=5400      / Input buffer starts at 05400
+        INCTL=0200      / also 2 pages long.
+        INRECS=1        / 2 pages = 1 record
+        INDEVH=7000     / Allow 2 page intput handler at 07000.
+        ORIGIN=6600     / The subroutines reside at 16600.
+        DCB=#7760       / Device Control Table
 
-        .=ORIGIN;FIELD 1
-                ;*ORIGIN
-        INFLD=INCTL&#70 ; Input Buffer Field
-        OUFLD=OUCTL&#70 ; Output Buffer Field
+        FIELD 1
+        *ORIGIN
+        INFLD=INCTL&70  / Input Buffer Field
+        OUFLD=OUCTL&70  / Output Buffer Field
 
-IN7400: #7400
-IOPEN:  0               ; Initialize Input
+IN7400: 7400
+IOPEN:  0               / Initialize Input
         CLA CMA
-        DCA INCHCT      ; Set to read from new device
-        ISZ INEOF       ; Force a new input file.
-        TAD C7617       ; Point to CD Input List.
+        DCA INCHCT      / Set to read from new device
+        ISZ INEOF       / Force a new input file.
+        TAD C7617       / Point to CD Input List.
         DCA INFPTR
-        JMP @IOPEN
+        JMP I IOPEN
 INEOF:  0
 INFPTR: 0
 INPTR:  0
 
-ICHAR:  0               ; Input a character.
-IN7600: #7600
-        RDF             ; Save calling field for return.
+ICHAR:  0               / Input a character.
+IN7600: 7600
+        RDF             / Save calling field for return.
         TAD INCDIF
         DCA INRTRN
-INCHAR: CDF INFLD       ; Data field to field of buffer
-        ISZ INJMP       ; 3 - way unpacking switch
-        ISZ INCHCT      ; Input buffer exhausted?
-INJMPP: JMP INJMP       ; No..unpack the next char.
-        TAD INEOF       ; Did last read give EOF on this device?
+INCHAR: CDF INFLD       / Data field to field of buffer
+        ISZ INJMP       / 3 - way unpacking switch
+        ISZ INCHCT      / Input buffer exhausted?
+INJMPP: JMP INJMP       / No..unpack the next char.
+        TAD INEOF       / Did last read give EOF on this device?
         SNA CLA
-        JMP INGBUF      ; No.  Continue Reading.
-GETNEW: JMS INNEWF      ; Yes..get next input if it exists.
-        JMP EOFERR      ; Take EOF exit from ICHAR.
-INGBUF: TAD INCTR       ; INCTR holds the current length of
-                        ; the input file.  When the amount remaining
-                        ; to read is less than the size of the
-                        ; input buffer, an EOF is signalled.
+        JMP INGBUF      / No.  Continue Reading.
+GETNEW: JMS INNEWF      / Yes..get next input if it exists.
+        JMP EOFERR      / Take EOF exit from ICHAR.
+INGBUF: TAD INCTR       / INCTR holds the current length of
+                        / the input file.  When the amount remaining
+                        / to read is less than the size of the
+                        / input buffer, an EOF is signalled.
         CLL
         TAD CNRECS
         SNL
-        DCA INCTR       ; Update remaining length
+        DCA INCTR       / Update remaining length
         SZL
-        ISZ INEOF       ; and signal EOF for next read.
-        CLL CML CMA RTR ; Construct a control word for this
-        RTR             ; read from the overflow, if any.
-        RTR             ; and the standard control word.
+        ISZ INEOF       / and signal EOF for next read.
+        CLL CML CMA RTR / Construct a control word for this
+        RTR             / read from the overflow, if any.
+        RTR             / and the standard control word.
         TAD INCTL1
         DCA INCTLW
         EJECT
-INCDIF: CXF 0           ; Now do a call to the input handler
-        CDF 1           ; We are in field 1, handler in field 0
-        JMS @INHNDL
-INCTLW: 0               ; Input Control Word
-INBUFP: INBUF           ; Input buffer address
-INREC:  0               ; Pointer to input record
+INCDIF: CXF 0           / Now do a call to the input handler
+        CDF 1           / We are in field 1, handler in field 0
+        JMS I INHNDL
+INCTLW: 0               / Input Control Word
+INBUFP: INBUF           / Input buffer address
+INREC:  0               / Pointer to input record
         JMP INERRX
 INBREC: TAD INREC
-        TAD CNRECS      ; Update pointer into file
+        TAD CNRECS      / Update pointer into file
         DCA INREC
-        TAD INCTLW      ; Now compute the number of characters
-        AND IN7600      ; in this input buffer
+        TAD INCTLW      / Now compute the number of characters
+        AND IN7600      / in this input buffer
         CLL RAL
         TAD INCTLW
         AND IN7600
         CMA
-        DCA INCHCT      ; New number of characters.
-        TAD INJMPP      ; Reset 3 way switch
+        DCA INCHCT      / New number of characters.
+        TAD INJMPP      / Reset 3 way switch
         DCA INJMP
         TAD INBUFP
-        DCA INPTR       ; and buffer pointer
-        JMP INCHAR      ; Now read the buffer
-INERRX: ISZ INEOF       ; Set EOF just in case
-        SMA CLA         ; If < 0, a physical error
-        JMP INBREC      ; EOF on input
-INERR:  CLA CLL CML RAR ; Fatal
-EOFERR: JMP INRTRN      ; Get out
-INJMP:  HLT             ; 3 way unpack switch
-        JMP ICHAR1      ; Get 1st of 3
-        JMP ICHAR2      ; Second
+        DCA INPTR       / and buffer pointer
+        JMP INCHAR      / Now read the buffer
+INERRX: ISZ INEOF       / Set EOF just in case
+        SMA CLA         / If < 0, a physical error
+        JMP INBREC      / EOF on input
+INERR:  CLA CLL CML RAR / Fatal
+EOFERR: JMP INRTRN      / Get out
+INJMP:  HLT             / 3 way unpack switch
+        JMP ICHAR1      / Get 1st of 3
+        JMP ICHAR2      / Second
 ICHAR3: TAD INJMPP
-        DCA INJMP       ; Set for first char, next
-        TAD @INPTR      ; The third word is made of the high
-IN200:  AND IN7400      ; order four bits of the first
-        CLL RTR         ; two.
+        DCA INJMP       / Set for first char, next
+        TAD I INPTR     / The third word is made of the high
+IN200:  AND IN7400      / order four bits of the first
+        CLL RTR         / two.
         RTR
         TAD INCTLW
         RTR
         RTR
-        ISZ INPTR       ; Point to next word
-        JMP INCOMN      ; Get out with char in AC
-ICHAR2: TAD @INPTR
-        AND IN7400      ; Save high order for third word
+        ISZ INPTR       / Point to next word
+        JMP INCOMN      / Get out with char in AC
+ICHAR2: TAD I INPTR
+        AND IN7400      / Save high order for third word
         DCA INCTLW
         ISZ INPTR
-ICHAR1: TAD @INPTR
+ICHAR1: TAD I INPTR
 INCOMN: AND C377
-        TAD N232        ; Is it a ^Z (EOF)?
+        TAD N232        / Is it a ^Z (EOF)?
         SNA
-        JMP GETNEW      ; Yes..look at next input
+        JMP GETNEW      / Yes..look at next input
         TAD C232
-        ISZ ICHAR       ; Take normal return
-INRTRN: 0               ; CIF CDF n.
-        JMP @ICHAR
+        ISZ ICHAR       / Take normal return
+INRTRN: 0               / CIF CDF n.
+        JMP I ICHAR
 INNEWF: -1
 INCHCT=INNEWF
         CDF 1
-        TAD CNDVH1      ; Initialize in case we need a new
-        DCA INHNDL      ; More input?
-        TAD @INFPTR
+        TAD CNDVH1      / Initialize in case we need a new
+        DCA INHNDL      / More input?
+        TAD I INFPTR
         SNA
-        JMP @INNEWF     ; Nope
-        JMS @IN200      ; Call monitor to get handler
+        JMP I INNEWF    / Nope
+        JMS I IN200     / Call monitor to get handler
         1
 INHNDL: 0
-        HLT             ; Very bad!
-        TAD @INFPTR
-        AND C7760       ; Get input file length
+        HLT             / Very bad!
+        TAD I INFPTR
+        AND C7760       / Get input file length
         SZA
         TAD C17
         CLL CML RTR
-        RTR             ; Negative of file length
+        RTR             / Negative of file length
         DCA INCTR
-        ISZ INFPTR      ; Point to starting block
-        TAD @INFPTR
-        DCA INREC       ; Store in handler call
-        ISZ INFPTR      ; Next input.
-        DCA INEOF       ; Clear EOF flag.
+        ISZ INFPTR      / Point to starting block
+        TAD I INFPTR
+        DCA INREC       / Store in handler call
+        ISZ INFPTR      / Next input.
+        DCA INEOF       / Clear EOF flag.
         ISZ INNEWF
-        JMP @INNEWF
+        JMP I INNEWF
 INCTR=IOPEN
-.=#16767
-C17:    #17
-C7760:  #7760
+*6767
+C17:    17
+C7760:  7760
 CNDVH1: INDEVH+1
-C232:   #232
-N232:   -#232
-C377:   #377
+C232:   232
+N232:   -232
+C377:   377
 INCTL1: INCTL+1
 CNRECS: INRECS
-C7617:  #7617
+C7617:  7617
         PAGE
-OOPEN:  0               ; Open output file
-OU7600: #7600
-        TAD OU7601      ; Point to output file name in CD
-        DCA OUBLK       ; area
+OOPEN:  0               / Open output file
+OU7600: 7600
+        TAD OU7601      / Point to output file name in CD
+        DCA OUBLK       / area
         TAD CODEV1
-        DCA OUHNDL      ; Initialize output device handler
-        TAD @OU7600     ; Pick up output device number
+        DCA OUHNDL      / Initialize output device handler
+        TAD I OU7600    / Pick up output device number
         AND K17
-        SNA             ; Is there one?
-        JMP ONOFIL      ; No..Inhibit output
-        JMS @_USR       ; Fetch output handler
+        SNA             / Is there one?
+        JMP ONOFIL      / No..Inhibit output
+        JMS I _USR      / Fetch output handler
         1
 OUHNDL: 0
-        HLT             ; Bad thing
-OUENTR: TAD @OU7600
-        JMS @_USR       ; Enter the output file
+        HLT             / Bad thing
+OUENTR: TAD I OU7600
+        JMS I _USR      / Enter the output file
         3
-OUBLK:  #7601           ; Gets starting block of hole
-OUELEN: 0               ; Gets size of hole available
-        JMP OEFAIL      ; Failure.  See what we did.
-        DCA OUCCNT      ; Clear closing length
-        DCA @COTINH     ; Clear output inhibit
-        JMS @COSETP     ; Set up pointers
+OUBLK:  7601            / Gets starting block of hole
+OUELEN: 0               / Gets size of hole available
+        JMP OEFAIL      / Failure.  See what we did.
+        DCA OUCCNT      / Clear closing length
+        DCA I COTINH    / Clear output inhibit
+        JMS I COSETP    / Set up pointers
         ISZ OOPEN
 OORETN: CXF 1
-        JMP @OOPEN      ; Return O.K.
-OEFAIL: TAD @OU7600     ; If length=0, give open error
-        AND K7760       ; If not, make it 0 and try again
+        JMP I OOPEN     / Return O.K.
+OEFAIL: TAD @OU7600     / If length=0, give open error
+        AND K7760       / If not, make it 0 and try again
         SNA CLA
-        JMP ONTERR      ; Was 0, failed
+        JMP ONTERR      / Was 0, failed
         TAD @OU7600
-        AND K17         ; Make it 0
-        DCA @OU7600
-        JMP OUENTR      ; and try again
+        AND K17         / Make it 0
+        DCA I OU7600
+        JMP OUENTR      / and try again
 ONTERR: CLA CLL CML RAR
         JMP OORETN
-ONOFIL: ISZ @COTINH     ; Inhibit output
+ONOFIL: ISZ I COTINH    / Inhibit output
         JMP OORETN
-OUTDMP: 0               ; Dump output buffer
-        DCA OUCTLW      ; Store control word
+OUTDMP: 0               / Dump output buffer
+        DCA OUCTLW      / Store control word
         CDF 1
-        TAD @COTINH     ; Is output inhibited?
+        TAD I COTINH    / Is output inhibited?
         SZA CLA
-        JMP OUNOWR      ; Yep.
-        TAD OUCCNT      ; If this is first write, start the
-        SNA             ; search forward on DECtape
+        JMP OUNOWR      / Yep.
+        TAD OUCCNT      / If this is first write, start the
+        SNA             / search forward on DECtape
         ISZ OUCTLW
-        TAD OUBLK       ; Get starting block of this
-        DCA OUREC       ; transfer
+        TAD OUBLK       / Get starting block of this
+        DCA OUREC       / transfer
         TAD OUCTLW
         CLL RTL
         RTL
-        RTL             ; Compute # of records to output
+        RTL             / Compute # of records to output
         AND K17
-        TAD OUCCNT      ; Update closing length
+        TAD OUCCNT      / Update closing length
         DCA OUCCNT
-        TAD OUCCNT      ; See if closing length will be
-        CLL CML         ; bigger than the output hole
+        TAD OUCCNT      / See if closing length will be
+        CLL CML         / bigger than the output hole
         TAD OUELEN
         SNL SZA CLA
-        JMP @OUTDMP     ; Will be too big
+        JMP I OUTDMP    / Will be too big
 OUCDIF: CXF 0
         CDF 1
-        JMS @OUHNDL     ; Do the write
+        JMS I OUHNDL    / Do the write
 OUCTLW: 0
         OUBUF
 OUREC:  0
-        SKP             ; Error
-OUNOWR: ISZ OUTDMP      ; Take normal return
-        JMP @OUTDMP
-        PTP=#0020
+        SKP             / Error
+OUNOWR: ISZ OUTDMP      / Take normal return
+        JMP I OUTDMP
+        PTP=0020
         EJECT
-OCLOSE: 0               ; Close output file
+OCLOSE: 0               / Close output file
         CDF 1
-        TAD @COTINH     ; If output inhibited, close is a NOP.
+        TAD I COTINH    / If output inhibited, close is a NOP.
         SZA CLA
-        JMP OCISZ       ; A NOP
-        JMS @POTYPE     ; Determine if output is to PTP
-        AND C770        ; If it is, don't output a ^Z.
+        JMP OCISZ       / A NOP
+        JMS I POTYPE    / Determine if output is to PTP
+        AND C770        / If it is, don't output a ^Z.
         TAD NPTP
         SZA CLA
-        TAD K232        ; Not PTP, output ^Z as EOF
-        JMS @POCHAR
-        JMP OCRET       ; Error return
-        JMS @POCHAR     ; Fill with 0 characters
+        TAD K232        / Not PTP, output ^Z as EOF
+        JMS I POCHAR
+        JMP OCRET       / Error return
+        JMS I POCHAR    / Fill with 0 characters
         JMP OCRET
-FILLIP: JMS @POCHAR     ; Fill to boundary with 0
+FILLIP: JMS I POCHAR    / Fill to boundary with 0
         JMP OCRET
-        JMS @POTYPE     ; If output is directory device, fill
-        SPA CLA         ; whole record, else half record
+        JMS I POTYPE    / If output is directory device, fill
+        SPA CLA         / whole record, else half record
         TAD K100
         TAD K77
-        AND @PODWCT     ; Are we up to boundary yet?
+        AND I PODWCT    / Are we up to boundary yet?
         SZA CLA
-        JMP FILLIP      ; No
-        TAD @PODWCT
-        TAD OCTLSZ      ; Is there a full write left?
+        JMP FILLIP      / No
+        TAD I PODWCT
+        TAD OCTLSZ      / Is there a full write left?
         SNA
-        JMP NODUMP      ; Yes, but don't do it, as ^Z is out.
+        JMP NODUMP      / Yes, but don't do it, as ^Z is out.
         TAD OCTL
-        JMS OUTDMP      ; Dump last buffer
+        JMS OUTDMP      / Dump last buffer
         JMP OCRET
-NODUMP: TAD @OU7600     ; Get device number
-        JMS @_USR       ; Close the output file
+NODUMP: TAD I OU7600    / Get device number
+        JMS I _USR      / Close the output file
         4
-OU7601: #7601           ; Pointer to file name
-OUCCNT: 0               ; Closing file length here
-        SKP             ; Error
-OCISZ:  ISZ OCLOSE      ; Normal return
-OCRET:  CXF 1           ; Restore calling fields
-        JMP @OCLOSE
-.=#17160
-OCTLSZ: OUCTL&#3700
+OU7601: 7601            / Pointer to file name
+OUCCNT: 0               / Closing file length here
+        SKP             / Error
+OCISZ:  ISZ OCLOSE      / Normal return
+OCRET:  CXF 1           / Restore calling fields
+        JMP I OCLOSE
+*7160
+OCTLSZ: OUCTL&3700
 NPTP:   -PTP
-OCTL:   #4000+OUFLD
+OCTL:   4000+OUFLD
 PODWCT: OUDWCT
-K77:    #77
-K100:   #100
+K77:    77
+K100:   100
 POCHAR: OCHAR
-K232:   #232
-C770:   #770
+K232:   232
+C770:   770
 POTYPE: OTYPE
-K7760:  #7760
+K7760:  7760
 COSETP: OUSETP
 COTINH: OUTINH
-_USR:   #200
-K17:    #17
+_USR:   200
+K17:    17
 CODEV1: OUDEVH+1
         PAGE
-OUSETP: 0               ; Initialize output pointers
+OUSETP: 0               / Initialize output pointers
         TAD OUCTLS
         CIA
-        DCA OUDWCT      ; Double word output count
-        TAD POUBUF      ; Initialize word pointer
+        DCA OUDWCT      / Double word output count
+        TAD POUBUF      / Initialize word pointer
         DCA OUPTR
         TAD OUJMPE
-        DCA OUJMP       ; 3 way unpack switch
-        JMP @OUSETP
+        DCA OUJMP       / 3 way unpack switch
+        JMP I OUSETP
         EJECT
-OCHAR:  0               ; Output character routine
-        AND K377        ; Isolate eight bits
+OCHAR:  0               / Output character routine
+        AND K377        / Isolate eight bits
         DCA OUTEMP
-        RDF             ; Get field we were called
-        TAD CXF0        ; from
+        RDF             / Get field we were called
+        TAD CXF0        / from
         DCA OUCRET
-        TAD OUTINH      ; Output inhibited?
+        TAD OUTINH      / Output inhibited?
         SZA CLA
-        JMP OUCOMN      ; Yes, NOP.
-OUCHAR: CDF OUFLD       ; Go to data field of buffer
-        ISZ OUJMP       ; Bump character switch
-OUJMP:  HLT             ; Get JMP ., JMP .+1, etc.
+        JMP OUCOMN      / Yes, NOP.
+OUCHAR: CDF OUFLD       / Go to data field of buffer
+        ISZ OUJMP       / Bump character switch
+OUJMP:  HLT             / Get JMP ., JMP .+1, etc.
         JMP OCHAR1
         JMP OCHAR2
-OCHAR3: TAD OUTEMP      ; Third char
-        CLL RTL         ; High order bits go into the
-        RTL             ; high order 4 bits or the
-        AND K7400       ; first of two words
-        TAD @OUPOLD
-        DCA @OUPOLD
-        TAD OUTEMP      ; The second double word gets
-        CLL RTR         ; the low order bits of
-        RTR             ; the third char
+OCHAR3: TAD OUTEMP      / Third char
+        CLL RTL         / High order bits go into the
+        RTL             / high order 4 bits or the
+        AND K7400       / first of two words
+        TAD I OUPOLD
+        DCA I OUPOLD
+        TAD OUTEMP      / The second double word gets
+        CLL RTR         / the low order bits of
+        RTR             / the third char
         RAR
         AND K7400
-        TAD @OUPTR
-        DCA @OUPTR
-        TAD OUJMPE      ; Reset character switch
+        TAD I OUPTR
+        DCA I OUPTR
+        TAD OUJMPE      / Reset character switch
         DCA OUJMP
-        ISZ OUPTR       ; Point to next buffer word
-        ISZ OUDWCT      ; Bump double count after
-                        ; 2 chars.
-        JMP OUCOMN      ; Get out
-        TAD KOUCTL      ; Ready to output a buffer
-        JMS @POUDMP     ; Output it
-        JMP OUCRET      ; An error
-        JMS OUSETP      ; Reset output pointers
+        ISZ OUPTR       / Point to next buffer word
+        ISZ OUDWCT      / Bump double count after
+                        / 2 chars.
+        JMP OUCOMN      / Get out
+        TAD KOUCTL      / Ready to output a buffer
+        JMS I POUDMP    / Output it
+        JMP OUCRET      / An error
+        JMS OUSETP      / Reset output pointers
         JMP OUCOMN
-OCHAR2: TAD OUPTR       ; Point to first double word
+OCHAR2: TAD OUPTR       / Point to first double word
         DCA OUPOLD
-        ISZ OUPTR       ; Point OUPTR to second
+        ISZ OUPTR       / Point OUPTR to second
 OCHAR1: TAD OUTEMP
-        DCA @OUPTR
-OUCOMN: ISZ OCHAR       ; Normal exit
+        DCA I OUPTR
+OUCOMN: ISZ OCHAR       / Normal exit
 OUCRET: HLT
-        JMP @OCHAR
+        JMP I OCHAR
 OUTEMP: 0
 OUPOLD: 0
 OUPTR:  0
 OUJMPE: JMP OUJMP
 OUDWCT: 0
 OUTINH: 0
-OTYPE:  0               ; Otype looks at the output device #,
+OTYPE:  0               / Otype looks at the output device #,
         RDF
         TAD CXF0
         DCA OTRTN
         CDF 1
-        TAD @L7600      ; and looks up the DCB word for
-        AND L17         ; that device
+        TAD I L7600     / and looks up the DCB word for
+        AND L17         / that device
         TAD PDCB
         DCA OUTEMP
-        TAD @OUTEMP     ; Get DCB entry
+        TAD I OUTEMP    / Get DCB entry
 OTRTN:  HLT
-        JMP @OTYPE
-.=#17366
+        JMP I OTYPE
+*7366
 PDCB:   DCB-1
-L17:    #17
-L7600:  #7600
+L17:    17
+L7600:  7600
 POUDMP: OUTDMP
 KOUCTL: OUCTL
-K7400:  #7400
+K7400:  7400
 CXF0:   CXF 0
-K377:   #377
+K377:   377
 POUBUF: OUBUF
-OUCTLS: OUCTL&#3700
-        ;FIELD 1
-        ;*2000
-        .=#12000
-        JMS @PUSR       ; Lock monitor into core
-        #10
-CALLCD: JMS @L200       ; Call the command decoder
+OUCTLS: OUCTL&3700
+        FIELD 1
+        *2000
+        JMS I PUSR      / Lock monitor into core
+        10
+CALLCD: JMS I L200      / Call the command decoder
         5
         0
-        JMS @PIOPEN     ; Set up input pointers
-        JMS @POOPEN     ; Open output file
-        SMA CLA         ; Error.  If AC < 0, it was fatal
-        JMP OK          ; Non file structured output
+        JMS I PIOPEN    / Set up input pointers
+        JMS I POOPEN    / Open output file
+        SMA CLA         / Error.  If AC < 0, it was fatal
+        JMP OK          / Non file structured output
         JMS TERR
-        SIXBIT "OPEN FAILED"
-OK:     JMS @PICHAR     ; Read a character
-        JMP TSTEOF      ; Error, see if EOF.
-        SNA             ; Ignore nulls
+        TEXT "OPEN FAILED"
+OK:     JMS @PICHAR     / Read a character
+        JMP TSTEOF      / Error, see if EOF.
+        SNA             / Ignore nulls
         JMP OK
-        JMS @LOCHAR     ; and output the character
+        JMS I LOCHAR    / and output the character
         JMP OUTERR
-        JMP OK          ; Continue until EOF.
-TSTEOF: SMA CLA         ; Was it fatal?
-        JMP CLOSE       ; No..EOF.  Close output
+        JMP OK          / Continue until EOF.
+TSTEOF: SMA CLA         / Was it fatal?
+        JMP CLOSE       / No..EOF.  Close output
         JMS TERR
-        SIXBIT "READ ERROR", 0
-CLOSE:  JMS @PCLOSE
-        JMP CLERR       ; File close failed
-        JMP CALLCD      ; New input.
+        TEXT "READ ERROR", 0
+CLOSE:  JMS I PCLOSE
+        JMP CLERR       / File close failed
+        JMP CALLCD      / New input.
 
 OUTERR: JMS TERR
-        SIXBIT "OUTPUT ERROR", 0
+        TEXT "OUTPUT ERROR", 0
 
-CLERR:  JMS TERR        ; Close failure
-        SIXBIT "CLOSE FAILED", 0
+CLERR:  JMS TERR        / Close failure
+        TEXT "CLOSE FAILED", 0
 
-TERR:   0               ; Routine to print error messages
-        TAD @TERR
+TERR:   0               / Routine to print error messages
+        TAD I TERR
         RTR
         RTR
         RTR
-        JMS TYPIT       ; Type the character
-        TAD @TERR
+        JMS TYPIT       / Type the character
+        TAD I TERR
         JMS TYPIT
         ISZ TERR
         JMP TERR+1
 
 TYPIT:  0
-        AND L77         ; Isolate the character
+        AND L77         / Isolate the character
         SNA
-        JMP CRLF        ; 0 terminates it
+        JMP CRLF        / 0 terminates it
         TAD C300
         JMS TTYOUT
-        JMP @TYPIT
+        JMP I TYPIT
 CRLF:   TAD CR
         JMS TTYOUT
         TAD LF
@@ -428,20 +427,19 @@ TTYOUT: 0
         TSF
         JMP .-1
         CLA
-        JMP @TTYOUT
+        JMP I TTYOUT
 
-.=#12165
-LF:     #212
-CR:     #215
-C300:   #300
-L77:    #77
+*2165
+LF:     212
+CR:     215
+C300:   300
+L77:    77
 PCLOSE: OCLOSE
 LOCHAR: OCHAR
 PICHAR: ICHAR
 POOPEN: OOPEN
 PIOPEN: IOPEN
-L200:   #200
-PUSR:   #7700
-        END
+L200:   200
+PUSR:   7700
 
-;$$$$$$$$$$
+$

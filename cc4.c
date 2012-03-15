@@ -286,7 +286,7 @@ setcodes() {
   code[WORDn]   = "\000  <n>\n";
   code[WORDr0]  = "\000# 0\n#\n";
   code[JMPm]    = "\000JMP _<n>\n";
-  code[LABm]    = "\000_<n>:\n";
+  code[LABm]    = "\000_<n>,\n";
   code[LE10f]   = "\010JMS @__le10f\n _<n>\n";
   code[LE12]    = "\011JMS __le\n";
   code[LE12u]   = "\011JMS @__ule\n";
@@ -323,7 +323,7 @@ setcodes() {
   code[PUTwp1]  = "\011TAD _AX\nDCA @_BX\n";
   code[rDEC1]   = "\010#JMS @__rdec1\n#";
   code[rDEC2]   = "\010#JMS @__rdec2\n#";
-  code[REFm]    = "\000_<n>:"; /* Label for data */
+  code[REFm]    = "\000_<n>,"; /* Label for data */
   code[RETURN]  = "\000?JMP @__return\n?JMP @__rets\n?";
   code[rINC1]   = "\010#ISZ _AX\nNOP\n#";
   code[rINC2]   = "\010#ISZ _BX\nNOP\n#";
@@ -350,14 +350,11 @@ header()  {
 /* BEGIN PDP8 */
   /*
    * These encode the absolute addresses of the page zero stuff.
-   * These can't be EXT because the assembler doesn't know how 
-   * to do an MRI relative to a symbol that is neither absolute, 
-   * nor relative to ".".
    * NOTE: Be sure to keep these matched up with vm.c!!
   */
 #include "vm.h"
 
-  outline(" 0"); /* force non-zero code pointers, word alignment */
+  /* outline(" 0");*/ /* force non-zero code pointers, word alignment */
   toseg(DATASEG);
   /*outline(" 0");*/ /* force non-zero data pointers, word alignment */
 /* END PDP8 */
@@ -476,13 +473,13 @@ dumpstage() {
 */
 toseg(newseg) int newseg; {
   if(oldseg == newseg)  return;
-  if(oldseg == CODESEG) outline(";CODE ENDS"); /* PDP8 */
-  else if(oldseg == DATASEG) outline(";DATA ENDS"); /* PDP8 */
+  if(oldseg == CODESEG) outline("/CODE ENDS"); /* PDP8 */
+  else if(oldseg == DATASEG) outline("/DATA ENDS"); /* PDP8 */
   if(newseg == CODESEG) {
-    outline(";CODE"); /* PDP8 */
+    outline("/CODE"); /* PDP8 */
     /*outline("ASSUME CS:CODE, SS:DATA, DS:DATA");*/ /* PDP8 */
     }
-  else if(newseg == DATASEG) outline(";DATA"); /* PDP8 */
+  else if(newseg == DATASEG) outline("/DATA"); /* PDP8 */
   oldseg = newseg;
   }
 
@@ -493,7 +490,7 @@ public(ident) int ident;{
   if(ident == FUNCTION)
        toseg(CODESEG);
   else toseg(DATASEG);
-  outstr("INT ");
+  outstr("GLOBAL ");
   outname(ssname);
   newline();
   outname(ssname);
@@ -511,7 +508,7 @@ external(name, size, ident) char *name; int size, ident; {
   if(ident == FUNCTION)
        toseg(CODESEG);
   else toseg(DATASEG);
-  outstr("EXT ");
+  outstr("EXTERNAL ");
   outname(name);
 #if 0
   colon();
@@ -676,7 +673,7 @@ getpop(next) int *next; {
 /******************* output functions *********************/
 
 colon() {
-  fputc(':', output);
+  fputc(',', output);
   }
 
 newline() {

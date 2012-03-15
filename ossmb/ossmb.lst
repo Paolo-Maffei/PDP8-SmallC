@@ -1,482 +1,482 @@
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  1
-                                                             Fri Mar  9 2012
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  1
+                                                             Thu Mar 15 2012
 
-                                 1  ; Parameter Definition:
+                                 1  / Parameter Definition:
                                  2  
-                                 3          OUBUF=#5000     ; Output buffer starts at 05000.
-                                 4          OUCTL=#4200     ; and is 2 pages long.
-                                 5          OUDEVH=#6600    ; Output handler gets loaded at 06600.  We
-                                 6                          ; allow 2 page handlers.
-                                 7          INBUF=#5400     ; Input buffer starts at 05400
-                                 8          INCTL=#0200     ; also 2 pages long.
-                                 9          INRECS=1        ; 2 pages = 1 record
-                                10          INDEVH=#7000    ; Allow 2 page intput handler at 07000.
-                                11          ORIGIN=#16600   ; The subroutines reside at 16600.
-                                12          DCB=#7760       ; Device Control Table
+                                 3          OUBUF=5000      / Output buffer starts at 05000.
+                                 4          OUCTL=4200      / and is 2 pages long.
+                                 5          OUDEVH=6600     / Output handler gets loaded at 06600.  We
+                                 6                          / allow 2 page handlers.
+                                 7          INBUF=5400      / Input buffer starts at 05400
+                                 8          INCTL=0200      / also 2 pages long.
+                                 9          INRECS=1        / 2 pages = 1 record
+                                10          INDEVH=7000     / Allow 2 page intput handler at 07000.
+                                11          ORIGIN=6600     / The subroutines reside at 16600.
+                                12          DCB=#7760       / Device Control Table
                                 13  
-                                14          .=ORIGIN;FIELD 1
-                                15                  ;*ORIGIN
-                                16          INFLD=INCTL&#70 ; Input Buffer Field
-                                17          OUFLD=OUCTL&#70 ; Output Buffer Field
+                                14          FIELD 1
+                                15          *ORIGIN
+                                16          INFLD=INCTL&70  / Input Buffer Field
+                                17          OUFLD=OUCTL&70  / Output Buffer Field
                                 18  
- 16600: 7400                    19  IN7400: #7400
- 16601: 0000                    20  IOPEN:  0               ; Initialize Input
+ 16600: 7400                    19  IN7400: 7400
+ 16601: 0000                    20  IOPEN:  0               / Initialize Input
  16602: 7240                    21          CLA CMA
- 16603: 3333                    22          DCA INCHCT      ; Set to read from new device
- 16604: 2210                    23          ISZ INEOF       ; Force a new input file.
- 16605: 1377                    24          TAD C7617       ; Point to CD Input List.
+ 16603: 3333                    22          DCA INCHCT      / Set to read from new device
+ 16604: 2210                    23          ISZ INEOF       / Force a new input file.
+ 16605: 1377                    24          TAD C7617       / Point to CD Input List.
  16606: 3211                    25          DCA INFPTR
- 16607: 5601                    26          JMP @IOPEN
+ 16607: 5601                    26          JMP I IOPEN
  16610: 0000                    27  INEOF:  0
  16611: 0000                    28  INFPTR: 0
  16612: 0000                    29  INPTR:  0
                                 30  
- 16613: 0000                    31  ICHAR:  0               ; Input a character.
- 16614: 7600                    32  IN7600: #7600
- 16615: 6214                    33          RDF             ; Save calling field for return.
+ 16613: 0000                    31  ICHAR:  0               / Input a character.
+ 16614: 7600                    32  IN7600: 7600
+ 16615: 6214                    33          RDF             / Save calling field for return.
  16616: 1245                    34          TAD INCDIF
  16617: 3331                    35          DCA INRTRN
- 16620: 6201                    36  INCHAR: CDF INFLD       ; Data field to field of buffer
- 16621: 2300                    37          ISZ INJMP       ; 3 - way unpacking switch
- 16622: 2333                    38          ISZ INCHCT      ; Input buffer exhausted?
- 16623: 5300                    39  INJMPP: JMP INJMP       ; No..unpack the next char.
- 16624: 1210                    40          TAD INEOF       ; Did last read give EOF on this device?
+ 16620: 6201                    36  INCHAR: CDF INFLD       / Data field to field of buffer
+ 16621: 2300                    37          ISZ INJMP       / 3 - way unpacking switch
+ 16622: 2333                    38          ISZ INCHCT      / Input buffer exhausted?
+ 16623: 5300                    39  INJMPP: JMP INJMP       / No..unpack the next char.
+ 16624: 1210                    40          TAD INEOF       / Did last read give EOF on this device?
  16625: 7650                    41          SNA CLA
- 16626: 5231                    42          JMP INGBUF      ; No.  Continue Reading.
- 16627: 4333                    43  GETNEW: JMS INNEWF      ; Yes..get next input if it exists.
- 16630: 5277                    44          JMP EOFERR      ; Take EOF exit from ICHAR.
- 16631: 1201                    45  INGBUF: TAD INCTR       ; INCTR holds the current length of
-                                46                          ; the input file.  When the amount remaining
-                                47                          ; to read is less than the size of the
-                                48                          ; input buffer, an EOF is signalled.
+ 16626: 5231                    42          JMP INGBUF      / No.  Continue Reading.
+ 16627: 4333                    43  GETNEW: JMS INNEWF      / Yes..get next input if it exists.
+ 16630: 5277                    44          JMP EOFERR      / Take EOF exit from ICHAR.
+ 16631: 1201                    45  INGBUF: TAD INCTR       / INCTR holds the current length of
+                                46                          / the input file.  When the amount remaining
+                                47                          / to read is less than the size of the
+                                48                          / input buffer, an EOF is signalled.
  16632: 7100                    49          CLL
  16633: 1376                    50          TAD CNRECS
  16634: 7420                    51          SNL
- 16635: 3201                    52          DCA INCTR       ; Update remaining length
+ 16635: 3201                    52          DCA INCTR       / Update remaining length
  16636: 7430                    53          SZL
- 16637: 2210                    54          ISZ INEOF       ; and signal EOF for next read.
- 16640: 7172                    55          CLL CML CMA RTR ; Construct a control word for this
- 16641: 7012                    56          RTR             ; read from the overflow, if any.
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  2
-                                                             Fri Mar  9 2012
+ 16637: 2210                    54          ISZ INEOF       / and signal EOF for next read.
+ 16640: 7172                    55          CLL CML CMA RTR / Construct a control word for this
+ 16641: 7012                    56          RTR             / read from the overflow, if any.
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  2
+                                                             Thu Mar 15 2012
 
- 16642: 7012                    57          RTR             ; and the standard control word.
+ 16642: 7012                    57          RTR             / and the standard control word.
  16643: 1375                    58          TAD INCTL1
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  3
-                                                             Fri Mar  9 2012
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  3
+                                                             Thu Mar 15 2012
 
  16644: 3250                    59          DCA INCTLW
                                 60          EJECT
- 16645: 6203                    61  INCDIF: CXF 0           ; Now do a call to the input handler
- 16646: 6211                    62          CDF 1           ; We are in field 1, handler in field 0
- 16647: 4744                    63          JMS @INHNDL
- 16650: 0000                    64  INCTLW: 0               ; Input Control Word
- 16651: 5400                    65  INBUFP: INBUF           ; Input buffer address
- 16652: 0000                    66  INREC:  0               ; Pointer to input record
+ 16645: 6203                    61  INCDIF: CXF 0           / Now do a call to the input handler
+ 16646: 6211                    62          CDF 1           / We are in field 1, handler in field 0
+ 16647: 4744                    63          JMS I INHNDL
+ 16650: 0000                    64  INCTLW: 0               / Input Control Word
+ 16651: 5400                    65  INBUFP: INBUF           / Input buffer address
+ 16652: 0000                    66  INREC:  0               / Pointer to input record
  16653: 5273                    67          JMP INERRX
  16654: 1252                    68  INBREC: TAD INREC
- 16655: 1376                    69          TAD CNRECS      ; Update pointer into file
+ 16655: 1376                    69          TAD CNRECS      / Update pointer into file
  16656: 3252                    70          DCA INREC
- 16657: 1250                    71          TAD INCTLW      ; Now compute the number of characters
- 16660: 0214                    72          AND IN7600      ; in this input buffer
+ 16657: 1250                    71          TAD INCTLW      / Now compute the number of characters
+ 16660: 0214                    72          AND IN7600      / in this input buffer
  16661: 7104                    73          CLL RAL
  16662: 1250                    74          TAD INCTLW
  16663: 0214                    75          AND IN7600
  16664: 7040                    76          CMA
- 16665: 3333                    77          DCA INCHCT      ; New number of characters.
- 16666: 1223                    78          TAD INJMPP      ; Reset 3 way switch
+ 16665: 3333                    77          DCA INCHCT      / New number of characters.
+ 16666: 1223                    78          TAD INJMPP      / Reset 3 way switch
  16667: 3300                    79          DCA INJMP
  16670: 1251                    80          TAD INBUFP
- 16671: 3212                    81          DCA INPTR       ; and buffer pointer
- 16672: 5220                    82          JMP INCHAR      ; Now read the buffer
- 16673: 2210                    83  INERRX: ISZ INEOF       ; Set EOF just in case
- 16674: 7700                    84          SMA CLA         ; If < 0, a physical error
- 16675: 5254                    85          JMP INBREC      ; EOF on input
- 16676: 7330                    86  INERR:  CLA CLL CML RAR ; Fatal
- 16677: 5331                    87  EOFERR: JMP INRTRN      ; Get out
- 16700: 7402                    88  INJMP:  HLT             ; 3 way unpack switch
- 16701: 5322                    89          JMP ICHAR1      ; Get 1st of 3
- 16702: 5316                    90          JMP ICHAR2      ; Second
+ 16671: 3212                    81          DCA INPTR       / and buffer pointer
+ 16672: 5220                    82          JMP INCHAR      / Now read the buffer
+ 16673: 2210                    83  INERRX: ISZ INEOF       / Set EOF just in case
+ 16674: 7700                    84          SMA CLA         / If < 0, a physical error
+ 16675: 5254                    85          JMP INBREC      / EOF on input
+ 16676: 7330                    86  INERR:  CLA CLL CML RAR / Fatal
+ 16677: 5331                    87  EOFERR: JMP INRTRN      / Get out
+ 16700: 7402                    88  INJMP:  HLT             / 3 way unpack switch
+ 16701: 5322                    89          JMP ICHAR1      / Get 1st of 3
+ 16702: 5316                    90          JMP ICHAR2      / Second
  16703: 1223                    91  ICHAR3: TAD INJMPP
- 16704: 3300                    92          DCA INJMP       ; Set for first char, next
- 16705: 1612                    93          TAD @INPTR      ; The third word is made of the high
- 16706: 0200                    94  IN200:  AND IN7400      ; order four bits of the first
- 16707: 7112                    95          CLL RTR         ; two.
+ 16704: 3300                    92          DCA INJMP       / Set for first char, next
+ 16705: 1612                    93          TAD I INPTR     / The third word is made of the high
+ 16706: 0200                    94  IN200:  AND IN7400      / order four bits of the first
+ 16707: 7112                    95          CLL RTR         / two.
  16710: 7012                    96          RTR
  16711: 1250                    97          TAD INCTLW
  16712: 7012                    98          RTR
  16713: 7012                    99          RTR
- 16714: 2212                   100          ISZ INPTR       ; Point to next word
- 16715: 5323                   101          JMP INCOMN      ; Get out with char in AC
- 16716: 1612                   102  ICHAR2: TAD @INPTR
- 16717: 0200                   103          AND IN7400      ; Save high order for third word
+ 16714: 2212                   100          ISZ INPTR       / Point to next word
+ 16715: 5323                   101          JMP INCOMN      / Get out with char in AC
+ 16716: 1612                   102  ICHAR2: TAD I INPTR
+ 16717: 0200                   103          AND IN7400      / Save high order for third word
  16720: 3250                   104          DCA INCTLW
  16721: 2212                   105          ISZ INPTR
- 16722: 1612                   106  ICHAR1: TAD @INPTR
+ 16722: 1612                   106  ICHAR1: TAD I INPTR
  16723: 0374                   107  INCOMN: AND C377
- 16724: 1373                   108          TAD N232        ; Is it a ^Z (EOF)?
+ 16724: 1373                   108          TAD N232        / Is it a ^Z (EOF)?
  16725: 7450                   109          SNA
- 16726: 5227                   110          JMP GETNEW      ; Yes..look at next input
+ 16726: 5227                   110          JMP GETNEW      / Yes..look at next input
  16727: 1372                   111          TAD C232
- 16730: 2213                   112          ISZ ICHAR       ; Take normal return
- 16731: 0000                   113  INRTRN: 0               ; CIF CDF n.
- 16732: 5613                   114          JMP @ICHAR
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  4
-                                                             Fri Mar  9 2012
+ 16730: 2213                   112          ISZ ICHAR       / Take normal return
+ 16731: 0000                   113  INRTRN: 0               / CIF CDF n.
+ 16732: 5613                   114          JMP I ICHAR
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  4
+                                                             Thu Mar 15 2012
 
  16733: 7777                   115  INNEWF: -1
                                116  INCHCT=INNEWF
  16734: 6211                   117          CDF 1
- 16735: 1371                   118          TAD CNDVH1      ; Initialize in case we need a new
- 16736: 3344                   119          DCA INHNDL      ; More input?
- 16737: 1611                   120          TAD @INFPTR
+ 16735: 1371                   118          TAD CNDVH1      / Initialize in case we need a new
+ 16736: 3344                   119          DCA INHNDL      / More input?
+ 16737: 1611                   120          TAD I INFPTR
  16740: 7450                   121          SNA
- 16741: 5733                   122          JMP @INNEWF     ; Nope
- 16742: 4706                   123          JMS @IN200      ; Call monitor to get handler
+ 16741: 5733                   122          JMP I INNEWF    / Nope
+ 16742: 4706                   123          JMS I IN200     / Call monitor to get handler
  16743: 0001                   124          1
  16744: 0000                   125  INHNDL: 0
- 16745: 7402                   126          HLT             ; Very bad!
- 16746: 1611                   127          TAD @INFPTR
- 16747: 0370                   128          AND C7760       ; Get input file length
+ 16745: 7402                   126          HLT             / Very bad!
+ 16746: 1611                   127          TAD I INFPTR
+ 16747: 0370                   128          AND C7760       / Get input file length
  16750: 7440                   129          SZA
  16751: 1367                   130          TAD C17
  16752: 7132                   131          CLL CML RTR
- 16753: 7012                   132          RTR             ; Negative of file length
+ 16753: 7012                   132          RTR             / Negative of file length
  16754: 3201                   133          DCA INCTR
- 16755: 2211                   134          ISZ INFPTR      ; Point to starting block
- 16756: 1611                   135          TAD @INFPTR
- 16757: 3252                   136          DCA INREC       ; Store in handler call
- 16760: 2211                   137          ISZ INFPTR      ; Next input.
- 16761: 3210                   138          DCA INEOF       ; Clear EOF flag.
+ 16755: 2211                   134          ISZ INFPTR      / Point to starting block
+ 16756: 1611                   135          TAD I INFPTR
+ 16757: 3252                   136          DCA INREC       / Store in handler call
+ 16760: 2211                   137          ISZ INFPTR      / Next input.
+ 16761: 3210                   138          DCA INEOF       / Clear EOF flag.
  16762: 2333                   139          ISZ INNEWF
- 16763: 5733                   140          JMP @INNEWF
+ 16763: 5733                   140          JMP I INNEWF
                                141  INCTR=IOPEN
-                               142  .=#16767
- 16767: 0017                   143  C17:    #17
- 16770: 7760                   144  C7760:  #7760
+                               142  *6767
+ 16767: 0017                   143  C17:    17
+ 16770: 7760                   144  C7760:  7760
  16771: 7001                   145  CNDVH1: INDEVH+1
- 16772: 0232                   146  C232:   #232
- 16773: 7546                   147  N232:   -#232
- 16774: 0377                   148  C377:   #377
+ 16772: 0232                   146  C232:   232
+ 16773: 7546                   147  N232:   -232
+ 16774: 0377                   148  C377:   377
  16775: 0201                   149  INCTL1: INCTL+1
  16776: 0001                   150  CNRECS: INRECS
- 16777: 7617                   151  C7617:  #7617
+ 16777: 7617                   151  C7617:  7617
                                152          PAGE
- 17000: 0000                   153  OOPEN:  0               ; Open output file
- 17001: 7600                   154  OU7600: #7600
- 17002: 1347                   155          TAD OU7601      ; Point to output file name in CD
- 17003: 3221                   156          DCA OUBLK       ; area
+ 17000: 0000                   153  OOPEN:  0               / Open output file
+ 17001: 7600                   154  OU7600: 7600
+ 17002: 1347                   155          TAD OU7601      / Point to output file name in CD
+ 17003: 3221                   156          DCA OUBLK       / area
  17004: 1377                   157          TAD CODEV1
- 17005: 3214                   158          DCA OUHNDL      ; Initialize output device handler
- 17006: 1601                   159          TAD @OU7600     ; Pick up output device number
+ 17005: 3214                   158          DCA OUHNDL      / Initialize output device handler
+ 17006: 1601                   159          TAD I OU7600    / Pick up output device number
  17007: 0376                   160          AND K17
- 17010: 7450                   161          SNA             ; Is there one?
- 17011: 5244                   162          JMP ONOFIL      ; No..Inhibit output
- 17012: 4775                   163          JMS @_USR       ; Fetch output handler
+ 17010: 7450                   161          SNA             / Is there one?
+ 17011: 5244                   162          JMP ONOFIL      / No..Inhibit output
+ 17012: 4775                   163          JMS I _USR      / Fetch output handler
  17013: 0001                   164          1
  17014: 0000                   165  OUHNDL: 0
- 17015: 7402                   166          HLT             ; Bad thing
- 17016: 1601                   167  OUENTR: TAD @OU7600
- 17017: 4775                   168          JMS @_USR       ; Enter the output file
+ 17015: 7402                   166          HLT             / Bad thing
+ 17016: 1601                   167  OUENTR: TAD I OU7600
+ 17017: 4775                   168          JMS I _USR      / Enter the output file
  17020: 0003                   169          3
- 17021: 7601                   170  OUBLK:  #7601           ; Gets starting block of hole
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  5
-                                                             Fri Mar  9 2012
+ 17021: 7601                   170  OUBLK:  7601            / Gets starting block of hole
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  5
+                                                             Thu Mar 15 2012
 
- 17022: 0000                   171  OUELEN: 0               ; Gets size of hole available
- 17023: 5232                   172          JMP OEFAIL      ; Failure.  See what we did.
- 17024: 3350                   173          DCA OUCCNT      ; Clear closing length
- 17025: 3774                   174          DCA @COTINH     ; Clear output inhibit
- 17026: 4773                   175          JMS @COSETP     ; Set up pointers
+ 17022: 0000                   171  OUELEN: 0               / Gets size of hole available
+ 17023: 5232                   172          JMP OEFAIL      / Failure.  See what we did.
+ 17024: 3350                   173          DCA OUCCNT      / Clear closing length
+ 17025: 3774                   174          DCA I COTINH    / Clear output inhibit
+ 17026: 4773                   175          JMS I COSETP    / Set up pointers
  17027: 2200                   176          ISZ OOPEN
  17030: 6213                   177  OORETN: CXF 1
- 17031: 5600                   178          JMP @OOPEN      ; Return O.K.
- 17032: 1601                   179  OEFAIL: TAD @OU7600     ; If length=0, give open error
- 17033: 0372                   180          AND K7760       ; If not, make it 0 and try again
+ 17031: 5600                   178          JMP I OOPEN     / Return O.K.
+ 17032: 1601                   179  OEFAIL: TAD @OU7600     / If length=0, give open error
+ 17033: 0372                   180          AND K7760       / If not, make it 0 and try again
  17034: 7650                   181          SNA CLA
- 17035: 5242                   182          JMP ONTERR      ; Was 0, failed
+ 17035: 5242                   182          JMP ONTERR      / Was 0, failed
  17036: 1601                   183          TAD @OU7600
- 17037: 0376                   184          AND K17         ; Make it 0
- 17040: 3601                   185          DCA @OU7600
- 17041: 5216                   186          JMP OUENTR      ; and try again
+ 17037: 0376                   184          AND K17         / Make it 0
+ 17040: 3601                   185          DCA I OU7600
+ 17041: 5216                   186          JMP OUENTR      / and try again
  17042: 7330                   187  ONTERR: CLA CLL CML RAR
  17043: 5230                   188          JMP OORETN
- 17044: 2774                   189  ONOFIL: ISZ @COTINH     ; Inhibit output
+ 17044: 2774                   189  ONOFIL: ISZ I COTINH    / Inhibit output
  17045: 5230                   190          JMP OORETN
- 17046: 0000                   191  OUTDMP: 0               ; Dump output buffer
- 17047: 3300                   192          DCA OUCTLW      ; Store control word
+ 17046: 0000                   191  OUTDMP: 0               / Dump output buffer
+ 17047: 3300                   192          DCA OUCTLW      / Store control word
  17050: 6211                   193          CDF 1
- 17051: 1774                   194          TAD @COTINH     ; Is output inhibited?
+ 17051: 1774                   194          TAD I COTINH    / Is output inhibited?
  17052: 7640                   195          SZA CLA
- 17053: 5304                   196          JMP OUNOWR      ; Yep.
- 17054: 1350                   197          TAD OUCCNT      ; If this is first write, start the
- 17055: 7450                   198          SNA             ; search forward on DECtape
+ 17053: 5304                   196          JMP OUNOWR      / Yep.
+ 17054: 1350                   197          TAD OUCCNT      / If this is first write, start the
+ 17055: 7450                   198          SNA             / search forward on DECtape
  17056: 2300                   199          ISZ OUCTLW
- 17057: 1221                   200          TAD OUBLK       ; Get starting block of this
- 17060: 3302                   201          DCA OUREC       ; transfer
+ 17057: 1221                   200          TAD OUBLK       / Get starting block of this
+ 17060: 3302                   201          DCA OUREC       / transfer
  17061: 1300                   202          TAD OUCTLW
  17062: 7106                   203          CLL RTL
  17063: 7006                   204          RTL
- 17064: 7006                   205          RTL             ; Compute # of records to output
+ 17064: 7006                   205          RTL             / Compute # of records to output
  17065: 0376                   206          AND K17
- 17066: 1350                   207          TAD OUCCNT      ; Update closing length
+ 17066: 1350                   207          TAD OUCCNT      / Update closing length
  17067: 3350                   208          DCA OUCCNT
- 17070: 1350                   209          TAD OUCCNT      ; See if closing length will be
- 17071: 7120                   210          CLL CML         ; bigger than the output hole
+ 17070: 1350                   209          TAD OUCCNT      / See if closing length will be
+ 17071: 7120                   210          CLL CML         / bigger than the output hole
  17072: 1222                   211          TAD OUELEN
  17073: 7660                   212          SNL SZA CLA
- 17074: 5646                   213          JMP @OUTDMP     ; Will be too big
+ 17074: 5646                   213          JMP I OUTDMP    / Will be too big
  17075: 6203                   214  OUCDIF: CXF 0
  17076: 6211                   215          CDF 1
- 17077: 4614                   216          JMS @OUHNDL     ; Do the write
+ 17077: 4614                   216          JMS I OUHNDL    / Do the write
  17100: 0000                   217  OUCTLW: 0
  17101: 5000                   218          OUBUF
  17102: 0000                   219  OUREC:  0
- 17103: 7410                   220          SKP             ; Error
- 17104: 2246                   221  OUNOWR: ISZ OUTDMP      ; Take normal return
- 17105: 5646                   222          JMP @OUTDMP
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  6
-                                                             Fri Mar  9 2012
+ 17103: 7410                   220          SKP             / Error
+ 17104: 2246                   221  OUNOWR: ISZ OUTDMP      / Take normal return
+ 17105: 5646                   222          JMP I OUTDMP
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  6
+                                                             Thu Mar 15 2012
 
-                               223          PTP=#0020
+                               223          PTP=0020
                                224          EJECT
- 17106: 0000                   225  OCLOSE: 0               ; Close output file
+ 17106: 0000                   225  OCLOSE: 0               / Close output file
  17107: 6211                   226          CDF 1
- 17110: 1774                   227          TAD @COTINH     ; If output inhibited, close is a NOP.
+ 17110: 1774                   227          TAD I COTINH    / If output inhibited, close is a NOP.
  17111: 7640                   228          SZA CLA
- 17112: 5352                   229          JMP OCISZ       ; A NOP
- 17113: 4771                   230          JMS @POTYPE     ; Determine if output is to PTP
- 17114: 0370                   231          AND C770        ; If it is, don't output a ^Z.
+ 17112: 5352                   229          JMP OCISZ       / A NOP
+ 17113: 4771                   230          JMS I POTYPE    / Determine if output is to PTP
+ 17114: 0370                   231          AND C770        / If it is, don't output a ^Z.
  17115: 1361                   232          TAD NPTP
  17116: 7640                   233          SZA CLA
- 17117: 1367                   234          TAD K232        ; Not PTP, output ^Z as EOF
- 17120: 4766                   235          JMS @POCHAR
- 17121: 5353                   236          JMP OCRET       ; Error return
- 17122: 4766                   237          JMS @POCHAR     ; Fill with 0 characters
+ 17117: 1367                   234          TAD K232        / Not PTP, output ^Z as EOF
+ 17120: 4766                   235          JMS I POCHAR
+ 17121: 5353                   236          JMP OCRET       / Error return
+ 17122: 4766                   237          JMS I POCHAR    / Fill with 0 characters
  17123: 5353                   238          JMP OCRET
- 17124: 4766                   239  FILLIP: JMS @POCHAR     ; Fill to boundary with 0
+ 17124: 4766                   239  FILLIP: JMS I POCHAR    / Fill to boundary with 0
  17125: 5353                   240          JMP OCRET
- 17126: 4771                   241          JMS @POTYPE     ; If output is directory device, fill
- 17127: 7710                   242          SPA CLA         ; whole record, else half record
+ 17126: 4771                   241          JMS I POTYPE    / If output is directory device, fill
+ 17127: 7710                   242          SPA CLA         / whole record, else half record
  17130: 1365                   243          TAD K100
  17131: 1364                   244          TAD K77
- 17132: 0763                   245          AND @PODWCT     ; Are we up to boundary yet?
+ 17132: 0763                   245          AND I PODWCT    / Are we up to boundary yet?
  17133: 7640                   246          SZA CLA
- 17134: 5324                   247          JMP FILLIP      ; No
- 17135: 1763                   248          TAD @PODWCT
- 17136: 1360                   249          TAD OCTLSZ      ; Is there a full write left?
+ 17134: 5324                   247          JMP FILLIP      / No
+ 17135: 1763                   248          TAD I PODWCT
+ 17136: 1360                   249          TAD OCTLSZ      / Is there a full write left?
  17137: 7450                   250          SNA
- 17140: 5344                   251          JMP NODUMP      ; Yes, but don't do it, as ^Z is out.
+ 17140: 5344                   251          JMP NODUMP      / Yes, but don't do it, as ^Z is out.
  17141: 1362                   252          TAD OCTL
- 17142: 4246                   253          JMS OUTDMP      ; Dump last buffer
+ 17142: 4246                   253          JMS OUTDMP      / Dump last buffer
  17143: 5353                   254          JMP OCRET
- 17144: 1601                   255  NODUMP: TAD @OU7600     ; Get device number
- 17145: 4775                   256          JMS @_USR       ; Close the output file
+ 17144: 1601                   255  NODUMP: TAD I OU7600    / Get device number
+ 17145: 4775                   256          JMS I _USR      / Close the output file
  17146: 0004                   257          4
- 17147: 7601                   258  OU7601: #7601           ; Pointer to file name
- 17150: 0000                   259  OUCCNT: 0               ; Closing file length here
- 17151: 7410                   260          SKP             ; Error
- 17152: 2306                   261  OCISZ:  ISZ OCLOSE      ; Normal return
- 17153: 6213                   262  OCRET:  CXF 1           ; Restore calling fields
- 17154: 5706                   263          JMP @OCLOSE
-                               264  .=#17160
- 17160: 0200                   265  OCTLSZ: OUCTL&#3700
+ 17147: 7601                   258  OU7601: 7601            / Pointer to file name
+ 17150: 0000                   259  OUCCNT: 0               / Closing file length here
+ 17151: 7410                   260          SKP             / Error
+ 17152: 2306                   261  OCISZ:  ISZ OCLOSE      / Normal return
+ 17153: 6213                   262  OCRET:  CXF 1           / Restore calling fields
+ 17154: 5706                   263          JMP I OCLOSE
+                               264  *7160
+ 17160: 0200                   265  OCTLSZ: OUCTL&3700
  17161: 7760                   266  NPTP:   -PTP
- 17162: 4000                   267  OCTL:   #4000+OUFLD
+ 17162: 4000                   267  OCTL:   4000+OUFLD
  17163: 7272                   268  PODWCT: OUDWCT
- 17164: 0077                   269  K77:    #77
- 17165: 0100                   270  K100:   #100
+ 17164: 0077                   269  K77:    77
+ 17165: 0100                   270  K100:   100
  17166: 7211                   271  POCHAR: OCHAR
- 17167: 0232                   272  K232:   #232
- 17170: 0770                   273  C770:   #770
+ 17167: 0232                   272  K232:   232
+ 17170: 0770                   273  C770:   770
  17171: 7274                   274  POTYPE: OTYPE
- 17172: 7760                   275  K7760:  #7760
+ 17172: 7760                   275  K7760:  7760
  17173: 7200                   276  COSETP: OUSETP
  17174: 7273                   277  COTINH: OUTINH
- 17175: 0200                   278  _USR:   #200
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  7
-                                                             Fri Mar  9 2012
+ 17175: 0200                   278  _USR:   200
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  7
+                                                             Thu Mar 15 2012
 
- 17176: 0017                   279  K17:    #17
+ 17176: 0017                   279  K17:    17
  17177: 6601                   280  CODEV1: OUDEVH+1
                                281          PAGE
- 17200: 0000                   282  OUSETP: 0               ; Initialize output pointers
+ 17200: 0000                   282  OUSETP: 0               / Initialize output pointers
  17201: 1377                   283          TAD OUCTLS
  17202: 7041                   284          CIA
- 17203: 3272                   285          DCA OUDWCT      ; Double word output count
- 17204: 1376                   286          TAD POUBUF      ; Initialize word pointer
+ 17203: 3272                   285          DCA OUDWCT      / Double word output count
+ 17204: 1376                   286          TAD POUBUF      / Initialize word pointer
  17205: 3270                   287          DCA OUPTR
  17206: 1271                   288          TAD OUJMPE
- 17207: 3224                   289          DCA OUJMP       ; 3 way unpack switch
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  8
-                                                             Fri Mar  9 2012
+ 17207: 3224                   289          DCA OUJMP       / 3 way unpack switch
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  8
+                                                             Thu Mar 15 2012
 
- 17210: 5600                   290          JMP @OUSETP
+ 17210: 5600                   290          JMP I OUSETP
                                291          EJECT
- 17211: 0000                   292  OCHAR:  0               ; Output character routine
- 17212: 0375                   293          AND K377        ; Isolate eight bits
+ 17211: 0000                   292  OCHAR:  0               / Output character routine
+ 17212: 0375                   293          AND K377        / Isolate eight bits
  17213: 3266                   294          DCA OUTEMP
- 17214: 6214                   295          RDF             ; Get field we were called
- 17215: 1374                   296          TAD CXF0        ; from
+ 17214: 6214                   295          RDF             / Get field we were called
+ 17215: 1374                   296          TAD CXF0        / from
  17216: 3264                   297          DCA OUCRET
- 17217: 1273                   298          TAD OUTINH      ; Output inhibited?
+ 17217: 1273                   298          TAD OUTINH      / Output inhibited?
  17220: 7640                   299          SZA CLA
- 17221: 5263                   300          JMP OUCOMN      ; Yes, NOP.
- 17222: 6201                   301  OUCHAR: CDF OUFLD       ; Go to data field of buffer
- 17223: 2224                   302          ISZ OUJMP       ; Bump character switch
- 17224: 7402                   303  OUJMP:  HLT             ; Get JMP ., JMP .+1, etc.
+ 17221: 5263                   300          JMP OUCOMN      / Yes, NOP.
+ 17222: 6201                   301  OUCHAR: CDF OUFLD       / Go to data field of buffer
+ 17223: 2224                   302          ISZ OUJMP       / Bump character switch
+ 17224: 7402                   303  OUJMP:  HLT             / Get JMP ., JMP .+1, etc.
  17225: 5261                   304          JMP OCHAR1
  17226: 5256                   305          JMP OCHAR2
- 17227: 1266                   306  OCHAR3: TAD OUTEMP      ; Third char
- 17230: 7106                   307          CLL RTL         ; High order bits go into the
- 17231: 7006                   308          RTL             ; high order 4 bits or the
- 17232: 0373                   309          AND K7400       ; first of two words
- 17233: 1667                   310          TAD @OUPOLD
- 17234: 3667                   311          DCA @OUPOLD
- 17235: 1266                   312          TAD OUTEMP      ; The second double word gets
- 17236: 7112                   313          CLL RTR         ; the low order bits of
- 17237: 7012                   314          RTR             ; the third char
+ 17227: 1266                   306  OCHAR3: TAD OUTEMP      / Third char
+ 17230: 7106                   307          CLL RTL         / High order bits go into the
+ 17231: 7006                   308          RTL             / high order 4 bits or the
+ 17232: 0373                   309          AND K7400       / first of two words
+ 17233: 1667                   310          TAD I OUPOLD
+ 17234: 3667                   311          DCA I OUPOLD
+ 17235: 1266                   312          TAD OUTEMP      / The second double word gets
+ 17236: 7112                   313          CLL RTR         / the low order bits of
+ 17237: 7012                   314          RTR             / the third char
  17240: 7010                   315          RAR
  17241: 0373                   316          AND K7400
- 17242: 1670                   317          TAD @OUPTR
- 17243: 3670                   318          DCA @OUPTR
- 17244: 1271                   319          TAD OUJMPE      ; Reset character switch
+ 17242: 1670                   317          TAD I OUPTR
+ 17243: 3670                   318          DCA I OUPTR
+ 17244: 1271                   319          TAD OUJMPE      / Reset character switch
  17245: 3224                   320          DCA OUJMP
- 17246: 2270                   321          ISZ OUPTR       ; Point to next buffer word
- 17247: 2272                   322          ISZ OUDWCT      ; Bump double count after
-                               323                          ; 2 chars.
- 17250: 5263                   324          JMP OUCOMN      ; Get out
- 17251: 1372                   325          TAD KOUCTL      ; Ready to output a buffer
- 17252: 4771                   326          JMS @POUDMP     ; Output it
- 17253: 5264                   327          JMP OUCRET      ; An error
- 17254: 4200                   328          JMS OUSETP      ; Reset output pointers
+ 17246: 2270                   321          ISZ OUPTR       / Point to next buffer word
+ 17247: 2272                   322          ISZ OUDWCT      / Bump double count after
+                               323                          / 2 chars.
+ 17250: 5263                   324          JMP OUCOMN      / Get out
+ 17251: 1372                   325          TAD KOUCTL      / Ready to output a buffer
+ 17252: 4771                   326          JMS I POUDMP    / Output it
+ 17253: 5264                   327          JMP OUCRET      / An error
+ 17254: 4200                   328          JMS OUSETP      / Reset output pointers
  17255: 5263                   329          JMP OUCOMN
- 17256: 1270                   330  OCHAR2: TAD OUPTR       ; Point to first double word
+ 17256: 1270                   330  OCHAR2: TAD OUPTR       / Point to first double word
  17257: 3267                   331          DCA OUPOLD
- 17260: 2270                   332          ISZ OUPTR       ; Point OUPTR to second
+ 17260: 2270                   332          ISZ OUPTR       / Point OUPTR to second
  17261: 1266                   333  OCHAR1: TAD OUTEMP
- 17262: 3670                   334          DCA @OUPTR
- 17263: 2211                   335  OUCOMN: ISZ OCHAR       ; Normal exit
+ 17262: 3670                   334          DCA I OUPTR
+ 17263: 2211                   335  OUCOMN: ISZ OCHAR       / Normal exit
  17264: 7402                   336  OUCRET: HLT
- 17265: 5611                   337          JMP @OCHAR
+ 17265: 5611                   337          JMP I OCHAR
  17266: 0000                   338  OUTEMP: 0
  17267: 0000                   339  OUPOLD: 0
  17270: 0000                   340  OUPTR:  0
  17271: 5224                   341  OUJMPE: JMP OUJMP
  17272: 0000                   342  OUDWCT: 0
  17273: 0000                   343  OUTINH: 0
- 17274: 0000                   344  OTYPE:  0               ; Otype looks at the output device #,
+ 17274: 0000                   344  OTYPE:  0               / Otype looks at the output device #,
  17275: 6214                   345          RDF
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  9
-                                                             Fri Mar  9 2012
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  9
+                                                             Thu Mar 15 2012
 
  17276: 1374                   346          TAD CXF0
  17277: 3306                   347          DCA OTRTN
  17300: 6211                   348          CDF 1
- 17301: 1770                   349          TAD @L7600      ; and looks up the DCB word for
- 17302: 0367                   350          AND L17         ; that device
+ 17301: 1770                   349          TAD I L7600     / and looks up the DCB word for
+ 17302: 0367                   350          AND L17         / that device
  17303: 1366                   351          TAD PDCB
  17304: 3266                   352          DCA OUTEMP
- 17305: 1666                   353          TAD @OUTEMP     ; Get DCB entry
+ 17305: 1666                   353          TAD I OUTEMP    / Get DCB entry
  17306: 7402                   354  OTRTN:  HLT
- 17307: 5674                   355          JMP @OTYPE
-                               356  .=#17366
+ 17307: 5674                   355          JMP I OTYPE
+                               356  *7366
  17366: 7757                   357  PDCB:   DCB-1
- 17367: 0017                   358  L17:    #17
- 17370: 7600                   359  L7600:  #7600
+ 17367: 0017                   358  L17:    17
+ 17370: 7600                   359  L7600:  7600
  17371: 7046                   360  POUDMP: OUTDMP
  17372: 4200                   361  KOUCTL: OUCTL
- 17373: 7400                   362  K7400:  #7400
+ 17373: 7400                   362  K7400:  7400
  17374: 6203                   363  CXF0:   CXF 0
- 17375: 0377                   364  K377:   #377
+ 17375: 0377                   364  K377:   377
  17376: 5000                   365  POUBUF: OUBUF
- 17377: 0200                   366  OUCTLS: OUCTL&#3700
-                               367          ;FIELD 1
-                               368          ;*2000
-                               369          .=#12000
- 12000: 4777                   370          JMS @PUSR       ; Lock monitor into core
- 12001: 0010                   371          #10
- 12002: 4776                   372  CALLCD: JMS @L200       ; Call the command decoder
- 12003: 0005                   373          5
- 12004: 0000                   374          0
- 12005: 4775                   375          JMS @PIOPEN     ; Set up input pointers
- 12006: 4774                   376          JMS @POOPEN     ; Open output file
- 12007: 7700                   377          SMA CLA         ; Error.  If AC < 0, it was fatal
- 12010: 5220                   378          JMP OK          ; Non file structured output
- 12011: 4263                   379          JMS TERR
- 12012: 1720  0516  4006       380          SIXBIT "OPEN FAILED"
+ 17377: 0200                   366  OUCTLS: OUCTL&3700
+                               367          FIELD 1
+                               368          *2000
+ 12000: 4777                   369          JMS I PUSR      / Lock monitor into core
+ 12001: 0010                   370          10
+ 12002: 4776                   371  CALLCD: JMS I L200      / Call the command decoder
+ 12003: 0005                   372          5
+ 12004: 0000                   373          0
+ 12005: 4775                   374          JMS I PIOPEN    / Set up input pointers
+ 12006: 4774                   375          JMS I POOPEN    / Open output file
+ 12007: 7700                   376          SMA CLA         / Error.  If AC < 0, it was fatal
+ 12010: 5220                   377          JMP OK          / Non file structured output
+ 12011: 4263                   378          JMS TERR
+ 12012: 1720  0516  4006       379          TEXT "OPEN FAILED"
  12015: 0111  1405  0400 
- 12020: 4773                   381  OK:     JMS @PICHAR     ; Read a character
- 12021: 5227                   382          JMP TSTEOF      ; Error, see if EOF.
- 12022: 7450                   383          SNA             ; Ignore nulls
- 12023: 5220                   384          JMP OK
- 12024: 4772                   385          JMS @LOCHAR     ; and output the character
- 12025: 5243                   386          JMP OUTERR
- 12026: 5220                   387          JMP OK          ; Continue until EOF.
- 12027: 7700                   388  TSTEOF: SMA CLA         ; Was it fatal?
- 12030: 5240                   389          JMP CLOSE       ; No..EOF.  Close output
- 12031: 4263                   390          JMS TERR
- 12032: 2205  0104  4005       391          SIXBIT "READ ERROR", 0
+ 12020: 4773                   380  OK:     JMS @PICHAR     / Read a character
+ 12021: 5227                   381          JMP TSTEOF      / Error, see if EOF.
+ 12022: 7450                   382          SNA             / Ignore nulls
+ 12023: 5220                   383          JMP OK
+ 12024: 4772                   384          JMS I LOCHAR    / and output the character
+ 12025: 5243                   385          JMP OUTERR
+ 12026: 5220                   386          JMP OK          / Continue until EOF.
+ 12027: 7700                   387  TSTEOF: SMA CLA         / Was it fatal?
+ 12030: 5240                   388          JMP CLOSE       / No..EOF.  Close output
+ 12031: 4263                   389          JMS TERR
+ 12032: 2205  0104  4005       390          TEXT "READ ERROR", 0
  12035: 2222  1722  0000 
- 12040: 4771                   392  CLOSE:  JMS @PCLOSE
- 12041: 5253                   393          JMP CLERR       ; File close failed
- 12042: 5202                   394          JMP CALLCD      ; New input.
-                               395  
- 12043: 4263                   396  OUTERR: JMS TERR
- 12044: 1725  2420  2524       397          SIXBIT "OUTPUT ERROR", 0
+ 12040: 4771                   391  CLOSE:  JMS I PCLOSE
+ 12041: 5253                   392          JMP CLERR       / File close failed
+ 12042: 5202                   393          JMP CALLCD      / New input.
+                               394  
+ 12043: 4263                   395  OUTERR: JMS TERR
+ 12044: 1725  2420  2524       396          TEXT "OUTPUT ERROR", 0
  12047: 4005  2222  1722 
  12052: 0000 
-SMAL8 (rev  3/12)               ossmb.                       19:29:38  Page  10
-                                                             Fri Mar  9 2012
+                               397  
+SMAL8 (rev  3/12)               ossmb.                       07:38:02  Page  10
+                                                             Thu Mar 15 2012
 
-                               398  
- 12053: 4263                   399  CLERR:  JMS TERR        ; Close failure
- 12054: 0314  1723  0540       400          SIXBIT "CLOSE FAILED", 0
+ 12053: 4263                   398  CLERR:  JMS TERR        / Close failure
+ 12054: 0314  1723  0540       399          TEXT "CLOSE FAILED", 0
  12057: 0601  1114  0504 
  12062: 0000 
-                               401  
- 12063: 0000                   402  TERR:   0               ; Routine to print error messages
- 12064: 1663                   403          TAD @TERR
- 12065: 7012                   404          RTR
- 12066: 7012                   405          RTR
- 12067: 7012                   406          RTR
- 12070: 4275                   407          JMS TYPIT       ; Type the character
- 12071: 1663                   408          TAD @TERR
- 12072: 4275                   409          JMS TYPIT
- 12073: 2263                   410          ISZ TERR
- 12074: 5264                   411          JMP TERR+1
-                               412  
- 12075: 0000                   413  TYPIT:  0
- 12076: 0370                   414          AND L77         ; Isolate the character
- 12077: 7450                   415          SNA
- 12100: 5304                   416          JMP CRLF        ; 0 terminates it
- 12101: 1367                   417          TAD C300
- 12102: 4311                   418          JMS TTYOUT
- 12103: 5675                   419          JMP @TYPIT
- 12104: 1366                   420  CRLF:   TAD CR
- 12105: 4311                   421          JMS TTYOUT
- 12106: 1365                   422          TAD LF
- 12107: 4311                   423          JMS TTYOUT
- 12110: 5202                   424          JMP CALLCD
-                               425  
- 12111: 0000                   426  TTYOUT: 0
- 12112: 6046                   427          TLS
- 12113: 6041                   428          TSF
- 12114: 5313                   429          JMP .-1
- 12115: 7200                   430          CLA
- 12116: 5711                   431          JMP @TTYOUT
-                               432  
-                               433  .=#12165
- 12165: 0212                   434  LF:     #212
- 12166: 0215                   435  CR:     #215
- 12167: 0300                   436  C300:   #300
- 12170: 0077                   437  L77:    #77
- 12171: 7106                   438  PCLOSE: OCLOSE
- 12172: 7211                   439  LOCHAR: OCHAR
- 12173: 6613                   440  PICHAR: ICHAR
- 12174: 7000                   441  POOPEN: OOPEN
- 12175: 6601                   442  PIOPEN: IOPEN
- 12176: 0200                   443  L200:   #200
- 12177: 7700                   444  PUSR:   #7700
-                               445          END
+                               400  
+ 12063: 0000                   401  TERR:   0               / Routine to print error messages
+ 12064: 1663                   402          TAD I TERR
+ 12065: 7012                   403          RTR
+ 12066: 7012                   404          RTR
+ 12067: 7012                   405          RTR
+ 12070: 4275                   406          JMS TYPIT       / Type the character
+ 12071: 1663                   407          TAD I TERR
+ 12072: 4275                   408          JMS TYPIT
+ 12073: 2263                   409          ISZ TERR
+ 12074: 5264                   410          JMP TERR+1
+                               411  
+ 12075: 0000                   412  TYPIT:  0
+ 12076: 0370                   413          AND L77         / Isolate the character
+ 12077: 7450                   414          SNA
+ 12100: 5304                   415          JMP CRLF        / 0 terminates it
+ 12101: 1367                   416          TAD C300
+ 12102: 4311                   417          JMS TTYOUT
+ 12103: 5675                   418          JMP I TYPIT
+ 12104: 1366                   419  CRLF:   TAD CR
+ 12105: 4311                   420          JMS TTYOUT
+ 12106: 1365                   421          TAD LF
+ 12107: 4311                   422          JMS TTYOUT
+ 12110: 5202                   423          JMP CALLCD
+                               424  
+ 12111: 0000                   425  TTYOUT: 0
+ 12112: 6046                   426          TLS
+ 12113: 6041                   427          TSF
+ 12114: 5313                   428          JMP .-1
+ 12115: 7200                   429          CLA
+ 12116: 5711                   430          JMP I TTYOUT
+                               431  
+                               432  *2165
+ 12165: 0212                   433  LF:     212
+ 12166: 0215                   434  CR:     215
+ 12167: 0300                   435  C300:   300
+ 12170: 0077                   436  L77:    77
+ 12171: 7106                   437  PCLOSE: OCLOSE
+ 12172: 7211                   438  LOCHAR: OCHAR
+ 12173: 6613                   439  PICHAR: ICHAR
+ 12174: 7000                   440  POOPEN: OOPEN
+ 12175: 6601                   441  PIOPEN: IOPEN
+ 12176: 0200                   442  L200:   200
+ 12177: 7700                   443  PUSR:   7700
+                               444  
+                               445  $
                     no errors

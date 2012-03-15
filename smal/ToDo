@@ -13,7 +13,6 @@ EXT references an external symbol
 COMMON
 MACRO declares a macro
 ENDMAC ends a macro
-USE does a file include
 LIST
 ERROR
 TITLE

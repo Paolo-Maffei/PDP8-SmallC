@@ -16,7 +16,7 @@ while (<INPUT>) {
 }
 
 #
-# Emit a macro to "USE" a library module
+# Emit a macro to "INCLUDE" a library module
 print <<Eof;
 ;
 ; Resolve all the symbols we can.
@@ -24,7 +24,7 @@ MACRO LIB file, name
   IF (FWD(R'name))
     R'OLD = .   ; Save current relocation context.
     . = R'file  ; Set up relocation for <file>.
-    USE file
+    INCLUDE file
     . = R'OLD   ; Restore previous relocation context.
     RESOLVED = 1
   ENDIF
