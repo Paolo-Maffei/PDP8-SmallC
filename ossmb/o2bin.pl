@@ -21,7 +21,7 @@ foreach $f (@ARGV) {
       # Ignore <symbol>=<stuff>
       next if /^\w+/;
       # .=#nnnnn sets the address.
-      if (/^[.]=#(\d+)/) {
+      if (/^[.]=#*(\d+)/) {
         $addr = oct($1);
         die "Bad address $addr" unless ($addr >= 0) && ($addr <= 077777);
         $nf = $addr >> 12;
@@ -39,7 +39,7 @@ foreach $f (@ARGV) {
         next;
       }
       # It better be a constant!
-      die "Unrecognised input: $_" unless /^#(\d+)\r*$/;
+      die "Unrecognised input: $_" unless /^#*(\d+)\r*$/;
       $data = oct($1);
       die "Bad data $data" unless ($data >= 0) && ($data <= 07777);
       die "No location counter!\n" unless defined $loc;
@@ -47,7 +47,7 @@ foreach $f (@ARGV) {
       print OUTPUT pack("c", $data & 077);
       $checksum += ($data>>6) + ($data & 077);
     }
-    $checksum = -$checksum & 07777;
+    $checksum = $checksum & 07777;
     print OUTPUT pack("c", ($checksum>>6));
     print OUTPUT pack("c", $checksum & 077);
     for ($i = 0; $i < 32; $i++) {

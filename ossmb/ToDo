@@ -1,1 +1,2 @@
-The checksum calculation in o2bin seems to be wrong.
+Compare the source to the original, fix bugs as needed in the source 
+and in the assembler.

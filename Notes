@@ -1,4 +1,6 @@
 Notes about a PDP-8 version of small-C:
+(These notes are about a theoretical optimizing 
+compiler, not yet the one implemented here.)
 
 Peephole optimization:
         TAD X

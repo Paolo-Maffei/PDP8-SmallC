@@ -1,186 +1,33 @@
-The profusion of PDP-8 assemblers is pretty bad, as each has 
-a different set of features and syntax, even for common operations.
-Here's a list of some of the differences:
+The pile of feature information that used to be here is now 
+updated in the spreadsheet "Features.xls".
 
-SMAL8 pseudo-ops:
-W defines word values, similar to PALX DATA.
-ASCII does 1 character per word
-IF
-ELSEIF
-ENDIF
-INT defines an external symbol
-EXT references an external symbol
-COMMON
-MACRO declares a macro
-ENDMAC ends a macro
-LIST
-ERROR
-TITLE
-SUBTITLE
-EJECT
-S
-END
-PAGE
-SIXBIT implemented like PAL-D TEXT, but requires "".
-All MRI and OPR instructions, and base IOTs are implemented as pseudo-ops.
-Uses ":" to define labels, ";" for comments, "@" for indirect.
-"=", "<", ">", "<=", ">=" for comparison
-">>", ">>>", "<<" for shifts
-"\\", "&", "!" for not, and, or
-"(" and ")" are parenthesis, overrides precedence free left-to-right evaluation.
-Doubleqote starts and ends a string.
-Functions to detect forward references, etc.
+MACREL has been identified as "the assembler to beat".  It 
+has enough features to just about do what we need, and obeys 
+the PDP-8 conventions sufficiently to assemble the existing 
+body of PDP-8 code, as well.
 
-PALX pseudo-ops:
-END
-ORG
-DATA
-TITLE
-ASCIZ does 1 character per word
-TEXT does 3 character every 2 words
-BLOCK doesn't zero the space reserved
-SIXBIT packs 2 characters per word, offset by 040
-OPDEF similar to FIXMRI
-PAGE
-FIELD
-IM6100
-HM6120
-VECTOR
-STACK
-PUSH
-POP
-PUSHJ
-POPJ
-NOWARN
-Uses [] syntax for current page literals.  Closing bracket required.
-No page zero literals.
-No dot arithmetic.
-Pseudo-op names all start with ".".
-Uses ":" to define labels, ";" for comments, "@" for indirect.
+SMAL8 is currently missing EXPUNGE, FIXMRI, and FIXTAB, which 
+are pretty essential for assembling legacy code without modification.
 
-PAL (Doug Jones) pseudo-ops:
-DECIMA
-OCTAL
-ZBLOCK
-PAGE
-TEXT
-EJECT
-FIELD
-NOPUNC
-ENPUNC
-XLIST
-IFZERO
-IFNZRO
-IFDEF
-IFNDEF
-RELOC
-SEGMNT
-BANK
-FIXMRI
-FIXTAB
-DEVICE
-FILENA
-I
-Z
+Also critical for legacy code would be literal support.
 
+Most of the other PAL variants come pretty easily after that.
 
-PAL-III pseudo-ops:
-I
-Z
-DECIMAL
-OCTAL
-FIELD
-PAUSE
-$
-EXPUNGE
-FIXTAB
-*
-Uses "," to define labels, "/" for comments, ";" for multiple statements/line
-Has FADD/FSUB/FMPY/FDIV/FGET/FPUT predefined.
-No literals.
+MACREL is not entirely compatible with MACRO-8, so probably 
+both feature sets would need to be implemented.  The MACREL 
+relocation model is also page-oriented -- things can go on 
+any page, but allocate the whole page.  That "solves" the 
+page packing problem, but I'd like to hope to do better.
 
-MACRO pseudo-ops:
-DECIMAL
-OCTAL
-PAUSE
-FIELD
-Z
-I
-EXPUNGE
-FIXTAB
-DEFINE
-TEXT stores 2 characters per word, by truncation
-FLTG
-DUBL
-PAGE
-*
-$
-Uses "," to define labels, "/" for comments, ";" for multiple statements/line
-&, !, operators
-" to quote a single character
-() for current page literals
-[] for page zero literals
-<> encloses macros
-Will generate links for off-page direct accesses.
+The SABR assembler is interesting, but doesn't support enough 
+of the directives used in legacy code.  It also has it's own 
+assembler hacks and funky runtime to support a coding model 
+that pretends to be independent of the addressing limitations 
+of the PDP-8.
 
-4K PAL-D pseudo-ops:
-FIELD
-PAUSE
-DECIMAL
-OCTAL
-Z
-I
-FIXTAB
-EXPUNGE
-TEXT
-PAGE
-XLIST
-$
-Compatible with both PAL-III and MACRO, but without macros, DUBL, or FLTG.
+The RALF assembler is even worse, and barely supports the 
+PDP-8 at all.  It is more properly described as an assembler 
+for the Floating Point Processor.  That was good enough for 
+Fortran IV, and would probably support C as well, if I wanted 
+to target Small-C for the FPP.
 
-8K PAL-D pseudo-ops:
-ZBLOCK
-IFDEF symbol <statements>
-IFZERO expression <statements>
-NOPUNCH
-ENPUNCH
-EJECT
-Compatible with 4K PAL-D.
-
-SABR pseudo-ops:
-ABSYM
-ARG
-BLOCK does zero the space reserved
-CALL
-COMMN
-CPAGE
-DECIM
-DUMMY
-EAP
-END
-ENTRY
-FORTR
-IF name, skipcount
-LAP
-OCTAL
-OPDEF
-PAGE
-PAUSE
-REORG
-RETRN
-SKPDF
-TEXT
-Current page literals only.
-Address arithmetic generally disallowed.
-Postfix # to increment an address.
-
-
-Here's a partial list of pseudo-ops we still probably need:
-FIELD
-OPDEF
-DEVICE
-FILENAME
-ASCIZ
-TEXT
-BLOCK
-LIST/XLIST
