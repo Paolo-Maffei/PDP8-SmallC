@@ -31,3 +31,52 @@ for the Floating Point Processor.  That was good enough for
 Fortran IV, and would probably support C as well, if I wanted 
 to target Small-C for the FPP.
 
+Features we still need:
+START, not S
+Fix TEXT compatibility.
+DEVICE pseudo-op
+FILENAME pseudo-op
+BSW
+DVI/NMI/SHL/ASR/LSR
+MQL/MQA/SWP/CAM/ACL
+SKON/SRQ/GTF/RTF/SGT/CAF
+KCF/KIE
+IOT/OPR
+PSF/PCF/PPC
+PCE, RPE
+TFL/TSK/SPF/SPI
+EXPUNGE/FIXMRI/FIXTAB pseudo-ops
+ASECT/DSECT/FSECT/RSECT/XSECT/ZSECT pseudo-ops
+ENPUNCH/NOPUNCH pseudo-ops
+GLOBAL/ENTRY/EXTERNAL/ZTERNAL/SECREF pseudo-ops
+IFDEF/IFNDEF pseudo-ops
+IFZERO/IFNZRO pseudo-ops
+XLIST pseudo-op
+Literals: "[", "("
+Multiply with "^", divide with "%"
+ZBLOCK pseudo-op
+
+Features for later:
+<> Expressions
+^" for control characters
+^B, ^D, ^O, trailing dot for radix control
+backslash lexical operator
+CHAIN as well as INCLUDE
+Colon locals
+CDI for CXF
+DTORG?
+FLD function
+JSW
+LEVEL
+Links for offpage direct access
+LIST/NOLIST
+MEXIT
+NARGS/NCHAR
+Assembly time PUSH, POP
+RADIX
+RELOC
+REPT/ENDR
+Two character constants with single quote
+Trailing $ for local symbols
+VERSION
+XEDF
