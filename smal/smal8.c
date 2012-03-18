@@ -695,7 +695,7 @@ typedef enum {
 	maxuse, /* too many source files */
 	baduse, /* cannot open use file */
 	miseif, /* missing endif */
-	misemc, /* missing endmac */
+	misemc, /* missing endm */
 	misquo, /* missing end quote */
 	muldef, /* multiple symbol definition */
 	mulstt, /* multiple start directives */
@@ -727,7 +727,7 @@ static char * errormsgs[] = { "---",
 	"too many use levels       ",
 	"cannot open use file      ",
 	"missing endif             ",
-	"missing endmac            ",
+	"missing endm              ",
 	"missing end quote         ",
 	"multiple label definition ",
 	"multiple start directives ",
@@ -2641,8 +2641,8 @@ static parm lookup_(inbufptr pos, inbufptr lim)
 
 static void getbody()
 {
-	/* parse macro body of form: <body> ::= <linesequence> endmac */
-	/* counter to find right endmac when nested */
+	/* parse macro body of form: <body> ::= <linesequence> endm */
+	/* counter to find right endm when nested */
 	int nest;
 	inbufptr pos;
 	/* progress pointers for parameter scan */

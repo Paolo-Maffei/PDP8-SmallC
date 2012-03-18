@@ -241,8 +241,8 @@ setcodes() {
   code[AND12]   = "\211JMS I __and12\n";
   code[ANEG1]   = "\010JMS I __aneg1\n";
   code[ARGCNTn] = "\000JMS I __argcntn\n <n>\n";
-  code[ASL12]   = "\011JMS I __asl\n";
-  code[ASR12]   = "\011JMS I __asr\n";
+  code[ASL12]   = "\011JMS I __asl12\n";
+  code[ASR12]   = "\011JMS I __asr12\n";
   code[CALL1]   = "\010JMS I __call1\n";
   code[CALLm]   = "\020JMS I __callm\n <m>\n";
   code[BYTE_]   = "\000  ";
@@ -260,7 +260,7 @@ setcodes() {
   code[EQ10f]   = "\010JMS I __eq10f\n _<n>\n";
   code[EQ12]    = "\211JMS __eq\n";
   code[GE10f]   = "\010JMS I __ge10f\n _<n>\n";
-  code[GE12]    = "\011JMS __ge\n";
+  code[GE12]    = "\011JMS I __ge\n";
   code[GE12u]   = "\011JMS I __uge\n";
   code[GETb1m]  = "\020JMS I __getb1m\n <m>\n";
   code[GETb1mu] = "\020JMS I __getb1mu\n <m>\n";
