@@ -3,10 +3,10 @@
 #
 # Read in "public" declarations to get a sense of what
 # is where in the library.
-open(INPUT, "grep -i 'INT' *.ASM |")
+open(INPUT, "grep -i 'GLOBAL' *.ASM |")
   || die "grep pipe: $!";
 while (<INPUT>) {
-  if (/(.*):\s*INT\s*(\w+)/i) {
+  if (/(.*).ASM:\s*GLOBAL\s*(\w+)/i) {
     $module = $1;
     $name = $2;
     warn "$module:$name hides $public{$name}:$name\n" if defined $public{$name};
@@ -18,17 +18,19 @@ while (<INPUT>) {
 #
 # Emit a macro to "INCLUDE" a library module
 print <<Eof;
-;
-; Resolve all the symbols we can.
+/
+/ Resolve all the symbols we can.
+OCTAL
+R=.
 MACRO LIB file, name
-  IF (FWD(R'name))
-    R'OLD = .   ; Save current relocation context.
-    . = R'file  ; Set up relocation for <file>.
+  IF (FWD(R`name))
+    R`OLD = .   / Save current relocation context.
+    . = R`file  / Set up relocation for <file>.
     INCLUDE file
-    . = R'OLD   ; Restore previous relocation context.
+    . = R`OLD   / Restore previous relocation context.
     RESOLVED = 1
   ENDIF
-ENDMAC
+ENDM
 Eof
 #
 # Emit a macro which invokes the LIB macro for each symbol
@@ -44,7 +46,7 @@ print <<Eof;
   IF RESOLVED
     RESOLVER
   ENDIF
-ENDMAC
+ENDM
 RESOLVER
 Eof
 #
@@ -52,23 +54,23 @@ Eof
 # pile of relocation contexts active, one per file possibly 
 # included.
 print <<Eof;
-;
-; Build up the initial map of free memory
-; Pages are numbered 1..32, not 0..31 here.
+/
+/ Build up the initial map of free memory
+/ Pages are numbered 1..32, not 0..31 here.
 MACRO SETROOM page
-  IF . > page * #200
-    ROOM'page = 0
+  IF . > (page << 7)
+    ROOM`page = 0
   ELSE
-    ROOM'page = page * 200 - .
-    IF ROOM'page > #200
-      ROOM'page = #200
+    ROOM`page = (page << 7) - .
+    IF ROOM`page > #200
+      ROOM`page = #200
     ENDIF
   ENDIF
-ENDMAC
-; SETROOM  1
-; SETROOM  2
-; SETROOM  3
-; SETROOM  4
+ENDM
+/ SETROOM  1
+/ SETROOM  2
+/ SETROOM  3
+/ SETROOM  4
 SETROOM  5
 SETROOM  6
 SETROOM  7
@@ -96,26 +98,28 @@ SETROOM 28
 SETROOM 29
 SETROOM 30
 SETROOM 31
-; SETROOM 32
-;
-; Finally, pack the modules
+/ SETROOM 32
+/
+/ Finally, pack the modules
 MACRO PACK page,file
-  IF TYP(R'file) != 0 ; Was file used and still relocatable?
-    IF ABS(R'file) < ROOM'page ; Yes, does it fit on the specified page?
-      ; Reduce the space available on this page.
-      ROOM'page = ROOM'page - ABS(R'file)
-      ; Set the relocation base for the file.
-      R'file = page*#200 - ROOM'page
-      ; Remember that we allocated something
-      PACKED = 1
+  IF DEF(R`file) / Was file used
+    IF TYP(R`file) != 0 / and still relocatable?
+      IF ABS(R`file) < ROOM`page / Yes, does it fit on the specified page?
+        / Reduce the space available on this page.
+        ROOM`page = ROOM`page - ABS(R`file)
+        / Set the relocation base for the file.
+        R`file = page*#200 - ROOM`page
+        / Remember that we allocated something
+        PACKED = 1
+      ENDIF
     ENDIF
   ENDIF
-ENDMAC
+ENDM
 MACRO PFILE file
-  ; PACK  1,file ; The first few pages are reserved for vm.c
-  ; PACK  2,file ; Those locations are filled, so don't even try.
-  ; PACK  3,file
-  ; PACK  4,file
+  / PACK  1,file / The first few pages are reserved for vm.c
+  / PACK  2,file / Those locations are filled, so don't even try.
+  / PACK  3,file
+  / PACK  4,file
   PACK  5,file
   PACK  6,file
   PACK  7,file
@@ -141,18 +145,18 @@ MACRO PFILE file
   PACK 27,file
   PACK 28,file
   PACK 29,file
-  ; PACK 30,file ; Two pages reserved for stack
-  ; PACK 31,file
-  ; PACK 32,file ; Reserved for operating system
-ENDMAC
+  / PACK 30,file / Two pages reserved for stack
+  / PACK 31,file
+  / PACK 32,file / Reserved for operating system
+ENDM
 MACRO PACKEM
   PACKED = 0
 Eof
 foreach $name (sort keys %modules) {
-  print "  PFILE \"$name\"\n";
+  print "  PFILE $name\n";
 }
 print <<Eof;
-ENDMAC
+ENDM
 PACKEM
 Eof
 

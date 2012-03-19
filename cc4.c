@@ -288,7 +288,7 @@ setcodes() {
   code[JMPm]    = "\000JMP _<n>\n";
   code[LABm]    = "\000_<n>,\n";
   code[LE10f]   = "\010JMS I __le10f\n _<n>\n";
-  code[LE12]    = "\011JMS __le\n";
+  code[LE12]    = "\011JMS I __le\n";
   code[LE12u]   = "\011JMS I __ule\n";
   code[LNEG1]   = "\010JMS __lneg\n";
   code[LT10f]   = "\010JMS I __lt10f\n _<n>\n";

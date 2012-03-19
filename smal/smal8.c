@@ -2401,6 +2401,8 @@ static void makeext(symptr symbol)
 	/* used only from externl and comdef */
 
 	association *WITH = &symtab[symbol - 1];
+        /* VRS EXTERNAL for previously defined GLOBAL is ignored. */
+	if (WITH->use & (1L << intdef)) return;
 	if (((1L << setyet) & WITH->use) != 0)
 		errmsg(muldef, lex.pos, lex.lim);
 /* VRS I hope this wasn't important somehow! */
@@ -2668,11 +2670,11 @@ static void getbody()
 				       && (pos <= length)
 				) {
 					/* copy non identifier text */
-					if (line[pos - 1] == '\'') {
+					if (line[pos - 1] == '\`') {
 						/* squeeze out quote marks */
 						pos++;
 						/* assert line[length+1]='/' */
-						while (line[pos - 1] == '\'') {
+						while (line[pos - 1] == '\`') {
 						    putch('\'');
 						    pos++;
 						}
@@ -3207,7 +3209,7 @@ static void onepass()
                     /* Get the referenced address */
                     expresbal();
                     if (expr.base == abssym) {
-                        if (expr.offset < 127) {
+                        if ((expr.offset&07777) < 127) {
                             /*
                              * The reference is to an absolute address on
                              * page zero.  We can fully resolve the instruction.
@@ -3311,7 +3313,7 @@ static void onepass()
                             expr.offset += loc.offset & 070000;
                         loc = expr;
 		} else if (lex.typ != eol) {
-                        /* Random junk, treat as if "DW" */
+                        /* Random junk, treat as if "DATA" */
                         expresbal();
                         putobj(1L, expr.offset, expr.base);
                         while (lex.typ != eol) {

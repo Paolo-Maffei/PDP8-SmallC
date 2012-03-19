@@ -1,10 +1,5 @@
 /DATA
-/ BUGBUG, This is assembler code, not C code.  The C compiler
-/ emits duplicate extern definitions for everything on page 0.
-/ BUGBUG, There is a kind of circular dependency here, since the
-/ C compiler uses vm.h, which is computed from the code below.
-/ That should be fixed by just writing this in assembler to begin
-/ with.
+        FIELD 1
         *0
         0       / Reserve location zero
 GLOBAL _AX
@@ -17,6 +12,7 @@ GLOBAL _BP
 _BP,    0
 GLOBAL _SP
 _SP,    7600    / Grow stack down from here
+        *20     / Skip over the autoindex locations
 / Dispatch pointers for VM operations
 GLOBAL __add12
 __add12,  _add12
@@ -98,6 +94,8 @@ GLOBAL __gt10f
 __gt10f,  _gt10f
 GLOBAL __imul
 __imul, _imul
+GLOBAL __le
+__le,   _le
 GLOBAL __le10f
 __le10f,  _le10f
 GLOBAL __lt10f
@@ -186,15 +184,6 @@ __ne,   0
         IAC
         DCA _AX
         JMP I __ne
-GLOBAL __le
-__le,   0
-        TAD _BX
-        CIA
-        TAD _AX
-        SPA SNA CLA
-        IAC
-        DCA _AX
-        JMP I __le
 GLOBAL __lt
 __lt,   0
         TAD _BX
@@ -475,6 +464,15 @@ _le10fa,TAD I _le10f     / Get "branch false" address
         DCA _le10f
         JMP I _le10f
 / _le12 and _le12u are implemented with __le and __ule.
+GLOBAL _le
+_le,    0
+        TAD _BX
+        CIA
+        TAD _AX
+        SPA SNA CLA
+        IAC
+        DCA _AX
+        JMP I _le
 / _lneg1 is implemented with __lneg
 _lt10f, 0
         TAD _AX
@@ -489,6 +487,7 @@ _lt10fa,TAD I _lt10f     / Get "branch false" address
 / _mod12 and _mod12u are implemented with __mod and __modu.
 / _move21 is implemented inline.
 / _mul12 and _mul12u are implemented with __imul and __umulu.
+        PAGE
 _ne10f, 0
         TAD _AX
         SNA CLA
@@ -499,7 +498,6 @@ _ne10fa,TAD I _ne10f     / Get "branch false" address
         DCA _ne10f
         JMP I _ne10f
 / nearm is implemented inline.
-        PAGE
 _or12,  0
         TAD _AX         / Complement _AX
         CMA
@@ -622,17 +620,17 @@ _rets,  TAD I _SP
         DCA _rdec2
         JMP I _rdec2
 / _rinc1, _rinc2 are implemented inline.
+        PAGE
 _sub_m, 0               / Two operands, destination first
         TAD I _sub_m
         ISZ _sub_m
-        DCA _rdec2
+        DCA _sub12
         TAD I _sub_m
         ISZ _sub_m
         CIA
-        TAD I _rdec2
-        DCA I _rdec2
+        TAD I _sub12
+        DCA I _sub12
         JMP I _sub_m
-        PAGE
 _sub12, 0
         TAD _BX
         CIA
@@ -740,6 +738,7 @@ _div,   0
         TAD _CX
         DCA _AX
         JMP I _div
+        PAGE
 _umulu,
 _imul,  0
         TAD _AX         / Start with +X*2^0
