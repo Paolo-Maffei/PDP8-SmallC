@@ -1095,6 +1095,7 @@ static void get(FILE *f)
 	i = 0;
 	for (;;) {
 		ch = getc(f);
+                if (ch == '\r') ch = getc(f);
 		if ((ch == EOF) || (ch == '\n')) break;
                 if (ch == ';') break;
 		if (i >= (linelen - 1)) break;
@@ -2670,11 +2671,11 @@ static void getbody()
 				       && (pos <= length)
 				) {
 					/* copy non identifier text */
-					if (line[pos - 1] == '\`') {
+					if (line[pos - 1] == '`') {
 						/* squeeze out quote marks */
 						pos++;
 						/* assert line[length+1]='/' */
-						while (line[pos - 1] == '\`') {
+						while (line[pos - 1] == '`') {
 						    putch('\'');
 						    pos++;
 						}
@@ -3236,8 +3237,9 @@ static void onepass()
                         for (i=oppos; i<oplim; i++)
                             fputc(line[i-1], obj);
                         fputc(' ', obj);
-                        if (indir)
-                            fputc('@', obj);
+                        if (indir) {
+                            fputc('I', obj);
+                        }
                     }
                     putobj(1L, expr.offset, expr.base);
                 }
@@ -3595,5 +3597,5 @@ main(int argc, char *argv[])
 		fclose(obj);
 	if (dmp != NULL)
 		fclose(dmp);
-	exit(0); /* normal termination */
+	exit(errorcount); /* normal termination */
 }

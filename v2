@@ -1,0 +1,3 @@
+# cat clib/vm.o hello.o clib/fprintf.o clib/csyslib.o clib/strlen.o clib/itoa.o clib/is.o clib/fputc.o clib/itoab.o clib/atoi.o clib/iscons.o clib/avail.o clib/exit.o clib/isatty.o clib/auxbuf.o clib/pad.o clib/reverse.o clib/itou.o clib/fclose.o clib/fputs.o clib/left.o clib/malloc.o >link.a
+(echo ".=#11230"; cat clib/vm.o hello.o clib/fprintf.o stubs.o clib/strlen.o clib/itoa.o clib/is.o clib/itoab.o clib/atoi.o clib/reverse.o) >link.a
+./smal8 link.a

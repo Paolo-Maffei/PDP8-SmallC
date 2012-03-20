@@ -2,14 +2,18 @@
 ** return length of string s (fast version)
 */
 strlen(s) char *s; {
-  #asm
-  xor al,al        ; set search value to zero
-  mov cx,65535     ; set huge maximum
-  mov di,[bp+4]    ; get address of s
-  cld              ; set direction flag forward
-  repne scasb      ; scan for zero
-  mov ax,65534
-  sub ax,cx        ; calc and return length
-  #endasm
-  }
+    s; /* Get s into AX */
+#asm
+    TAD _AX
+    DCA _BX
+    DCA _AX
+L,  TAD I _BX
+    SZA
+    ISZ _AX
+    SNA CLA
+    JMP I __rets
+    JMS I __jmpm
+    L
+#endasm
+}
 

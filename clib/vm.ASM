@@ -94,6 +94,8 @@ GLOBAL __gt10f
 __gt10f,  _gt10f
 GLOBAL __imul
 __imul, _imul
+GLOBAL __jmpm
+__jmpm, _jmpm
 GLOBAL __le
 __le,   _le
 GLOBAL __le10f
@@ -195,13 +197,8 @@ __lt,   0
         JMP I __lt
 GLOBAL __ge
 __ge,   _ge
-GLOBAL __lneg
-__lneg, 0
-        TAD _AX
-        SNA CLA
-        IAC
-        DCA _AX
-        JMP I __lneg
+GLOBAL __lneg1
+__lneg1,_lneg1
 GLOBAL __switch
 __switch,0
         TAD I __switch
@@ -311,13 +308,13 @@ _call1, 0
         DCA I _SP        / onto stack
         JMP I _AX        / Go to subroutine address in _AX
 _callm, 0
-        TAD I _call1     / Get subroutine address
-        ISZ _call1
+        TAD I _callm     / Get subroutine address
+        ISZ _callm
         DCA _aneg1      / Save for now
         CLA CMA
         TAD _SP
         DCA _SP
-        TAD _call1      / Get return address
+        TAD _callm      / Get return address
         DCA I _SP        / onto stack
         JMP I _aneg1     / Go to saved subroutine address
 _com1,  0
@@ -452,7 +449,10 @@ _gt10fa,TAD I _gt10f     / Get "branch false" address
 / _gt12 and _gt12u are implemented with __gt and __ugt.
 / _incbp and _incwp are implemented inline.
 / word_, wordn, and wordr0 are implemented inline.
-/ _jmp is implemented inline.
+_jmpm,  0
+        TAD I _jmpm
+        DCA _jmpm
+        JMP I _jmpm
 / labm is inplemented inline.
 _le10f, 0
         TAD _AX
@@ -473,7 +473,13 @@ _le,    0
         IAC
         DCA _AX
         JMP I _le
-/ _lneg1 is implemented with __lneg
+_lneg1, 0
+        TAD _AX
+        SNA CLA
+        IAC
+        DCA _AX
+        JMP I _lneg1
+        PAGE
 _lt10f, 0
         TAD _AX
         SMA CLA
@@ -487,7 +493,6 @@ _lt10fa,TAD I _lt10f     / Get "branch false" address
 / _mod12 and _mod12u are implemented with __mod and __modu.
 / _move21 is implemented inline.
 / _mul12 and _mul12u are implemented with __imul and __umulu.
-        PAGE
 _ne10f, 0
         TAD _AX
         SNA CLA
@@ -610,6 +615,7 @@ _rdec2, 0
         DCA _BX
         JMP I _rdec2
 / refm is implemented inline.
+        PAGE
 _return,TAD _BP
         DCA _SP
 _rets,  TAD I _SP
@@ -617,10 +623,9 @@ _rets,  TAD I _SP
         DCA _BP
         TAD I _SP
         ISZ _SP
-        DCA _rdec2
-        JMP I _rdec2
+        DCA _sub_m
+        JMP I _sub_m
 / _rinc1, _rinc2 are implemented inline.
-        PAGE
 _sub_m, 0               / Two operands, destination first
         TAD I _sub_m
         ISZ _sub_m
@@ -759,4 +764,6 @@ mullp,  TAD _BX         / Y have bits left?
         JMP I _imul     / Yes, can't affect result anymore
         DCA _CX         / No, set up for next time
         JMP mullp
+GLOBAL __ORG
+__ORG=. / Force the code to load here!
         END
