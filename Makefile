@@ -17,6 +17,7 @@ vm.h : clib/vm.ASM ./clib/mkzero.pl ; (cd clib; ./mkzero.pl)
 #
 # A quick regression test
 test: all
+	cd clib; make
 	./smallcc hello.c stubs.c
 	./smal8 hello.ASM
 	./link hello.o

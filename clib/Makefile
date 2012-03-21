@@ -21,7 +21,7 @@ vm.o:: vm.ASM
 	../smal8 $<
 
 .c.o:
-	../smallcc $<
+	../smallcc -p $<
 	../smal8 $(<:.c=.ASM)
 
 $(OBJ):: ../smallcc ../smal8
