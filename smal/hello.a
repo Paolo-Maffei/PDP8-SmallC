@@ -1,1 +1,26 @@
-INCLUDE "hello.asm"
+MYNOP=7000
+
+/       . = 200
+        FIELD 1
+        *400
+hello,  TAD message     / Initialize message pointer
+        DCA ptr
+loop,   TAD I ptr        / Get a character
+        ISZ ptr
+        SNA
+        HLT             / '\0' terminates the string
+        TLS
+        TSF
+        JMP .-1
+        CLA
+        JMP loop
+ptr,    DATA .
+message,.+1
+        ASCII "Hello World",15,12,0
+        PAGE
+        MYNOP
+        DECIMAL
+        10
+        OCTAL
+        10;20
+$

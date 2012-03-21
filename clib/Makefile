@@ -15,6 +15,8 @@ BROKEN = csyslib.o exit.o fgetc.o fputc.o free.o isatty.o iscons.o rename.o \
 DIR: $(OBJ)
 	./mkDIR.pl >$@
 
+clean: ; rm -f *.o *.lst
+
 vm.o:: vm.ASM
 	../smal8 $<
 
