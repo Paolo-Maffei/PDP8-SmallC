@@ -8,9 +8,9 @@ smaldir: ; cd smal; make
 
 clibdir: ; cd clib; make
 
-clean : ; cd smal; make clean; rm -f smallcc $(OBJ)
+clean : ; (cd smal; make clean); rm -f *.o hello.lst *.ASM
 
-smallcc : $(OBJ) vm.h ; $(CC) -g -o $@ $(OBJ) clib/getarg.c
+smallcc : $(OBJ) vm.h ; $(CC) -g -o $(OBJ) clib/getarg.c
 
 vm.h : clib/vm.ASM ./clib/mkzero.pl ; (cd clib; ./mkzero.pl)
 
