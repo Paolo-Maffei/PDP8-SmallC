@@ -1,10 +1,10 @@
-ALL = smal8
+ALL = smal8 ../smal8 ../link
 CFLAGS = -g
 
 # Run a quick regression test on the assembler.
 all: $(ALL) hello.bin
 
-../smal8: smal8 ../smal8 ../link
+../smal8: smal8
 	cp smal8 ..
 
 ../link: link.sh
