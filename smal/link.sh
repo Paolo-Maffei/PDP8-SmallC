@@ -24,7 +24,6 @@ done
 echo INCLUDE \"clib/DIR\" >> link.a
 echo C=. >> link.a
 echo RUNUSED=C >> link.a
-./smal8 -D -L link.a
-rm link.a
+./smal8 -D -L link.a && rm link.a
 sort +2 -3 link.d > link.map
 

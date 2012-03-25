@@ -3265,20 +3265,31 @@ static void onepass()
 		break;
 
 	case opcxf:
-                /* Get the referenced address */
-                expresbal();
-                if ((expr.base != abssym) || (expr.offset > 077)) {
-                    errmsg(bounds, exprpos, exprlim);
-                    break;
-                }
-                if (expr.offset > 07) {
-                    if (expr.offset & 07) {
-                        errmsg(bounds, exprpos, exprlim);
+                {   int inst;
+                    inst = opval;
+                    while (lex.typ == id) {
+                        opcode();
+                        if (optype != opcxf) { /* better be another CXF */
+                            errmsg(unproc, oppos, oplim);
+                            break;
+                        }
+                        inst |= opval;
                     }
-                } else {
-                    expr.offset <<= 3;
+                    /* Get the field expression */
+                    expresbal();
+                    if ((expr.base != abssym) || (expr.offset > 077)) {
+                        errmsg(bounds, exprpos, exprlim);
+                        break;
+                    }
+                    if (expr.offset > 07) {
+                        if (expr.offset & 07) {
+                            errmsg(bounds, exprpos, exprlim);
+                        }
+                    } else {
+                        expr.offset <<= 3;
+                    }
+                    putobj(1L, inst + expr.offset, abssym);
                 }
-                putobj(1L, opval + expr.offset, abssym);
 		break;
 	case optext: /* packed ascii string */
 		while (lex.typ != eol) {

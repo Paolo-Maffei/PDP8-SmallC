@@ -3,7 +3,11 @@ CFLAGS = -g
 
 # Run a quick regression test on the assembler.
 all: $(ALL) hello.bin
+
+../smal8: smal8 ../smal8 ../link
 	cp smal8 ..
+
+../link: link.sh
 	cp link.sh ../link
 
 hello.o: hello.a smal8
