@@ -16,4 +16,4 @@ hello.o: hello.a smal8
 hello.bin: hello.o
 	../ossmb/o2bin.pl hello.o
 
-clean: ; rm -f *.lst *.o *.d *.bin *.map
+clean: ; rm -f x$(ALL) *.lst *.o *.d *.bin *.map
