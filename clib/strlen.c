@@ -8,6 +8,7 @@ strlen(s) char *s; {
     DCA _BX
     DCA _AX
 L,  TAD I _BX
+    ISZ _BX
     SZA
     ISZ _AX
     SNA CLA

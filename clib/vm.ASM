@@ -48,8 +48,8 @@ GLOBAL __com1
 __com1,   _com1
 GLOBAL __dbl1
 __dbl1,   _dbl1
-GLOBAL __dbl2
-__dbl2,   _dbl2
+/GLOBAL __dbl2          / Turns out the compiler won't generate these
+/__dbl2,   _dbl2
 GLOBAL __decbp
 __decbp,
 GLOBAL __decwp
@@ -170,27 +170,27 @@ GLOBAL __umulu
 __umulu,_umulu
 GLOBAL __eq
 __eq,   0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SNA CLA
         IAC
         DCA _AX
         JMP I __eq
 GLOBAL __ne
 __ne,   0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SZA CLA
         IAC
         DCA _AX
         JMP I __ne
 GLOBAL __lt
 __lt,   0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SPA CLA
         IAC
         DCA _AX
@@ -214,9 +214,16 @@ __switch,0
         JMP __switch+1
         JMP I _CX
         PAGE
-        EXTERNAL _main
-        JMP I __start    / Make start at 0200 work
-__start,_main
+        EXTERNAL _main, _exit
+_start, TAD C7600       / Make start at 10200 work
+        DCA _SP         / Initialize stack pointer
+                        / TODO: Set up argc, argv
+        JMS I __callm   / Call main
+        _main
+        JMS I __push1   / Pass return value
+        JMS I __callm   / to exit
+        _exit
+C7600,  7600
 _add12, 0
         TAD _AX
         TAD _BX
@@ -235,10 +242,10 @@ _add1n, 0
         JMP I _add1n
 _add2n, 0
         TAD _BX
-        TAD I _add1n
-        ISZ _add1n
+        TAD I _add2n
+        ISZ _add2n
         DCA _BX
-        JMP I _add1n
+        JMP I _add2n
 _addbpn,
 _addwpn,0
         TAD I _addwpn
@@ -276,30 +283,33 @@ _argcntn,0
         DCA _CX
         JMP I _argcntn
 _asl12, 0
-        TAD _BX
+        TAD _AX
         CIA
         SNA
-        JMP I _asl12 / Shift 0 bits
-        DCA _BX
-        TAD _AX
-        TAD _AX
+        JMP _asl12r     / Shift 0 bits
         DCA _AX
-        ISZ _BX
-        JMP .-4
+        TAD _BX
+        CLL RAL
+        ISZ _AX
+        JMP .-2
+        DCA _BX
+_asl12r,TAD _BX
+        DCA _AX
         JMP I _asl12
 _asr12, 0
-        TAD _BX
+        TAD _AX
         CIA
         SNA
-        JMP I _asr12 / Shift 0 bits
-        DCA _BX
-        TAD _AX
-        CLL RAR
+        JMP _asr12r     / Shift 0 bits
         DCA _AX
-        ISZ _BX
-        JMP .-4
+        TAD _BX
+        CLL RAR
+        ISZ _AX
+        JMP .-2
+        DCA _BX
+_asr12r,TAD _BX
+        DCA _AX
         JMP I _asr12
-/ _asr12 is implemented by a call to __asr.
 _call1, 0
         CLA CMA
         TAD _SP
@@ -315,8 +325,8 @@ _callm, 0
         TAD _SP
         DCA _SP
         TAD _callm      / Get return address
-        DCA I _SP        / onto stack
-        JMP I _aneg1     / Go to saved subroutine address
+        DCA I _SP       / onto stack
+        JMP I _aneg1    / Go to saved subroutine address
 _com1,  0
         TAD _AX
         CMA
@@ -327,11 +337,11 @@ _dbl1,  0
         TAD _AX
         DCA _AX
         JMP I _dbl1
-_dbl2,  0
-        TAD _BX
-        TAD _BX
-        DCA _BX
-        JMP I _dbl2
+/_dbl2,  0              / Turns out the compiler won't generate these
+/        TAD _BX
+/        TAD _BX
+/        DCA _BX
+/        JMP I _dbl2
 _decbp,
 _decwp, 0
         CLA CMA
@@ -344,7 +354,7 @@ _enter, 0
         TAD _SP
         DCA _SP
         TAD _BP
-        DCA I _SP        / "push bp"
+        DCA I _SP       / "push bp"
         TAD _SP
         DCA _BP         / "mov bp,sp"
         JMP I _enter
@@ -422,17 +432,17 @@ _getw2n,0
         DCA _BX
         JMP I _getw2n
 _ge,    0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SMA CLA
         IAC     / _AX-_BX >= 0
         DCA _AX
         JMP I _ge
 _gt,    0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SMA SZA CLA
         IAC     / _AX-_BX > 0
         DCA _AX
@@ -466,9 +476,9 @@ _le10fa,TAD I _le10f     / Get "branch false" address
 / _le12 and _le12u are implemented with __le and __ule.
 GLOBAL _le
 _le,    0
-        TAD _BX
-        CIA
         TAD _AX
+        CIA
+        TAD _BX
         SPA SNA CLA
         IAC
         DCA _AX
@@ -554,7 +564,7 @@ _push2, 0
         DCA _SP
         TAD _BX
         DCA I _SP
-        JMP I _push1
+        JMP I _push2
 _pushm, 0
         CLA CMA
         TAD _SP
@@ -648,7 +658,7 @@ _sub1n, 0
         CIA
         TAD _AX
         DCA _AX
-        JMP I _sub12
+        JMP I _sub1n
 _subbpn,
 _subwpn,0
         TAD I _sub1n
@@ -675,37 +685,37 @@ _swap1s,0
         JMP I _swap1s
 / _xor12 is implemented with __xor.
 _ule,   0
-        TAD _BX
-        CLL CML CIA
         TAD _AX
+        CLL CML CIA
+        TAD _BX
         SZL SNA CLA
         IAC
         DCA _AX
-        JMP I __ule
+        JMP I _ule
 _ult,   0
-        TAD _BX
-        CLL CML CIA
         TAD _AX
+        CLL CML CIA
+        TAD _BX
         SZL CLA
         IAC
         DCA _AX
-        JMP I __ult
+        JMP I _ult
 _uge,   0
-        TAD _BX
-        CLL CML CIA
         TAD _AX
+        CLL CML CIA
+        TAD _BX
         SNL CLA
         IAC     / _AX-_BX >= 0
         DCA _AX
-        JMP I __uge
+        JMP I _uge
 _ugt,   0
-        TAD _BX
-        CLL CML CIA
         TAD _AX
+        CLL CML CIA
+        TAD _BX
         SNL SZA CLA
         IAC     / _AX-_BX > 0
         DCA _AX
-        JMP I __ugt
+        JMP I _ugt
 div,    0              / Slow but small div for now
         DCA _CX
         TAD _BX
