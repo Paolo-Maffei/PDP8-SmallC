@@ -327,7 +327,7 @@ level14(is)  int *is; {
             }
           }
         else {
-          if(ptr[TYPE] >> 2 == BPW) gen(DBL1, 0);
+          if(ptr[TYPE] >> 2 > 1) gen(DBL1, 0);
           gen(ADD12, 0);
           }
         is[TA] = 0;
@@ -438,6 +438,7 @@ callfunc(ptr)  char *ptr; {      /* symbol table entry or 0 */
 ** true if is2's operand should be doubled
 */
 dble(oper, is1, is2) int oper, is1[], is2[]; {
+  if (BPW < 2) return 0;
   if((oper != ADD12 && oper != SUB12)
   || (is1[TA] >> 2 != BPW)
   || (is2[TA])) return 0;

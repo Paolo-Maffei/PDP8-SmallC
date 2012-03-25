@@ -334,7 +334,7 @@ setcodes() {
   code[SUBwpn]  = "\001JMS I __subwpn\n <n>\n";
   code[SWAP12]  = "\011JMS I __swap12\n";
   code[SWAP1s]  = "\012JMS I __swap1s\n";
-  code[SWITCH]  = "\012JMS I __switch\n";
+  code[SWITCH]  = "\012JMS __switch\n";
   code[XOR12]   = "\211JMS I __xor\n";
 /* END PDP8 */
   }
