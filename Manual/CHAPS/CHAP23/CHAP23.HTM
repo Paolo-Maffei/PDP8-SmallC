@@ -1,0 +1,76 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 23:<P>
+THE MAIN FUNCTION</H1><P>
+</CENTER></B>
+
+Like all C programs, Small C begins execution in a function called<B> main()</B>.  <B>Main()</B> resides in the first part of the compiler (file <B>CC1.C</B>) and performs six tasks--(1) displaying the signon message, (2) allocating storage for various buffers, (3) initializing variables, (4) setting run-time options, (5) opening files, and (6) controlling overall program flow. <P>
+
+<B>Main()</B>, and the other functions mentioned below, can be located in the compiler listings (<a href="../append/appc.htm">Appendix C</a>) by referring to the function index in <a href="../append/apph.htm">Appendix H</a>.  Textual references are also given so that further investigation of these functions can be easily pursued.  <P>
+
+<B>Displaying the Signon Message<P>
+</B>
+
+The file <B>NOTICE.H</B> contains macro definitions for two symbols which specify version and copyright information.  <B>VERSION</B> specifies the version and revision numbers of the compiler, and <B>CRIGHT1</B> contains copyright information.  <B>NOTICE.H</B> is included into part one of the compiler, making these notices available to<B> main()</B> for display on the console.  <P>
+
+<B>Allocating Storage<P>
+</B>
+
+<B>Calloc()</B> is called repeatedly to allocate the switch queue, the staging buffer, the while queue, the literal pool, the macro name and text buffers, the line buffers, and the symbol table.  This process also involves saving the addresses of these data structures in pointers and placing buffer ending addresses in other pointers.  <P>
+
+<B>Initializing Variables<P>
+</B>
+
+Most global objects are initialized either by default or by the use of initializers.  <B>Main()</B> initializes others which must be set at run time.  Those are <B>argcs</B>, <B>argvs</B>, <B>locptr</B>, and <B>glbptr</B>.  Of course, the setting of pointers to allocated blocks of memory, described above, is also an initializing activity.  <P>
+<P>
+<B>Processing Command-Line Switches<P>
+</B>
+
+Command-line switches are processed by<B> ask()</B>.  Basically, this consists of setting default values for several global variables, then scanning the command line for switches that specify different values for them.  These variables are described below: <P>
+
+<UL>
+<LI>Alarm determines whether or not to sound an audible alarm when an error is reported.  It is initially zero by virtue of its static storage class.  If <b>ask()</b> finds -A in the command line, it sets alarm true.
+<LI>Monitor determines whether or not to display the header lines of function declarations.  It is initially zero by virtue of its static storage class.  If <b>ask()</b> finds -M in the command line, it sets monitor true.
+<LI>Optimize determines whether or not to perform the peephole optimizing operations.  It is initially set true.  If <b>ask()</b> finds -NO in the command line, it sets optimize false.
+<LI>Pause determines whether or not to pause after an error is reported.  It is initially zero by virtue of its static storage class.  If<b> ask()</b> finds -P in the command line, it sets pause true.<p>
+</UL>
+
+If<B> ask()</B> finds an undefined switch it displays a usage message, showing which switches are valid, and then aborts the run.  This reminder can be evoked deliberately by supplying the null switch (<B>-</B>). <P>
+
+To gain access to the command-line arguments,<B> ask()</B> calls the Small C library function<B> getarg()</B>.  Any arguments without a leading hyphen are considered to be filenames and so are ignored by<B> ask()</B>.  By converting switch characters to uppercase and comparing them to uppercase constants<B> ask()</B> is effectively case blind.  <P>
+
+<B>Opening Files<P>
+</B>
+
+Before compiling begins<B> main()</B> calls<B> openfile()</B> to open the first source file that might be specified in the command line (also an output file of the same name but with an <B>ASM</B> extension).  Later,<B> openfile()</B> will be called, at a lower level, to look for the next source file when the current file has been exhausted. <P>
+
+Like<B> ask()</B>,<B> openfile()</B> calls<B> getarg()</B> repeatedly looking for file names (any argument not preceded by a hyphen).  That failing, it sets <B>input</B> to the value of <B>stdin</B>, thereby establishing the default input device.  (Recall that the standard input file may be redirected to any file or input device.)  On the other hand, if it finds a filename, <B>openfile()</B> tries to open it for input.  First, however, it supplies <B>C</B> as a default extension if none was given.  If an 
+input file was given,<B> openfile()</B> assumes that the output should go to a file of the same name, but with an extension of <B>ASM</B>--unless the standard output file was redirected from the screen, that is.  Redirecting it implies that the user has other ideas, and so the output should be left alone.  If <B>openfile()</B> cannot open a file, it displays an error message and aborts the run. <P>
+
+After opening the first input file,<B> main()</B> calls<B> preprocess()</B> to fetch the first input line for parsing.  <P>
+
+<B>Controlling Program Flow<P>
+</B>
+
+With these preliminaries out of the way,<B> main()</B> calls five functions to effect high level control over the compiler.  In order of execution, they are as follows: <P>
+
+<OL>
+<LI><b>Header()</b>, as we saw in <a href="../chap21/chap21.htm">Chapter 21</a>, writes preliminary text to the output file.
+<LI><b>Setcodes()</b> initializes the array <b>code[]</b> to the addresses of the p-code translation strings.  It also calls <b>setseq()</b> which initializes <b>seq[]</b> to the addresses of arrays of optimizing sequences.  <b>Peep()</b> scans this array to find potential optimizing cases (<a href="../chap27/chap27.htm">Chapter 27</a>).
+<LI><b>Parse()</b> is the highest level parsing function.  <a href="../chap24/chap24.htm">Chapter 24</a> describes <b>parse()</b>; suffice it to say here that this step in <b>main()</b> is where the compiling takes place.
+<LI><b>Trailer()</b> writes text at the end of the output file.  This consists of (1) external declarations for functions that were referenced but not declared, (2) the external declaration of <b>_main()</b> (if the module being compiled contains the function<b> main()</b> ), (3) a directive that terminates the active memory segment, and (4) the END directive that signals the end of the output file.  Also, if the compiler was compiled with 
+DISOPT defined in CC4.C, this function dumps optimizing statistics to the standard output file.
+<LI>Finally, <b>fclose()</b> is called to close the output file.  This call is not strictly necessary since all open files will be closed upon program exit anyway.<p>
+</OL>
+
+After that,<B> main()</B> exits through its closing brace and control returns to the operating system.<P>
+
+<CENTER>
+Go to <a href="../chap24/chap24.htm">Chapter 24 </a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

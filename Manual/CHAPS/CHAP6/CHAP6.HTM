@@ -1,0 +1,260 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 6:<P>
+ARRAYS<P></H1>
+</CENTER>
+
+</B>An array is a collection of like variables which share a 
+single name.  The individual elements of an array are referenced 
+by appending a <I>subscript</I>, in square brackets, behind the 
+name.  The subscript itself can be any legitimate C expression 
+that yields an integer value--that includes every Small C 
+expression.  Most programming languages provide for arrays of 
+more than one dimension; that is, each element may itself be a 
+sub-array of smaller elements.  Small C, however, only supports 
+single-dimension arrays.  Therefore, arrays in Small C may be regarded as 
+simple linear collections of like variables.<P>
+
+<B>Array Subscripts<P>
+
+</B>When an array element is referenced, the subscript expression 
+designates the desired element by its position in the array.  The 
+first element occupies position zero, the second position one, 
+and so on.  It follows that the last element is subscripted by <B>
+[N-1]</B> where <B>N</B> is the number of elements in the array.  
+The statement<P>
+
+<PRE>
+	array[5] = 0;<P>
+</PRE>
+
+for instance, sets the sixth element of <B>array</B> to zero.<P>
+
+Since array subscripts are treated as integers, they are in fact 
+signed values.  It is the programmer's responsibility to see that 
+only positive values are produced, since a negative subscript 
+would refer to some point in memory preceding the array.  As we 
+shall see, there is a place for negative subscripts which are not 
+associated with array names.<P>
+
+<B>Array Declarations<P>
+
+</B>The number of elements in an array is determined by its 
+declaration.  Appending a constant expression in square brackets 
+to a name in a declaration identifies the name as the name of an 
+array with the number of elements indicated.  The examples in 
+Table 6-1 are valid declarations.<P>
+
+<CENTER>
+<img src="tb6-1.gif">
+</CENTER>
+<CENTER><B>Table 6-1: Array Declarations<P>
+</CENTER></B>
+
+Notice in the third example that ordinary variables 
+may be declared together with arrays in the same statement.  In 
+fact array declarations obey the syntax rules of ordinary 
+declarations, as described in <a href="../chap4/chap4.htm">Chapters 4</a> and 
+<a href="../chap5/chap5.htm">5</a>, except that 
+certain names are designated as arrays by the presence of a 
+dimension expression.<P>
+
+What about the undimensioned array in Table 6-1?  How can the 
+compiler work with non-specific array sizes?  This points up an 
+important fact about the C language.  In C, array dimensions 
+serve only to determine how much memory to reserve; it is the 
+programmer's responsibility to stay in proper bounds when he 
+references array elements.  So it is not necessary for the 
+compiler to know the size of an array at the point where it is 
+referenced.  It only needs that information at the point of 
+definition--where storage is actually reserved for it.  Therefore, in declarations 
+that do not define the array, the dimension expression is 
+useless; all that is needed are the brackets to designate the 
+name as an array name.  There are two such situations--external 
+declarations and declarations of arguments in function headers.  
+We shall see in <a href="../chap8/chap8.htm">Chapter 8</a>
+ that a function argument declared as <B>arg[]</B> is really a pointer.<P>
+
+Another situation in which an array's size need not be specified 
+is when the array elements are given initial values.  As we will 
+see in <a href="../chap7/chap7.htm">Chapter 7</a>,
+ the compiler will determine the size of such an 
+array from the number of initial values.<P>
+
+<B>Array References<P>
+
+</B>In C we may refer to an array in several ways.  Most 
+obviously, we can write subscripted references to array elements, 
+as we have already seen.  Not so obvious is C's reaction to the 
+appearance of an unadorned array name.  C interprets an 
+unsubscripted array name as the address of the array.  We could, 
+for instance, set a pointer to the address of an array with the 
+expression<P>
+
+<PRE>
+		pointer = array;<P>
+</PRE>
+
+This interpretation of array names leads to even more 
+interesting uses.  In some ways, we can use array names like 
+pointers.  We can legally write<P>
+
+<PRE> 		i = *array;<P>
+</PRE>
+
+for instance.  This assigns the object at <B>array</B> to <B>i</B>.  
+Since the address of an array is also the address of its 
+first element, this statement copies the first element of <B>array</B> 
+to <B>i</B>.  More will be said about this below.<P>
+<a href="../chap5/chap5.htm">Chapter 5</a>
+ introduced the address operator <B>&amp;</B> which yields 
+the address of an object.  This operator may also be used with 
+array elements.  Thus, the expression <B>&amp;array[3]</B> yields 
+the address of the fourth element of <B>array</B>.  Notice too 
+that<B> </B><B>&amp;array[0]</B> and <B>array+0</B> and 
+<B>array</B> are all equivalent.  It should be clear by analogy that 
+<B>&amp;array[3]</B> and <B>array+3</B> are also equivalent.<P>
+
+To refer to an array element, the Small C compiler adds the 
+subscript (scaled in the case of integer arrays) to the address 
+of the array.  The result points to the desired object.  This 
+sequence of steps suggests an alternate way for programmers to 
+reference array elements--by adding subscripts to array names and 
+applying the indirection operator to the result.  Thus 
+<B>array[x]</B> is equivalent to <B>*(array+x)</B>.  The parentheses 
+are required since without them the expression would be evaluated 
+as <B>(*array)+x</B> which is quite different.  Instead of fetching 
+the element at <B>array+x</B>, it would add <B>x</B> to the first 
+element of <B>array</B>.<P>
+
+It follows from this discussion that the first element of 
+<B>array</B> may be written as <B>array[0]</B> or 
+<B>*(array+0)</B>, or <B>*array</B>.<P>
+
+<B>Pointers and Array Names<P>
+
+</B>These considerations suggest that pointers and array names 
+might be used interchangeably.  And, in many cases, they may.  C 
+will let us subscript pointers and also use array names as 
+addresses (as we say above).  Assuming that the integer pointer 
+<B>ip</B> contains the address of an array of integers, it is 
+perfectly reasonable and legal to write either <B>ip[4]</B>
+ or <B>*(ip+4)</B>.  On the other hand, as we saw above, <B>ip</B>
+ could be the name of an array.<P>
+
+It is important to realize that although C accepts unsubscripted 
+array names it does not accept them everywhere.  We cannot write<P>
+
+<PRE>		array = y;<P>
+</PRE>
+
+for instance.  What sense would that make?  It asserts that 
+the value in <B>y</B> is to be assigned as the address of 
+<B>array</B>.  But an array, like any object, has a fixed home in 
+memory; therefore, its address cannot be changed.  We say that 
+<B>array</B> is not an <I>lvalue</I>; that is, it cannot be used on 
+the left side of an assignment operator (nor may it be operated 
+on by increment or decrement operators); it simply cannot be 
+changed.  Not only does this assignment make no sense, it is 
+physically impossible because an array address is not a variable.  
+There is no place reserved in memory for an array's address to 
+reside; there is only space for its elements.<P>
+
+On the other hand, an array name may appear in a larger 
+expression that is an lvalue.  Examples are<P>
+
+<PRE>		*array = x;<P>
+</PRE>
+
+and
+<PRE>		array[0] = x;<P>
+</PRE>
+
+where the subexpressions <B>*array</B> and <B>array[0]</B> 
+are in fact lvalues.<P>
+
+<B>Negative Subscripts<P>
+
+</B>The previous section makes it plain that a pointer may refer 
+to an array.  For instance, we might write a function that 
+performs some operation on any array.  A pointer to the pertinent 
+array would be passed to it, and it would do its thing without 
+caring which array it is working with.  But since a pointer may 
+address any element of an array--not just the first one--it 
+follows that negative subscripts applied to pointers might well 
+yield array references that are in bounds.  This sort of thing 
+might be useful in situations where there is a relationship between 
+successive elements in an array and it becomes necessary to 
+reference an element preceding the one being pointed to.<P>
+
+<B>Address Arithmetic<P>
+
+</B>As we have seen, addresses (pointers, array names, and values 
+produced by the address operator) may be used freely in 
+expressions.  This one fact is responsible for much of the power 
+of C as a systems programming language.<P>
+
+As with pointers (<a href="../chap5/chap5.htm">Chapter 5</a>), all addresses are treated as 
+unsigned quantities.  Therefore, only unsigned operations are 
+performed on them.  Furthermore, the opposite operand in a binary 
+operation is regarded as unsigned (whether or not it is in fact). 
+ The results of such operations are also considered unsigned as 
+they participate in the further process of expression evaluation.<P>
+
+Of all the arithmetic operations that could be performed on 
+addresses only two make sense--displacing an address by a 
+positive or negative amount, and taking the difference between 
+two addresses.  All others, though permissible, yield meaningless 
+results.<P>
+
+Displacing an address can be done either by means of subscripts 
+or by use of the plus and minus operators, as we saw earlier.  
+These operations should be used only when the original address 
+and the displaced address refer to positions in the same array or 
+data structure of some sort (an operating system control block 
+for instance).  Any other situation would assume a knowledge of 
+how memory is organized and would, therefore, be ill advised for 
+portability reasons.<P>
+
+As we saw in <a href="../chap5/chap5.htm">Chapter 5</a>,
+ taking the difference of two addresses is 
+a special case in which the compiler interprets the result as the 
+number of objects lying between the addresses.  It should be 
+clear that certain nonsense expressions of this type might be 
+written.  Examples are:<P>
+<OL>
+<LI>taking the difference of a character address and an integer address,
+<LI>taking the difference of addresses which are not in the same 
+array and 
+<LI>subtracting an address from a smaller address.
+</OL>
+
+The compiler will accept these, but the results will not be useful.<P>
+
+<B>An Example<P>
+
+</B>The example in <a href="../chap5/ls5--1.gif">Listing 5-1</a> may be rewritten 
+using array notation.  Listing 6-1 shows the result.  First, integer <B>i</B> 
+is set to zero.  Then the <B>while</B> statement controls 
+repeated execution of a compound statement which does the work.  
+As long as <B>i</B> is less than <B>5</B>, corresponding elements 
+of the arrays <B>ca[]</B> and <B>ia[]</B> are added 
+with the result going into <B>ia[]</B>.  With each 
+iteration, <B>i</B> is incremented by <B>1</B>.  When <B>i</B> 
+becomes <B>5</B>, control leaves the <B>while</B> and goes on to whatever 
+follows.<P>
+
+<P>
+<CENTER>
+<img src="ls6-1.gif">
+</CENTER>
+<CENTER><B>Listing 6-1: Example of the Use of Arrays<P>
+</CENTER></B><P>
+<P>
+<CENTER>Go to <a href="../chap7/chap7.htm">Chapter 7</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+</HTML>

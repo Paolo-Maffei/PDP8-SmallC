@@ -1,0 +1,120 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>INTRODUCTION<P></H1>
+</CENTER>
+</B>The C programming language was developed at Bell 
+Laboratories in the early seventies by Dennis Ritchie who based 
+his work on Ken Thompson's B language.  C was designed to 
+conveniently manipulate the same kinds of object known to 
+computer processors--bits, bytes, words, and addresses.  For that 
+reason, and because it is a structured language, it has become 
+the language of choice for systems programming on minicomputers 
+and microcomputers.  It was originally developed for implementing 
+the UNIX operating system and today PC/MS-DOS is largely written in C.<P>
+C has other good applications too.  It is well suited to text 
+processing, engineering, and simulation problems.  Although other 
+languages have specific features which in many cases equip them 
+better for particular tasks (e.g., the complex numbers of 
+FORTRAN, the matrix operations of PL/I, and the sort verb, report 
+writer, and edited moves of COBOL), C is nevertheless becoming a 
+very popular language for a wide range of applications, and for 
+good reason--programmers like it.<P>
+
+Users of C typically cite the following reasons: (1) C programs 
+tend to be more portable; (2) C has a rich set of expression 
+operators, making it unnecessary to resort to assembly language 
+except in rare cases; (3) C programs are compact, but are not 
+necessarily cryptic; (4) C compilers usually generate efficient 
+object code; (5) C is a relaxed language, without unnecessarily 
+awkward syntax.<P>
+
+For a description of the complete C language, I refer you to the 
+original book on the subject, <I><a href="../append/biblio.htm">The C Programming Language</a></I> 
+by Brian W. Kernighan and Dennis M. Ritchie[10].  Although 
+numerous other books have appeared and a standard dialect of C is 
+emerging, this remains the primary non-vendor source on the language.<P>
+
+In May of 1980 <i><a href="http://www.ddj.com">Dr. Dobb's Journal</a>
+</i> ran an article entitled &quot;<I>A Small C Compiler for the 
+8080s</I>&quot; in which Ron Cain presented a small compiler for 
+a subset of the C language.  The most interesting feature of the 
+compiler besides its small size was the language in which it was 
+written--the one it compiled.  It was a self-compiler!  (Although 
+this is commonplace today, it was a fairly novel idea at the 
+time.)  With a simple, one-pass algorithm, his compiler generated 
+assembly language for the 8080 processor.  Being small, however, it had its limitations.  It 
+recognized only characters, integers, and single dimension arrays 
+of either type.  The only loop controlling device was the <B>
+while</B> statement.  There were no Boolean operators, so the 
+bitwise logical operators <B>&amp;</B> (AND) and <B>|</B> (OR) 
+were used instead.  But even with these limitations, it was a 
+very capable language and a delight to use, especially compared 
+to assembly language.<P>
+
+Recognizing the need for improvements, Ron encouraged me to 
+produce a second version, and in December of 1982 it also 
+appeared in <i>Dr. Dobb's Journal</i>.  The new compiler augmented Small 
+C with (1) code optimizing, (2) data initializing, (3) 
+conditional compiling, (4) the <B>extern</B> storage class, (5) 
+the <B>for</B>, <B>do</B><B>/</B><B>while</B>, <B>switch</B>, and 
+<B>goto</B> statements, (6) combination assignment operators, (7) 
+Boolean operators, (8) the one's complement operator, (9) block 
+local variables, and (10) various other features.  Then in 1984 Ernest Payne 
+and I developed and published a CP/M compatible run-time library 
+for the compiler.  It consisted of over 80 functions and included 
+most of those in the UNIX C Standard I/O Library--the ones that 
+pertained to the CP/M environment.  This became version 2.1 and 
+the subject of <I>The Small C Handbook</I>.<P>
+
+Within a year, Russ Nelson, of Clarkson College had this compiler 
+running under MS-DOS.  And, through an agreement with them, I was 
+able to base my own 8086 implementation on his work.  Although I 
+revised the compiler extensively, his primary contribution--the 
+use of p-codes--has remained.  The run-time library was 
+thoroughly reworked, adapting the input/output functions to the 
+DOS file handle facility.  This is the DOS compiler that <i>Dr. 
+Dobb's Journal</i> distributed as version 2.1.<P>
+On two occasions since, I revisited the compiler to overhaul its 
+code generator.  First, I replaced the long string of <B>
+if...else...</B> statements that translated p-codes to assembly 
+code with a huge <B>switch</B> statement, then I replaced that 
+with an array of pointers to assembly code strings.  Translating 
+the p-codes then became just a matter of subscripting the array 
+with the p-codes themselves.<P>
+
+Finally, while sprucing up the compiler for this book, I rewrote 
+the code optimizer from scratch.  Whereas before it consisted of 
+a string of <B>if...else...</B> statements that looked for 
+specific sequences of p-codes and replaced them with others, it 
+has now been generalized, reduced in size, and made to do more 
+optimizing.  The result is that Small C now generates code that 
+is respectable compared to professional compilers.  Another 
+advantage is that it is now very easy to understand what the 
+optimizer does and to add to its repertoire of tricks.<P>
+See <a href="../append/appg.htm">Appendix G </a>for a complete list of 
+differences between versions 2.1 and 2.2.<P>
+This version of Small C (2.2) is the subject of this book.  It 
+remains a subset compiler, but is now better organized and much 
+more efficient.  I have resisted the urge to develop Small C into 
+a full C compiler for a number of reasons.  First it would take a 
+lot of work.  But, more importantly, it would move Small C out of 
+its niche as a student compiler by obscuring its logic with 
+additional complications.  Being incomplete, Small C has plenty 
+of room improvement.  Students can experiment with it, adding
+ missing features and improving its algorithms.  
+<a href="../chap28/chap28.htm">Chapter 28</a> lists many possibilities for developing the compiler 
+further.<P>
+
+As you read along, I trust that you will enjoy learning a really 
+neat language and experience the satisfaction of learning the 
+mysteries of compiler operation.<P>
+<P>
+<CENTER>
+Go to <a href="../part1/part1.htm">Part 1</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

@@ -1,0 +1,3180 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER><B><H1>Appendix C:</H1>
+</CENTER></B> 
+<CENTER><B><H1>Small C Compiler Listings</H1> 
+</CENTER></B><P> 
+<PRE>
+    _____________________________________________________________________ 
+                                   notice.h 
+    _____________________________________________________________________ 
+    /* 
+    ** NOTICE.H -- Small C Signon Notice. 
+    */ 
+    #define VERSION &quot;Small C, Version 2.2, Revision Level 112\n&quot; 
+    #define CRIGHT1 &quot;Copyright 1982, 1983, 1985, 1988 J. E. Hendrix\n\n&quot; 
+     
+    _____________________________________________________________________ 
+                                   cc.h 
+    _____________________________________________________________________ 
+    /* 
+    ** CC.H -- Symbol Definitions for Small-C compiler. 
+    */ 
+     
+    /* 
+    ** machine dependent parameters 
+    */ 
+    #define BPW     2   /* bytes per word */ 
+    #define LBPW    1   /* log2(BPW) */ 
+    #define SBPC    1   /* stack bytes per character */ 
+    #define ERRCODE 7   /* op sys return code */ 
+     
+    /* 
+    ** symbol table format 
+    */ 
+    #define IDENT    0 
+    #define TYPE     1 
+    #define CLASS    2 
+    #define SIZE     3 
+    #define OFFSET   5 
+    #define NAME     7 
+     
+    #define SYMAVG  12 
+    #define SYMMAX  16 
+     
+    /* 
+    ** symbol table parameters 
+    */ 
+    #define NUMLOCS   25 
+    #define STARTLOC  symtab 
+    #define ENDLOC    (symtab+NUMLOCS*SYMAVG) 
+    #define NUMGLBS   200 
+    #define STARTGLB  ENDLOC 
+    #define ENDGLB    (ENDLOC+(NUMGLBS-1)*SYMMAX) 
+    #define SYMTBSZ   3050  /* (NUMLOCS*SYMAVG + NUMGLBS*SYMMAX) */ 
+     
+    /* 
+    ** system wide name size (for symbols) 
+    */ 
+    #define NAMESIZE 9 
+    #define NAMEMAX  8 
+     
+    /* 
+    ** values for &quot;IDENT&quot; 
+    */ 
+    #define LABEL    0 
+    #define VARIABLE 1 
+    #define ARRAY    2 
+    #define POINTER  3 
+    #define FUNCTION 4 
+     
+    /* 
+    ** values for &quot;TYPE&quot; 
+    **    high order 14 bits give length of object 
+    **    low order 2 bits make type unique within length 
+    */ 
+    /*      LABEL   0 */ 
+    #define CHR     (  1 &lt;&lt; 2) 
+    #define INT     (BPW &lt;&lt; 2) 
+    #define UCHR   ((  1 &lt;&lt; 2) + 1) 
+    #define UINT   ((BPW &lt;&lt; 2) + 1) 
+    #define UNSIGNED             1 
+     
+    /* 
+    ** values for &quot;CLASS&quot; 
+    */ 
+    /*      LABEL     0 */ 
+    #define AUTOMATIC 1 
+    #define STATIC    2 
+    #define EXTERNAL  3 
+    #define AUTOEXT   4 
+     
+    /* 
+    ** segment types 
+    */ 
+    #define DATASEG 1 
+    #define CODESEG 2 
+     
+    /* 
+    ** &quot;switch&quot; table 
+    */ 
+    #define SWSIZ   (2*BPW) 
+    #define SWTABSZ (90*SWSIZ) 
+     
+    /* 
+    ** &quot;while&quot; queue 
+    */ 
+    #define WQTABSZ  30 
+    #define WQSIZ     3 
+    #define WQMAX   (wq+WQTABSZ-WQSIZ) 
+     
+    /* 
+    ** field offsets in &quot;while&quot; queue 
+    */ 
+    #define WQSP    0 
+    #define WQLOOP  1 
+    #define WQEXIT  2 
+     
+    /* 
+    ** literal pool 
+    */ 
+    #define LITABSZ 2000 
+    #define LITMAX  (LITABSZ-1) 
+     
+    /* 
+    ** input line 
+    */ 
+    #define LINEMAX  127 
+    #define LINESIZE 128 
+     
+    /* 
+    ** entries in staging buffer 
+    */ 
+    #define STAGESIZE   200 
+     
+    /* 
+    ** macro (#define) pool 
+    */ 
+    #define MACNBR   300 
+    #define MACNSIZE (MACNBR*(NAMESIZE+2)) 
+    #define MACNEND  (macn+MACNSIZE) 
+    #define MACQSIZE (MACNBR*7) 
+    #define MACMAX   (MACQSIZE-1) 
+     
+    /* 
+    ** statement types 
+    */ 
+    #define STIF      1 
+    #define STWHILE   2 
+    #define STRETURN  3 
+    #define STBREAK   4 
+    #define STCONT    5 
+    #define STASM     6 
+    #define STEXPR    7 
+    #define STDO      8 
+    #define STFOR     9 
+    #define STSWITCH 10 
+    #define STCASE   11 
+    #define STDEF    12 
+    #define STGOTO   13 
+    #define STLABEL  14 
+     
+    /* 
+    ** p-code symbols 
+    ** 
+    ** legend: 
+    **  1 = primary register (pr in comments) 
+    **  2 = secondary register (sr in comments) 
+    **  b = byte 
+    **  f = jump on false condition 
+    **  l = current literal pool label number 
+    **  m = memory reference by label 
+    **  n = numeric constant 
+    **  p = indirect reference thru pointer in sr 
+    **  r = repeated r times 
+    **  s = stack frame reference 
+    **  u = unsigned 
+    **  w = word 
+    **  _ (tail) = another p-code completes this one 
+    */ 
+     
+            /* compiler-generated */ 
+    #define ADD12     1   /* add sr to pr */ 
+    #define ADDSP     2   /* add to stack pointer */ 
+    #define AND12     3   /* AND sr to pr */ 
+    #define ANEG1     4   /* arith negate pr */ 
+    #define ARGCNTn   5   /* pass arg count to function */ 
+    #define ASL12     6   /* arith shift left sr by pr into pr */ 
+    #define ASR12     7   /* arith shift right sr by pr into pr */ 
+    #define CALL1     8   /* call function thru pr */ 
+    #define CALLm     9   /* call function directly */ 
+    #define BYTE_    10   /* define bytes (part 1) */ 
+    #define BYTEn    11   /* define byte of value n */ 
+    #define BYTEr0   12   /* define r bytes of value 0 */ 
+    #define COM1     13   /* ones complement pr */ 
+    #define DBL1     14   /* double pr */ 
+    #define DBL2     15   /* double sr */ 
+    #define DIV12    16   /* div pr by sr */ 
+    #define DIV12u   17   /* div pr by sr unsigned */ 
+    #define ENTER    18   /* set stack frame on function entry */ 
+    #define EQ10f    19   /* jump if (pr == 0) is false */ 
+    #define EQ12     20   /* set pr TRUE if (sr == pr) */ 
+    #define GE10f    21   /* jump if (pr &gt;= 0) is false */ 
+    #define GE12     22   /* set pr TRUE if (sr &gt;= pr) */ 
+    #define GE12u    23   /* set pr TRUE if (sr &gt;= pr) unsigned */ 
+    #define POINT1l  24   /* point pr to function's literal pool */ 
+    #define POINT1m  25   /* point pr to mem item thru label */ 
+    #define GETb1m   26   /* get byte into pr from mem thru label */ 
+    #define GETb1mu  27   /* get unsigned byte into pr from mem thru label */ 
+    #define GETb1p   28   /* get byte into pr from mem thru sr ptr */ 
+    #define GETb1pu  29   /* get unsigned byte into pr from mem thru sr ptr */ 
+    #define GETw1m   30   /* get word into pr from mem thru label */ 
+    #define GETw1n   31   /* get word of value n into pr */ 
+    #define GETw1p   32   /* get word into pr from mem thru sr ptr */ 
+    #define GETw2n   33   /* get word of value n into sr */ 
+    #define GT10f    34   /* jump if (pr &gt; 0) is false */ 
+    #define GT12     35   /* set pr TRUE if (sr &gt; pr) */ 
+    #define GT12u    36   /* set pr TRUE if (sr &gt; pr) unsigned */ 
+    #define WORD_    37   /* define word (part 1) */ 
+    #define WORDn    38   /* define word of value n */ 
+    #define WORDr0   39   /* define r words of value 0 */ 
+    #define JMPm     40   /* jump to label */ 
+    #define LABm     41   /* define label m */ 
+    #define LE10f    42   /* jump if (pr &lt;= 0) is false */ 
+    #define LE12     43   /* set pr TRUE if (sr &lt;= pr) */ 
+    #define LE12u    44   /* set pr TRUE if (sr &lt;= pr) unsigned */ 
+    #define LNEG1    45   /* logical negate pr */ 
+    #define LT10f    46   /* jump if (pr &lt; 0) is false */ 
+    #define LT12     47   /* set pr TRUE if (sr &lt; pr) */ 
+    #define LT12u    48   /* set pr TRUE if (sr &lt; pr) unsigned */ 
+    #define MOD12    49   /* modulo pr by sr */ 
+    #define MOD12u   50   /* modulo pr by sr unsigned */ 
+    #define MOVE21   51   /* move pr to sr */ 
+    #define MUL12    52   /* multiply pr by sr */ 
+    #define MUL12u   53   /* multiply pr by sr unsigned */ 
+    #define NE10f    54   /* jump if (pr != 0) is false */ 
+    #define NE12     55   /* set pr TRUE if (sr != pr) */ 
+    #define NEARm    56   /* define near pointer thru label */ 
+    #define OR12     57   /* OR sr onto pr */ 
+    #define POINT1s  58   /* point pr to stack item */ 
+    #define POP2     59   /* pop stack into sr */ 
+    #define PUSH1    60   /* push pr onto stack */ 
+    #define PUTbm1   61   /* put pr byte in mem thru label */ 
+    #define PUTbp1   62   /* put pr byte in mem thru sr ptr */ 
+    #define PUTwm1   63   /* put pr word in mem thru label */ 
+    #define PUTwp1   64   /* put pr word in mem thru sr ptr */ 
+    #define rDEC1    65   /* dec pr (may repeat) */ 
+    #define REFm     66   /* finish instruction with label */ 
+    #define RETURN   67   /* restore stack and return */ 
+    #define rINC1    68   /* inc pr (may repeat) */ 
+    #define SUB12    69   /* sub sr from pr */ 
+    #define SWAP12   70   /* swap pr and sr */ 
+    #define SWAP1s   71   /* swap pr and top of stack */ 
+    #define SWITCH   72   /* find switch case */ 
+    #define XOR12    73   /* XOR pr with sr */ 
+     
+            /* optimizer-generated */ 
+    #define ADD1n    74   /* add n to pr */ 
+    #define ADD21    75   /* add pr to sr */ 
+    #define ADD2n    76   /* add immediate to sr */ 
+    #define ADDbpn   77   /* add n to mem byte thru sr ptr */ 
+    #define ADDwpn   78   /* add n to mem word thru sr ptr */ 
+    #define ADDm_    79   /* add n to mem byte/word thru label (part 1) */ 
+    #define COMMAn   80   /* finish instruction with ,n */ 
+    #define DECbp    81   /* dec mem byte thru sr ptr */ 
+    #define DECwp    82   /* dec mem word thru sr ptr */ 
+    #define POINT2m  83   /* point sr to mem thru label */ 
+    #define POINT2m_ 84   /* point sr to mem thru label (part 1) */ 
+    #define GETb1s   85   /* get byte into pr from stack */ 
+    #define GETb1su  86   /* get unsigned byte into pr from stack */ 
+    #define GETw1m_  87   /* get word into pr from mem thru label (part 1) */ 
+    #define GETw1s   88   /* get word into pr from stack */ 
+    #define GETw2m   89   /* get word into sr from mem (label) */ 
+    #define GETw2p   90   /* get word into sr thru sr ptr */ 
+    #define GETw2s   91   /* get word into sr from stack */ 
+    #define INCbp    92   /* inc byte in mem thru sr ptr */ 
+    #define INCwp    93   /* inc word in mem thru sr ptr */ 
+    #define PLUSn    94   /* finish instruction with +n */ 
+    #define POINT2s  95   /* point sr to stack */ 
+    #define PUSH2    96   /* push sr */ 
+    #define PUSHm    97   /* push word from mem thru label */ 
+    #define PUSHp    98   /* push word from mem thru sr ptr */ 
+    #define PUSHs    99   /* push word from stack */ 
+    #define PUT_m_  100   /* put byte/word into mem thru label (part 1) */ 
+    #define rDEC2   101   /* dec sr (may repeat) */ 
+    #define rINC2   102   /* inc sr (may repeat) */ 
+    #define SUB_m_  103   /* sub from mem byte/word thru label (part 1) */ 
+    #define SUB1n   104   /* sub n from pr */ 
+    #define SUBbpn  105   /* sub n from mem byte thru sr ptr */ 
+    #define SUBwpn  106   /* sub n from mem word thru sr ptr */ 
+     
+    #define PCODES  107   /* size of code[] */ 
+     
+    
+ 
+ 
+    _____________________________________________________________________ 
+                                   stdio.h 
+    ______________________________________________________________________ 
+    /* 
+    ** STDIO.H -- Standard Small C Definitions. 
+    */ 
+    #define stdin    0  /* file descriptor for standard input file */ 
+    #define stdout   1  /* file descriptor for standard output file */ 
+    #define stderr   2  /* file descriptor for standard error file */ 
+    #define stdaux   3  /* file descriptor for standard auxiliary port */ 
+    #define stdprn   4  /* file descriptor for standard printer */ 
+    #define FILE  char  /* supports &quot;FILE *fp;&quot; declarations */ 
+    #define ERR   (-2)  /* return value for errors */ 
+    #define EOF   (-1)  /* return value for end-of-file */ 
+    #define YES      1  /* true */ 
+    #define NO       0  /* false */ 
+    #define NULL     0  /* zero */ 
+    #define CR      13  /* ASCII carriage return */ 
+    #define LF      10  /* ASCII line feed */ 
+    #define BELL     7  /* ASCII bell */ 
+    #define SPACE  ' '  /* ASCII space */ 
+    #define NEWLINE LF  /* Small C newline character */ 
+     
+     
+    _____________________________________________________________________ 
+                                   cc1.c 
+    _____________________________________________________________________ 
+    /* 
+    ** Small-C Compiler -- Part 1 --  Top End. 
+    ** Copyright 1982, 1983, 1985, 1988 J. E. Hendrix 
+    ** All rights reserved. 
+    */ 
+     
+    #include &lt;stdio.h&gt; 
+    #include &quot;notice.h&quot; 
+    #include &quot;cc.h&quot; 
+     
+ 
+    /* 
+    ** miscellaneous storage 
+    */ 
+    int 
+      nogo,     /* disable goto statements? */ 
+      noloc,    /* disable block locals? */ 
+      opindex,  /* index to matched operator */ 
+      opsize,   /* size of operator in characters */ 
+      swactive, /* inside a switch? */ 
+      swdefault,/* default label #, else 0 */ 
+     *swnext,   /* address of next entry */ 
+     *swend,    /* address of last entry */ 
+     *stage,    /* staging buffer address */ 
+     *wq,       /* while queue */ 
+      argcs,    /* static argc */ 
+     *argvs,    /* static argv */ 
+     *wqptr,    /* ptr to next entry */ 
+      litptr,   /* ptr to next entry */ 
+      macptr,   /* macro buffer index */ 
+      pptr,     /* ptr to parsing buffer */ 
+      ch,       /* current character of input line */ 
+      nch,      /* next character of input line */ 
+      declared, /* # of local bytes to declare, -1 when declared */ 
+      iflevel,  /* #if... nest level */ 
+      skiplevel,/* level at which #if... skipping started */ 
+      nxtlab,   /* next avail label # */ 
+      litlab,   /* label # assigned to literal pool */ 
+      csp,      /* compiler relative stk ptr */ 
+      argstk,   /* function arg sp */ 
+      argtop,   /* highest formal argument offset */ 
+      ncmp,     /* # open compound statements */ 
+      errflag,  /* true after 1st error in statement */ 
+      eof,      /* true on final input eof */ 
+      output,   /* fd for output file */ 
+      files,    /* true if file list specified on cmd line */ 
+      filearg,  /* cur file arg index */ 
+      input   = EOF, /* fd for input file */ 
+      input2  = EOF, /* fd for &quot;#include&quot; file */ 
+      usexpr  = YES, /* true if value of expression is used */ 
+      ccode   = YES, /* true while parsing C code */ 
+     *snext,    /* next addr in stage */ 
+     *stail,    /* last addr of data in stage */ 
+     *slast,    /* last addr in stage */ 
+      listfp,   /* file pointer to list device */ 
+      lastst,   /* last parsed statement type */ 
+      oldseg;   /* current segment (0, DATASEG, CODESEG) */ 
+     
+    char 
+      optimize, /* optimize output of staging buffer? */ 
+      alarm,    /* audible alarm on errors? */ 
+      monitor,  /* monitor function headers? */ 
+      pause,    /* pause for operator on errors? */ 
+     *symtab,   /* symbol table */ 
+     *litq,     /* literal pool */ 
+     *macn,     /* macro name buffer */ 
+     *macq,     /* macro string buffer */ 
+     *pline,    /* parsing buffer */ 
+     *mline,    /* macro buffer */ 
+     *line,     /* ptr to pline or mline */ 
+     *lptr,     /* ptr to current character in &quot;line&quot; */ 
+     *glbptr,   /* global symbol table */ 
+     *locptr,   /* next local symbol table entry */ 
+      quote[2] = {'&quot;'}, /* literal string for '&quot;' */ 
+     *cptr,     /* work ptrs to any char buffer */ 
+     *cptr2, 
+     *cptr3, 
+      msname[NAMESIZE],   /* macro symbol name */ 
+      ssname[NAMESIZE];   /* static symbol name */ 
+     
+    int op[16] = {   /* p-codes of signed binary operators */ 
+      OR12,                        /* level5 */ 
+      XOR12,                       /* level6 */ 
+      AND12,                       /* level7 */ 
+      EQ12,   NE12,                /* level8 */ 
+      LE12,   GE12,  LT12,  GT12,  /* level9 */ 
+      ASR12,  ASL12,               /* level10 */ 
+      ADD12,  SUB12,               /* level11 */ 
+      MUL12, DIV12, MOD12          /* level12 */ 
+      }; 
+     
+    int op2[16] = {  /* p-codes of unsigned binary operators */ 
+      OR12,                        /* level5 */ 
+      XOR12,                       /* level6 */ 
+      AND12,                       /* level7 */ 
+      EQ12,   NE12,                /* level8 */ 
+      LE12u,  GE12u, LT12u, GT12u, /* level9 */ 
+      ASR12,  ASL12,               /* level10 */ 
+      ADD12,  SUB12,               /* level11 */ 
+      MUL12u, DIV12u, MOD12u       /* level12 */ 
+      }; 
+     
+    /* 
+    ** execution begins here 
+    */ 
+    main(argc, argv) int argc, *argv; { 
+      fputs(VERSION, stderr); 
+      fputs(CRIGHT1, stderr); 
+      argcs   = argc; 
+      argvs   = argv; 
+      swnext  = calloc(SWTABSZ, 1); 
+      swend   = swnext+(SWTABSZ-SWSIZ); 
+      stage   = calloc(STAGESIZE, 2*BPW); 
+      wqptr   = 
+      wq      = calloc(WQTABSZ, BPW); 
+      litq    = calloc(LITABSZ, 1); 
+      macn    = calloc(MACNSIZE, 1); 
+      macq    = calloc(MACQSIZE, 1); 
+      pline   = calloc(LINESIZE, 1); 
+      mline   = calloc(LINESIZE, 1); 
+      slast   = stage+(STAGESIZE*2*BPW); 
+      symtab  = calloc((NUMLOCS*SYMAVG + NUMGLBS*SYMMAX), 1); 
+      locptr  = STARTLOC; 
+      glbptr  = STARTGLB; 
+     
+      ask();          /* get user options */ 
+      openfile();     /* and initial input file */ 
+      preprocess();   /* fetch first line */ 
+      header();       /* intro code */ 
+      setcodes();     /* initialize code pointer array */  
+      parse();        /* process ALL input */ 
+      trailer();      /* follow-up code */ 
+      fclose(output); /* explicitly close output */ 
+      } 
+     
+    /******************** high level parsing *******************/ 
+     
+    /* 
+    ** process all input text 
+    ** 
+    ** At this level, only static declarations, 
+    **      defines, includes and function 
+    **      definitions are legal... 
+    */ 
+    parse() { 
+      while (eof == 0) { 
+        if     (amatch(&quot;extern&quot;, 6)) dodeclare(EXTERNAL); 
+        else if(dodeclare(STATIC))   ; 
+        else if( match(&quot;#asm&quot;))      doasm(); 
+        else if( match(&quot;#include&quot;))  doinclude(); 
+        else if( match(&quot;#define&quot;))   dodefine(); 
+        else                         dofunction(); 
+        blanks();                 /* force eof if pending */ 
+        } 
+      } 
+     
+    /* 
+    ** test for global declarations 
+    */ 
+    dodeclare(class) int class; { 
+      if     (amatch(&quot;char&quot;,     4))  declglb(CHR,  class); 
+      else if(amatch(&quot;unsigned&quot;, 8)) { 
+        if   (amatch(&quot;char&quot;,     4))  declglb(UCHR, class); 
+        else {amatch(&quot;int&quot;,      3);  declglb(UINT, class);} 
+        } 
+      else if(amatch(&quot;int&quot;,      3) 
+           || class == EXTERNAL)      declglb(INT,  class); 
+      else return 0; 
+      ns(); 
+      return 1; 
+      } 
+     
+    /* 
+    ** declare a static variable 
+    */ 
+    declglb(type, class)  int type, class; { 
+      int id, dim; 
+      while(1) { 
+        if(endst()) return;  /* do line */ 
+        if(match(&quot;*&quot;))       {id = POINTER;  dim = 0;} 
+        else                 {id = VARIABLE; dim = 1;} 
+        if(symname(ssname) == 0) illname(); 
+        if(findglb(ssname)) multidef(ssname); 
+        if(id == VARIABLE) { 
+          if     (match(&quot;(&quot;))  {id = FUNCTION; need(&quot;)&quot;);} 
+          else if(match(&quot;[&quot;))  {id = ARRAY; dim = needsub();} 
+          } 
+        if     (class == EXTERNAL) external(ssname, type &gt;&gt; 2, id); 
+        else if(   id != FUNCTION) initials(type &gt;&gt; 2, id, dim); 
+        if(id == POINTER)  
+             addsym(ssname, id, type, BPW, 0, &amp;glbptr, class); 
+        else addsym(ssname, id, type, dim * (type &gt;&gt; 2), 0, &amp;glbptr, class); 
+        if(match(&quot;,&quot;) == 0) return; 
+        } 
+      } 
+     
+    /* 
+    ** initialize global objects 
+    */ 
+    initials(size, ident, dim) int size, ident, dim; { 
+      int savedim; 
+      litptr = 0; 
+      if(dim == 0) dim = -1;         /* *... or ...[] */ 
+      savedim = dim; 
+      public(ident); 
+      if(match(&quot;=&quot;)) { 
+        if(match(&quot;{&quot;)) { 
+          while(dim) { 
+            init(size, ident, &amp;dim); 
+            if(match(&quot;,&quot;) == 0) break; 
+            } 
+          need(&quot;}&quot;); 
+          } 
+        else init(size, ident, &amp;dim); 
+        } 
+      if(savedim == -1 &amp;&amp; dim == -1) { 
+        if(ident == ARRAY) error(&quot;need array size&quot;); 
+        stowlit(0, size = BPW); 
+        } 
+      dumplits(size); 
+      dumpzero(size, dim);           /* only if dim &gt; 0 */ 
+      } 
+     
+    /* 
+    ** evaluate one initializer 
+    */ 
+    init(size, ident, dim) int size, ident, *dim; { 
+      int value; 
+      if(string(&amp;value)) { 
+        if(ident == VARIABLE || size != 1) 
+          error(&quot;must assign to char pointer or char array&quot;); 
+        *dim -= (litptr - value); 
+        if(ident == POINTER) point(); 
+        } 
+      else if(constexpr(&amp;value)) { 
+        if(ident == POINTER) error(&quot;cannot assign to pointer&quot;); 
+        stowlit(value, size); 
+        *dim -= 1; 
+        } 
+      } 
+     
+    /* 
+    ** get required array size 
+    */ 
+    needsub()  { 
+      int val; 
+      if(match(&quot;]&quot;)) return 0; /* null size */ 
+      if(constexpr(&amp;val) == 0) val = 1; 
+      if(val &lt; 0) { 
+        error(&quot;negative size illegal&quot;); 
+        val = -val; 
+        } 
+      need(&quot;]&quot;);               /* force single dimension */ 
+      return val;              /* and return size */ 
+      } 
+     
+    /* 
+    ** open an include file 
+    */ 
+    doinclude() { 
+      int i; char str[30]; 
+      blanks();       /* skip over to name */ 
+      if(*lptr == '&quot;' || *lptr == '&lt;') ++lptr; 
+      i = 0; 
+      while(lptr[i] 
+         &amp;&amp; lptr[i] != '&quot;' 
+         &amp;&amp; lptr[i] != '&gt;' 
+         &amp;&amp; lptr[i] != '\n') { 
+        str[i] = lptr[i]; 
+        ++i; 
+        } 
+      str[i] = NULL; 
+      if((input2 = fopen(str,&quot;r&quot;)) == NULL) { 
+        input2 = EOF; 
+        error(&quot;open failure on include file&quot;); 
+        } 
+      kill();   /* make next read come from new file (if open) */ 
+      } 
+     
+    /* 
+    ** define a macro symbol 
+    */ 
+    dodefine() { 
+      int k; 
+      if(symname(msname) == 0) { 
+        illname(); 
+        kill(); 
+        return; 
+        } 
+      k = 0; 
+      if(search(msname, macn, NAMESIZE+2, MACNEND, MACNBR, 0) == 0) { 
+        if(cptr2 = cptr) 
+          while(*cptr2++ = msname[k++]) ; 
+        else { 
+          error(&quot;macro name table full&quot;); 
+          return; 
+          } 
+        } 
+      putint(macptr, cptr+NAMESIZE, 2); 
+      while(white()) gch(); 
+      while(putmac(gch())); 
+      if(macptr &gt;= MACMAX) { 
+        error(&quot;macro string queue full&quot;); 
+        abort(ERRCODE); 
+        } 
+      } 
+     
+    putmac(c)  char c; { 
+      macq[macptr] = c; 
+      if(macptr &lt; MACMAX) ++macptr; 
+      return c; 
+      } 
+     
+    /* 
+    ** begin a function 
+    ** 
+    ** called from &quot;parse&quot; and tries to make a function 
+    ** out of the following text 
+    */ 
+    dofunction()  { 
+      char *ptr; 
+      nogo   =                      /* enable goto statements */ 
+      noloc  =                      /* enable block-local declarations */ 
+      lastst =                      /* no statement yet */ 
+      litptr = 0;                   /* clear lit pool */ 
+      litlab = getlabel();          /* label next lit pool */ 
+      locptr = STARTLOC;            /* clear local variables */ 
+      if(match(&quot;void&quot;)) blanks();   /* skip &quot;void&quot; &amp; locate header */ 
+      if(monitor) lout(line, stderr); 
+      if(symname(ssname) == 0) { 
+        error(&quot;illegal function or declaration&quot;); 
+        errflag = 0; 
+        kill();                     /* invalidate line */ 
+        return; 
+        } 
+      if(ptr = findglb(ssname)) {   /* already in symbol table? */ 
+        if(ptr[CLASS] == AUTOEXT) 
+             ptr[CLASS] = STATIC; 
+        else multidef(ssname); 
+        } 
+      else addsym(ssname, FUNCTION, INT, 0, 0, &amp;glbptr, STATIC); 
+      public(FUNCTION); 
+      argstk = 0;                  /* init arg count */ 
+      if(match(&quot;(&quot;) == 0) error(&quot;no open paren&quot;); 
+      while(match(&quot;)&quot;) == 0) {     /* then count args */ 
+        if(symname(ssname)) { 
+          if(findloc(ssname)) multidef(ssname); 
+          else { 
+            addsym(ssname, 0, 0, 0, argstk, &amp;locptr, AUTOMATIC); 
+            argstk += BPW; 
+            } 
+          } 
+        else { 
+          error(&quot;illegal argument name&quot;); 
+          skip(); 
+          } 
+        blanks(); 
+        if(streq(lptr,&quot;)&quot;) == 0 &amp;&amp; match(&quot;,&quot;) == 0) 
+          error(&quot;no comma&quot;); 
+        if(endst()) break; 
+        } 
+      csp = 0;                     /* preset stack ptr */ 
+      argtop = argstk+BPW;         /* account for the pushed BP */ 
+      while(argstk) { 
+        if     (amatch(&quot;char&quot;,     4)) {doargs(CHR);  ns();} 
+        else if(amatch(&quot;int&quot;,      3)) {doargs(INT);  ns();} 
+        else if(amatch(&quot;unsigned&quot;, 8)) { 
+          if   (amatch(&quot;char&quot;, 4))     {doargs(UCHR); ns();} 
+          else {amatch(&quot;int&quot;, 3);       doargs(UINT); ns();} 
+          } 
+        else {error(&quot;wrong number of arguments&quot;); break;} 
+        } 
+      gen(ENTER, 0); 
+      statement(); 
+      if(lastst != STRETURN &amp;&amp; lastst != STGOTO) 
+        gen(RETURN, 0); 
+      if(litptr) { 
+        toseg(DATASEG); 
+        gen(REFm, litlab); 
+        dumplits(1);               /* dump literals */ 
+        } 
+      } 
+     
+    /* 
+    ** declare argument types 
+    */ 
+    doargs(type) int type; { 
+      int id, sz; 
+      char c, *ptr; 
+      while(1) { 
+        if(argstk == 0) return;           /* no arguments */ 
+        if(decl(type, POINTER, &amp;id, &amp;sz)) { 
+          if(ptr = findloc(ssname)) { 
+            ptr[IDENT] = id; 
+            ptr[TYPE]  = type; 
+            putint(sz, ptr+SIZE, 2); 
+            putint(argtop-getint(ptr+OFFSET, 2), ptr+OFFSET, 2); 
+            } 
+          else error(&quot;not an argument&quot;); 
+          } 
+        argstk = argstk - BPW;            /* cnt down */ 
+        if(endst()) return; 
+        if(match(&quot;,&quot;) == 0) error(&quot;no comma&quot;); 
+        } 
+      } 
+     
+ 
+    /* 
+    ** parse next local or argument declaration 
+    */ 
+    decl(type, aid, id, sz) int type, aid, *id, *sz; { 
+      int n, p; 
+      if(match(&quot;(&quot;)) p = 1; 
+      else           p = 0; 
+      if(match(&quot;*&quot;))        {*id = POINTER;  *sz  = BPW;} 
+      else                  {*id = VARIABLE; *sz  = type &gt;&gt; 2;} 
+      if((n = symname(ssname)) == 0) illname(); 
+      if(p &amp;&amp; match(&quot;)&quot;)) ; 
+      if(match(&quot;(&quot;)) { 
+        if(!p || *id != POINTER) error(&quot;try (*...)()&quot;); 
+        need(&quot;)&quot;); 
+        } 
+      else if(*id == VARIABLE &amp;&amp; match(&quot;[&quot;)) { 
+        *id = aid; 
+        if((*sz *= needsub()) == 0) { 
+          if(aid == ARRAY) error(&quot;need array size&quot;); 
+          *sz  = BPW;      /* size of pointer argument */ 
+          } 
+        } 
+      return n; 
+      } 
+     
+    /******************** start 2nd level parsing *******************/ 
+     
+    /* 
+    ** statement parser 
+    */ 
+    statement() { 
+      if(ch == 0 &amp;&amp; eof) return; 
+      else if(amatch(&quot;char&quot;,     4)) {declloc(CHR);    ns();} 
+      else if(amatch(&quot;int&quot;,      3)) {declloc(INT);    ns();} 
+      else if(amatch(&quot;unsigned&quot;, 8)) { 
+        if   (amatch(&quot;char&quot;,     4)) {declloc(UCHR);   ns();} 
+        else {amatch(&quot;int&quot;,      3);  declloc(UINT);   ns();} 
+        } 
+      else { 
+        if(declared &gt;= 0) { 
+          if(ncmp &gt; 1) nogo = declared;   /* disable goto */ 
+          gen(ADDSP, csp - declared); 
+          declared = -1; 
+          } 
+        if(match(&quot;{&quot;))                 compound(); 
+        else if(amatch(&quot;if&quot;,       2)) {doif();           lastst = STIF;} 
+        else if(amatch(&quot;while&quot;,    5)) {dowhile();        lastst = STWHILE;} 
+        else if(amatch(&quot;do&quot;,       2)) {dodo();           lastst = STDO;} 
+        else if(amatch(&quot;for&quot;,      3)) {dofor();          lastst = STFOR;} 
+        else if(amatch(&quot;switch&quot;,   6)) {doswitch();       lastst = STSWITCH;} 
+        else if(amatch(&quot;case&quot;,     4)) {docase();         lastst = STCASE;} 
+        else if(amatch(&quot;default&quot;,  7)) {dodefault();      lastst = STDEF;} 
+        else if(amatch(&quot;goto&quot;,     4)) {dogoto();         lastst = STGOTO;} 
+        else if(dolabel())                                lastst = STLABEL; 
+        else if(amatch(&quot;return&quot;,   6)) {doreturn(); ns(); lastst = STRETURN;} 
+        else if(amatch(&quot;break&quot;,    5)) {dobreak();  ns(); lastst = STBREAK;} 
+        else if(amatch(&quot;continue&quot;, 8)) {docont();   ns(); lastst = STCONT;} 
+        else if(match(&quot;;&quot;))            errflag = 0; 
+        else if(match(&quot;#asm&quot;))         {doasm();          lastst = STASM;} 
+        else                           {doexpr(NO); ns(); lastst = STEXPR;} 
+        } 
+      return lastst; 
+      } 
+     
+    /* 
+    ** declare local variables 
+    */ 
+    declloc(type)  int type;  { 
+      int id, sz; 
+      if(swactive)     error(&quot;not allowed in switch&quot;); 
+      if(noloc)        error(&quot;not allowed with goto&quot;); 
+      if(declared &lt; 0) error(&quot;must declare first in block&quot;); 
+      while(1) { 
+        if(endst()) return; 
+        decl(type, ARRAY, &amp;id, &amp;sz); 
+        declared += sz; 
+        addsym(ssname, id, type,  sz, csp - declared, &amp;locptr, AUTOMATIC); 
+        if(match(&quot;,&quot;) == 0) return; 
+        } 
+      } 
+     
+    compound()  { 
+      int savcsp; 
+      char *savloc; 
+      savcsp = csp; 
+      savloc = locptr; 
+      declared = 0;           /* may now declare local variables */ 
+      ++ncmp;                 /* new level open */ 
+      while (match(&quot;}&quot;) == 0) 
+        if(eof) { 
+          error(&quot;no final }&quot;); 
+          break; 
+          } 
+        else statement();     /* do one */ 
+      if(--ncmp               /* close current level */ 
+      &amp;&amp; lastst != STRETURN 
+      &amp;&amp; lastst != STGOTO) 
+        gen(ADDSP, savcsp);   /* delete local variable space */ 
+      cptr = savloc;          /* retain labels */ 
+      while(cptr &lt; locptr) { 
+        cptr2 = nextsym(cptr); 
+        if(cptr[IDENT] == LABEL) { 
+          while(cptr &lt; cptr2) *savloc++ = *cptr++; 
+          } 
+        else cptr = cptr2; 
+        } 
+      locptr = savloc;        /* delete local symbols */ 
+      declared = -1;          /* may not declare variables */ 
+      } 
+     
+    doif()  { 
+      int flab1, flab2; 
+      test(flab1 = getlabel(), YES);  /* get expr, and branch false */ 
+      statement();                    /* if true, do a statement */ 
+      if(amatch(&quot;else&quot;, 4) == 0) {    /* if...else ? */ 
+        /* simple &quot;if&quot;...print false label */ 
+        gen(LABm, flab1); 
+        return;                       /* and exit */ 
+        } 
+      flab2 = getlabel(); 
+      if(lastst != STRETURN &amp;&amp; lastst != STGOTO) 
+        gen(JMPm, flab2); 
+      gen(LABm, flab1);    /* print false label */ 
+      statement();         /* and do &quot;else&quot; clause */ 
+      gen(LABm, flab2);    /* print true label */ 
+      } 
+     
+    dowhile()  { 
+      int wq[4];              /* allocate local queue */ 
+      addwhile(wq);           /* add entry to queue for &quot;break&quot; */ 
+      gen(LABm, wq[WQLOOP]);  /* loop label */ 
+      test(wq[WQEXIT], YES);  /* see if true */ 
+      statement();            /* if so, do a statement */ 
+      gen(JMPm, wq[WQLOOP]);  /* loop to label */ 
+      gen(LABm, wq[WQEXIT]);  /* exit label */ 
+      delwhile();             /* delete queue entry */ 
+      } 
+     
+    dodo() { 
+      int wq[4]; 
+      addwhile(wq); 
+      gen(LABm, wq[WQLOOP]); 
+      statement(); 
+      need(&quot;while&quot;); 
+      test(wq[WQEXIT], YES); 
+      gen(JMPm, wq[WQLOOP]); 
+      gen(LABm, wq[WQEXIT]); 
+      delwhile(); 
+      ns(); 
+      } 
+     
+    dofor() { 
+      int wq[4], lab1, lab2; 
+      addwhile(wq); 
+      lab1 = getlabel(); 
+      lab2 = getlabel(); 
+      need(&quot;(&quot;); 
+      if(match(&quot;;&quot;) == 0) { 
+        doexpr(NO);           /* expr 1 */ 
+        ns(); 
+        } 
+      gen(LABm, lab1); 
+      if(match(&quot;;&quot;) == 0) { 
+        test(wq[WQEXIT], NO); /* expr 2 */ 
+        ns(); 
+        } 
+      gen(JMPm, lab2); 
+      gen(LABm, wq[WQLOOP]); 
+      if(match(&quot;)&quot;) == 0) { 
+        doexpr(NO);           /* expr 3 */ 
+        need(&quot;)&quot;); 
+        } 
+      gen(JMPm, lab1); 
+      gen(LABm, lab2); 
+      statement(); 
+      gen(JMPm, wq[WQLOOP]); 
+      gen(LABm, wq[WQEXIT]); 
+      delwhile(); 
+      } 
+     
+    doswitch() { 
+      int wq[4], endlab, swact, swdef, *swnex, *swptr; 
+      swact = swactive; 
+      swdef = swdefault; 
+      swnex = swptr = swnext; 
+      addwhile(wq); 
+      *(wqptr + WQLOOP - WQSIZ) = 0; 
+      need(&quot;(&quot;); 
+      doexpr(YES);                /* evaluate switch expression */ 
+      need(&quot;)&quot;); 
+      swdefault = 0; 
+      swactive = 1; 
+      gen(JMPm, endlab = getlabel()); 
+      statement();                /* cases, etc. */ 
+      gen(JMPm, wq[WQEXIT]); 
+      gen(LABm, endlab); 
+      gen(SWITCH, 0);             /* match cases */ 
+      while(swptr &lt; swnext) { 
+        gen(NEARm, *swptr++); 
+        gen(WORDn,  *swptr++);    /* case value */ 
+        } 
+      gen(WORDn, 0); 
+      if(swdefault) gen(JMPm, swdefault); 
+      gen(LABm, wq[WQEXIT]); 
+      delwhile(); 
+      swnext    = swnex; 
+      swdefault = swdef; 
+      swactive  = swact; 
+      } 
+     
+    docase() { 
+      if(swactive == 0) error(&quot;not in switch&quot;); 
+      if(swnext &gt; swend) { 
+        error(&quot;too many cases&quot;); 
+        return; 
+        } 
+      gen(LABm, *swnext++ = getlabel()); 
+      constexpr(swnext++); 
+      need(&quot;:&quot;); 
+      } 
+     
+    dodefault() { 
+      if(swactive) { 
+        if(swdefault) error(&quot;multiple defaults&quot;); 
+        } 
+      else error(&quot;not in switch&quot;); 
+      need(&quot;:&quot;); 
+      gen(LABm, swdefault = getlabel()); 
+      } 
+     
+    dogoto() { 
+      if(nogo &gt; 0) error(&quot;not allowed with block-locals&quot;); 
+      else noloc = 1; 
+      if(symname(ssname)) gen(JMPm, addlabel()); 
+      else error(&quot;bad label&quot;); 
+      ns(); 
+      } 
+     
+    dolabel() { 
+      char *savelptr; 
+      blanks(); 
+      savelptr = lptr; 
+      if(symname(ssname)) { 
+        if(gch() == ':') { 
+          gen(LABm, addlabel()); 
+          return 1; 
+          } 
+        else bump(savelptr-lptr); 
+        } 
+      return 0; 
+      } 
+     
+    addlabel()  { 
+      if(cptr = findloc(ssname)) { 
+        if(cptr[IDENT] != LABEL) error(&quot;not a label&quot;); 
+        } 
+      else cptr = addsym(ssname, LABEL, LABEL, 0, getlabel(), &amp;locptr, LABEL); 
+      return (getint(cptr+OFFSET, 2)); 
+      } 
+     
+    doreturn()  { 
+      int savcsp; 
+      if(endst() == 0) doexpr(YES); 
+      savcsp = csp; 
+      gen(RETURN, 0); 
+      csp = savcsp; 
+      } 
+     
+    dobreak()  { 
+      int *ptr; 
+      if((ptr = readwhile(wqptr)) == 0) return; 
+      gen(ADDSP, ptr[WQSP]); 
+      gen(JMPm, ptr[WQEXIT]); 
+      } 
+     
+    docont()  { 
+      int *ptr; 
+      ptr = wqptr; 
+      while (1) { 
+        if((ptr = readwhile(ptr)) == 0) return; 
+        if(ptr[WQLOOP]) break; 
+        } 
+      gen(ADDSP, ptr[WQSP]); 
+      gen(JMPm, ptr[WQLOOP]); 
+      } 
+     
+    doasm()  { 
+      ccode = 0;           /* mark mode as &quot;asm&quot; */ 
+      while (1) { 
+        inline(); 
+        if(match(&quot;#endasm&quot;)) break; 
+        if(eof)break; 
+        fputs(line, output); 
+        } 
+      kill(); 
+      ccode = 1; 
+      } 
+     
+    doexpr(use) int use; { 
+      int const, val; 
+      int *before, *start; 
+      usexpr = use;        /* tell isfree() whether expr value is used */ 
+      while(1) { 
+        setstage(&amp;before, &amp;start); 
+        expression(&amp;const, &amp;val); 
+        clearstage(before, start); 
+        if(ch != ',') break; 
+        bump(1); 
+        } 
+      usexpr = YES;        /* return to normal value */ 
+      } 
+     
+    /******************** miscellaneous functions *******************/ 
+     
+    /* 
+    ** get run options 
+    */ 
+    ask() { 
+      int i; 
+      i = listfp = nxtlab = 0; 
+      output = stdout; 
+      optimize = YES; 
+      alarm = monitor = pause = NO; 
+      line = mline; 
+      while(getarg(++i, line, LINESIZE, argcs, argvs) != EOF) { 
+        if(line[0] != '-') continue; 
+        if(toupper(line[1]) == 'L' 
+        &amp;&amp; isdigit(line[2]) 
+        &amp;&amp; line[3] &lt;= ' ') { 
+          listfp = line[2]-'0'; 
+          continue; 
+          } 
+        if(toupper(line[1]) == 'N' 
+        &amp;&amp; toupper(line[2]) == 'O' 
+        &amp;&amp; line[3] &lt;= ' ') { 
+          optimize = NO; 
+          continue; 
+          } 
+        if(line[2] &lt;= ' ') { 
+          if(toupper(line[1]) == 'A') {alarm   = YES; continue;} 
+          if(toupper(line[1]) == 'M') {monitor = YES; continue;} 
+          if(toupper(line[1]) == 'P') {pause   = YES; continue;} 
+          } 
+        fputs(&quot;usage: cc [file]... [-m] [-a] [-p] [-l#] [-no]\n&quot;, stderr); 
+        abort(ERRCODE); 
+        } 
+      } 
+     
+    /* 
+    ** input and output file opens 
+    */ 
+    openfile() {        /* entire function revised */ 
+      char outfn[15]; 
+      int i, j, ext; 
+      input = EOF; 
+      while(getarg(++filearg, pline, LINESIZE, argcs, argvs) != EOF) { 
+        if(pline[0] == '-') continue; 
+        ext = NO; 
+        i = -1; 
+        j = 0; 
+        while(pline[++i]) { 
+          if(pline[i] == '.') { 
+            ext = YES; 
+            break; 
+            } 
+          if(j &lt; 10) outfn[j++] = pline[i]; 
+          } 
+        if(!ext) strcpy(pline + i, &quot;.C&quot;); 
+        input = mustopen(pline, &quot;r&quot;); 
+        if(!files &amp;&amp; iscons(stdout)) { 
+          strcpy(outfn + j, &quot;.ASM&quot;); 
+          output = mustopen(outfn, &quot;w&quot;); 
+          } 
+        files = YES; 
+        kill(); 
+        return; 
+        } 
+      if(files++) eof = YES; 
+      else input = stdin; 
+      kill(); 
+      } 
+     
+    /* 
+    ** open a file with error checking 
+    */ 
+    mustopen(fn, mode) char *fn, *mode; { 
+      int fd; 
+      if(fd = fopen(fn, mode)) return fd; 
+      fputs(&quot;open error on &quot;, stderr); 
+      lout(fn, stderr); 
+      abort(ERRCODE); 
+      } 
+     
+     
+    _____________________________________________________________________ 
+                                   cc2.c 
+    _____________________________________________________________________ 
+    /* 
+    ** Small-C Compiler -- Part 2 -- Front End and Miscellaneous. 
+    ** Copyright 1982, 1983, 1985, 1988 J. E. Hendrix 
+    ** All rights reserved. 
+    */ 
+     
+    #include &lt;stdio.h&gt; 
+    #include &quot;cc.h&quot; 
+     
+    extern char 
+     *symtab, *macn, *macq, *pline, *mline,  optimize, 
+      alarm, *glbptr, *line, *lptr, *cptr, *cptr2,  *cptr3, 
+     *locptr, msname[NAMESIZE],  pause,  quote[2]; 
+     
+    extern int 
+      *wq,  ccode,  ch,  csp,  eof,  errflag,  iflevel, 
+      input,  input2,  listfp,  macptr,  nch, 
+      nxtlab,  op[16],  opindex,  opsize,  output,  pptr, 
+      skiplevel,  *wqptr; 
+     
+    /********************** input functions **********************/ 
+     
+    preprocess() { 
+      int k; 
+      char c; 
+      if(ccode) { 
+        line = mline; 
+        ifline(); 
+        if(eof) return; 
+        } 
+      else { 
+        inline(); 
+        return; 
+        } 
+      pptr = -1; 
+      while(ch != NEWLINE &amp;&amp; ch) { 
+        if(white()) { 
+          keepch(' '); 
+          while(white()) gch(); 
+          } 
+        else if(ch == '&quot;') { 
+          keepch(ch); 
+          gch(); 
+          while(ch != '&quot;' || (*(lptr-1) == 92 &amp;&amp; *(lptr-2) != 92)) { 
+            if(ch == NULL) { 
+              error(&quot;no quote&quot;); 
+              break; 
+              } 
+            keepch(gch()); 
+            } 
+          gch(); 
+          keepch('&quot;'); 
+          } 
+        else if(ch == 39) { 
+          keepch(39); 
+          gch(); 
+          while(ch != 39 || (*(lptr-1) == 92 &amp;&amp; *(lptr-2) != 92)) { 
+            if(ch == NULL) { 
+              error(&quot;no apostrophe&quot;); 
+              break; 
+              } 
+            keepch(gch()); 
+            } 
+          gch(); 
+          keepch(39); 
+          } 
+        else if(ch == '/' &amp;&amp; nch == '*') { 
+          bump(2); 
+          while((ch == '*' &amp;&amp; nch == '/') == 0) { 
+            if(ch) bump(1); 
+            else { 
+              ifline(); 
+              if(eof) break; 
+              } 
+            } 
+          bump(2); 
+          } 
+        else if(an(ch)) { 
+          k = 0; 
+          while(an(ch) &amp;&amp; k &lt; NAMEMAX) { 
+            msname[k++] = ch; 
+            gch(); 
+            } 
+          msname[k] = NULL; 
+          if(search(msname, macn, NAMESIZE+2, MACNEND, MACNBR, 0)) { 
+            k = getint(cptr+NAMESIZE, 2); 
+            while(c = macq[k++]) keepch(c); 
+            while(an(ch)) gch(); 
+            } 
+          else { 
+            k = 0; 
+            while(c = msname[k++]) keepch(c); 
+            } 
+          } 
+        else keepch(gch()); 
+        } 
+      if(pptr &gt;= LINEMAX) error(&quot;line too long&quot;); 
+      keepch(NULL); 
+      line = pline; 
+      bump(0); 
+      } 
+     
+    keepch(c)  char c; { 
+      if(pptr &lt; LINEMAX) pline[++pptr] = c; 
+      } 
+     
+    ifline() { 
+      while(1) { 
+        inline(); 
+        if(eof) return; 
+        if(match(&quot;#ifdef&quot;)) { 
+          ++iflevel; 
+          if(skiplevel) continue; 
+          symname(msname); 
+          if(search(msname, macn, NAMESIZE+2, MACNEND, MACNBR, 0) == 0) 
+            skiplevel = iflevel; 
+          continue; 
+          } 
+        if(match(&quot;#ifndef&quot;)) { 
+          ++iflevel; 
+          if(skiplevel) continue; 
+          symname(msname); 
+          if(search(msname, macn, NAMESIZE+2, MACNEND, MACNBR, 0)) 
+            skiplevel = iflevel; 
+          continue; 
+          } 
+        if(match(&quot;#else&quot;)) { 
+          if(iflevel) { 
+            if(skiplevel == iflevel) skiplevel = 0; 
+            else if(skiplevel == 0)  skiplevel = iflevel; 
+            } 
+          else noiferr(); 
+          continue; 
+          } 
+        if(match(&quot;#endif&quot;)) { 
+          if(iflevel) { 
+            if(skiplevel == iflevel) skiplevel = 0; 
+            --iflevel; 
+            } 
+          else noiferr(); 
+          continue; 
+          } 
+        if(skiplevel) continue; 
+        if(ch == 0) continue; 
+        break; 
+        } 
+      } 
+     
+    inline() {           /* numerous revisions */ 
+      int k, unit; 
+      poll(1);           /* allow operator interruption */ 
+      if(input == EOF) openfile(); 
+      if(eof) return; 
+      if((unit = input2) == EOF) unit = input; 
+      if(fgets(line, LINEMAX, unit) == NULL) { 
+        fclose(unit); 
+        if(input2 != EOF) 
+             input2 = EOF; 
+        else input  = EOF; 
+        *line = NULL; 
+        } 
+      else if(listfp) { 
+        if(listfp == output) fputc(';', output); 
+        fputs(line, listfp); 
+        } 
+      bump(0); 
+      } 
+     
+    inbyte()  { 
+      while(ch == 0) { 
+        if(eof) return 0; 
+        preprocess(); 
+        } 
+      return gch(); 
+      } 
+     
+    /********************* scanning functions ********************/ 
+     
+    /* 
+    ** test if next input string is legal symbol name 
+    */ 
+    symname(sname) char *sname; { 
+      int k;char c; 
+      blanks(); 
+      if(alpha(ch) == 0) return (*sname = 0); 
+      k = 0; 
+      while(an(ch)) { 
+        sname[k] = gch(); 
+        if(k &lt; NAMEMAX) ++k; 
+        } 
+      sname[k] = 0; 
+      return 1; 
+      } 
+     
+    need(str)  char *str; { 
+      if(match(str) == 0) error(&quot;missing token&quot;); 
+      } 
+     
+    ns()  { 
+      if(match(&quot;;&quot;) == 0) error(&quot;no semicolon&quot;); 
+      else errflag = 0; 
+      } 
+     
+    match(lit)  char *lit; { 
+      int k; 
+      blanks(); 
+      if(k = streq(lptr, lit)) { 
+        bump(k); 
+        return 1; 
+        } 
+      return 0; 
+      } 
+     
+    streq(str1, str2)  char str1[], str2[]; { 
+      int k; 
+      k = 0; 
+      while (str2[k]) { 
+        if(str1[k] != str2[k]) return 0; 
+        ++k; 
+        } 
+      return k; 
+     } 
+     
+    amatch(lit, len)  char *lit; int len; { 
+      int k; 
+      blanks(); 
+      if(k = astreq(lptr, lit, len)) { 
+        bump(k); 
+        return 1; 
+        } 
+      return 0; 
+     } 
+     
+    astreq(str1, str2, len)  char str1[], str2[]; int len; { 
+      int k; 
+      k = 0; 
+      while (k &lt; len) { 
+        if(str1[k] != str2[k]) break; 
+        /* 
+        ** must detect end of symbol table names terminated by 
+        ** symbol length in binary 
+        */ 
+        if(str2[k] &lt; ' ') break; 
+        if(str1[k] &lt; ' ') break; 
+        ++k; 
+        } 
+      if(an(str1[k]) || an(str2[k])) return 0; 
+      return k; 
+      } 
+     
+    nextop(list) char *list; { 
+      char op[4]; 
+      opindex = 0; 
+      blanks(); 
+      while(1) { 
+        opsize = 0; 
+        while(*list &gt; ' ') op[opsize++] = *list++; 
+        op[opsize] = 0; 
+        if(opsize = streq(lptr, op)) 
+          if(*(lptr+opsize) != '=' &amp;&amp;  
+             *(lptr+opsize) != *(lptr+opsize-1)) 
+             return 1; 
+        if(*list) { 
+          ++list; 
+          ++opindex; 
+          } 
+        else return 0; 
+        } 
+      } 
+     
+    blanks() { 
+      while(1) { 
+        while(ch) { 
+          if(white()) gch(); 
+          else return; 
+          } 
+        if(line == mline) return; 
+        preprocess(); 
+        if(eof) break; 
+        } 
+      } 
+     
+    white() { 
+      avail(YES);  /* abort on stack/symbol table overflow */ 
+      return (*lptr &lt;= ' ' &amp;&amp; *lptr); 
+      } 
+     
+    gch() { 
+      int c; 
+      if(c = ch) bump(1); 
+      return c; 
+      } 
+     
+    bump(n) int n; { 
+      if(n) lptr += n; 
+      else  lptr  = line; 
+      if(ch = nch = *lptr) nch = *(lptr+1); 
+      } 
+     
+    kill() { 
+      *line = 0; 
+      bump(0); 
+      } 
+     
+    skip() { 
+      if(an(inbyte())) 
+           while(an(ch)) gch(); 
+      else while(an(ch) == 0) { 
+        if(ch == 0) break; 
+        gch(); 
+        } 
+      blanks(); 
+      } 
+     
+    endst() { 
+      blanks(); 
+      return (streq(lptr, &quot;;&quot;) || ch == 0); 
+      } 
+     
+    /*********** symbol table management functions ***********/ 
+     
+    addsym(sname, id, type, size, value, lgpp, class) 
+      char *sname, id, type;  int size, value, *lgpp, class; { 
+      if(lgpp == &amp;glbptr) { 
+        if(cptr2 = findglb(sname)) return cptr2; 
+        if(cptr == 0) { 
+          error(&quot;global symbol table overflow&quot;); 
+          return 0; 
+          } 
+        } 
+      else { 
+        if(locptr &gt; (ENDLOC-SYMMAX)) { 
+          error(&quot;local symbol table overflow&quot;); 
+          abort(ERRCODE); 
+          } 
+        cptr = *lgpp; 
+        } 
+      cptr[IDENT] = id; 
+      cptr[TYPE]  = type; 
+      cptr[CLASS] = class; 
+      putint(size, cptr + SIZE, 2); 
+      putint(value, cptr + OFFSET, 2); 
+      cptr3 = cptr2 = cptr + NAME; 
+      while(an(*sname)) *cptr2++ = *sname++; 
+      if(lgpp == &amp;locptr) { 
+        *cptr2 = cptr2 - cptr3;         /* set length */ 
+        *lgpp = ++cptr2; 
+        } 
+      return cptr; 
+      } 
+     
+    /* 
+    ** search for symbol match 
+    ** on return cptr points to slot found or empty slot 
+    */ 
+    search(sname, buf, len, end, max, off) 
+      char *sname, *buf, *end;  int len, max, off; { 
+      cptr  = 
+      cptr2 = buf+((hash(sname)%(max-1))*len); 
+      while(*cptr != NULL) { 
+        if(astreq(sname, cptr+off, NAMEMAX)) return 1; 
+        if((cptr = cptr+len) &gt;= end) cptr = buf; 
+        if(cptr == cptr2) return (cptr = 0); 
+        } 
+      return 0; 
+      } 
+     
+    hash(sname) char *sname; { 
+      int i, c; 
+      i = 0; 
+      while(c = *sname++) i = (i &lt;&lt; 1) + c; 
+      return i; 
+      } 
+     
+    findglb(sname)  char *sname; { 
+      if(search(sname, STARTGLB, SYMMAX, ENDGLB, NUMGLBS, NAME)) 
+        return cptr; 
+      return 0; 
+      } 
+     
+    findloc(sname)  char *sname;  { 
+      cptr = locptr - 1;  /* search backward for block locals */ 
+      while(cptr &gt; STARTLOC) { 
+        cptr = cptr - *cptr; 
+        if(astreq(sname, cptr, NAMEMAX)) return (cptr - NAME); 
+        cptr = cptr - NAME - 1; 
+        } 
+      return 0; 
+      } 
+     
+    nextsym(entry) char *entry; { 
+      entry = entry + NAME; 
+      while(*entry++ &gt;= ' ');    /* find length byte */ 
+      return entry; 
+      } 
+     
+    /******** while queue management functions *********/   
+     
+    addwhile(ptr)  int ptr[]; { 
+      int k; 
+      ptr[WQSP]   = csp;         /* and stk ptr */ 
+      ptr[WQLOOP] = getlabel();  /* and looping label */ 
+      ptr[WQEXIT] = getlabel();  /* and exit label */ 
+      if(wqptr == WQMAX) { 
+        error(&quot;control statement nesting limit&quot;); 
+        abort(ERRCODE); 
+        } 
+      k = 0; 
+      while (k &lt; WQSIZ) *wqptr++ = ptr[k++]; 
+      } 
+     
+    readwhile(ptr) int *ptr; { 
+      if(ptr &lt;= wq) { 
+        error(&quot;out of context&quot;); 
+        return 0; 
+        } 
+      else return (ptr - WQSIZ); 
+     } 
+     
+    delwhile() { 
+      if(wqptr &gt; wq) wqptr -= WQSIZ; 
+      } 
+     
+    /****************** utility functions ********************/   
+     
+    /* 
+    ** test if c is alphabetic 
+    */ 
+    alpha(c)  char c; { 
+      return (isalpha(c) || c == '_'); 
+      } 
+     
+    /* 
+    ** test if given character is alphanumeric 
+    */ 
+    an(c)  char c; { 
+      return (alpha(c) || isdigit(c)); 
+      } 
+     
+    /* 
+    ** return next avail internal label number 
+    */ 
+    getlabel() { 
+      return(++nxtlab); 
+      } 
+     
+    /* 
+    ** get integer of length len from address addr 
+    ** (byte sequence set by &quot;putint&quot;) 
+    */ 
+    getint(addr, len) char *addr; int len; { 
+      int i; 
+      i = *(addr + --len);  /* high order byte sign extended */ 
+      while(len--) i = (i &lt;&lt; 8) | *(addr + len) &amp; 255; 
+      return i; 
+      } 
+     
+    /* 
+    ** put integer i of length len into address addr 
+    ** (low byte first) 
+    */ 
+    putint(i, addr, len) char *addr; int i, len; { 
+      while(len--) { 
+        *addr++ = i; 
+        i = i &gt;&gt; 8; 
+        } 
+      } 
+     
+    lout(line, fd) char *line; int fd; { 
+      fputs(line, fd); 
+      fputc(NEWLINE, fd); 
+      } 
+     
+    /******************* error functions *********************/   
+     
+    illname() { 
+      error(&quot;illegal symbol&quot;); 
+      skip(); 
+      } 
+     
+    multidef(sname)  char *sname; { 
+      error(&quot;already defined&quot;); 
+      } 
+     
+    needlval() { 
+      error(&quot;must be lvalue&quot;); 
+      } 
+     
+    noiferr() { 
+      error(&quot;no matching #if...&quot;); 
+      errflag = 0; 
+      } 
+     
+    error(msg) char msg[]; { 
+      if(errflag) return; 
+      else errflag = 1; 
+      lout(line, stderr); 
+      errout(msg, stderr); 
+      if(alarm) fputc(7, stderr); 
+      if(pause) while(fgetc(stderr) != NEWLINE); 
+      if(listfp &gt; 0) errout(msg, listfp); 
+      } 
+     
+    errout(msg, fp) char msg[]; int fp; { 
+      int k; 
+      k = line+2; 
+      while(k++ &lt;= lptr) fputc(' ', fp); 
+      lout(&quot;/_S0&quot;,_T fp); 
+      fputs(&quot;**** &quot;, fp); lout(msg, fp); 
+      } 
+     
+     
+    _____________________________________________________________________ 
+                                   cc3.c 
+    _____________________________________________________________________ 
+    /* 
+    ** Small-C Compiler -- Part 3 -- Expression Analyzer. 
+    ** Copyright 1982, 1983, 1985, 1988 J. E. Hendrix 
+    ** All rights reserved. 
+    */ 
+     
+    #include &lt;stdio.h&gt; 
+    #include &quot;cc.h&quot; 
+     
+    #define ST 0   /* is[ST] - symbol table address, else 0 */ 
+    #define TI 1   /* is[TI] - type of indirect obj to fetch, else 0 */ 
+    #define TA 2   /* is[TA] - type of address, else 0 */ 
+    #define TC 3   /* is[TC] - type of constant (INT or UINT), else 0 */ 
+    #define CV 4   /* is[CV] - value of constant (+ auxiliary uses) */ 
+    #define OP 5   /* is[OP] - code of highest/last binary operator */ 
+    #define SA 6   /* is[SA] - stage address of &quot;op 0&quot; code, else 0 */ 
+     
+    extern char 
+     *litq, *glbptr, *lptr,  ssname[NAMESIZE],  quote[2]; 
+    extern int 
+      ch,  csp,  litlab,  litptr,  nch,  op[16],  op2[16], 
+      opindex,  opsize, *snext; 
+     
+    /***************** lead-in functions *******************/ 
+     
+    constexpr(val) int *val; { 
+      int const; 
+      int *before, *start; 
+      setstage(&amp;before, &amp;start); 
+      expression(&amp;const, val); 
+      clearstage(before, 0);     /* scratch generated code */ 
+      if(const == 0) error(&quot;must be constant expression&quot;); 
+      return const; 
+      } 
+     
+    expression(con, val) int *con, *val;  { 
+      int is[7]; 
+      if(level1(is)) fetch(is); 
+      *con = is[TC]; 
+      *val = is[CV]; 
+      } 
+     
+    test(label, parens)  int label, parens;  { 
+      int is[7]; 
+      int *before, *start; 
+      if(parens) need(&quot;(&quot;); 
+      while(1) { 
+        setstage(&amp;before, &amp;start); 
+        if(level1(is)) fetch(is); 
+        if(match(&quot;,&quot;)) clearstage(before, start); 
+        else break; 
+        } 
+      if(parens) need(&quot;)&quot;); 
+      if(is[TC]) {             /* constant expression */ 
+        clearstage(before, 0); 
+        if(is[CV]) return; 
+        gen(JMPm, label); 
+        return; 
+        } 
+      if(is[SA]) {             /* stage address of &quot;oper 0&quot; code */ 
+        switch(is[OP]) {       /* operator code */ 
+          case EQ12: 
+          case LE12u: zerojump(EQ10f, label, is); break; 
+          case NE12: 
+          case GT12u: zerojump(NE10f, label, is); break; 
+          case GT12:  zerojump(GT10f, label, is); break; 
+          case GE12:  zerojump(GE10f, label, is); break; 
+          case GE12u: clearstage(is[SA], 0);      break; 
+          case LT12:  zerojump(LT10f, label, is); break; 
+          case LT12u: zerojump(JMPm,  label, is); break; 
+          case LE12:  zerojump(LE10f, label, is); break; 
+          default:    gen(NE10f, label);          break; 
+          } 
+        } 
+      else gen(NE10f, label); 
+      clearstage(before, start); 
+      } 
+     
+    /* 
+    ** test primary register against zero and jump if false 
+    */ 
+    zerojump(oper, label, is) int oper, label, is[]; { 
+      clearstage(is[SA], 0);       /* purge conventional code */ 
+      gen(oper, label); 
+      } 
+     
+    /***************** precedence levels ******************/ 
+     
+    level1(is) int is[];  { 
+      int k, is2[7], is3[2], oper, oper2; 
+      k = down1(level2, is); 
+      if(is[TC]) gen(GETw1n, is[CV]); 
+           if(match(&quot;|=&quot;))  {oper =        oper2 = OR12;} 
+      else if(match(&quot;^=&quot;))  {oper =        oper2 = XOR12;} 
+      else if(match(&quot;&amp;=&quot;))  {oper =        oper2 = AND12;} 
+      else if(match(&quot;+=&quot;))  {oper =        oper2 = ADD12;} 
+      else if(match(&quot;-=&quot;))  {oper =        oper2 = SUB12;} 
+      else if(match(&quot;*=&quot;))  {oper = MUL12; oper2 = MUL12u;} 
+      else if(match(&quot;/=&quot;))  {oper = DIV12; oper2 = DIV12u;} 
+      else if(match(&quot;%=&quot;))  {oper = MOD12; oper2 = MOD12u;} 
+      else if(match(&quot;&gt;&gt;=&quot;)) {oper =        oper2 = ASR12;} 
+      else if(match(&quot;&lt;&lt;=&quot;)) {oper =        oper2 = ASL12;} 
+      else if(match(&quot;=&quot;))   {oper =        oper2 = 0;} 
+      else return k; 
+                            /* have an assignment operator */ 
+      if(k == 0) { 
+        needlval(); 
+        return 0; 
+        } 
+      is3[ST] = is[ST]; 
+      is3[TI] = is[TI]; 
+      if(is[TI]) {                             /* indirect target */ 
+        if(oper) {                             /* ?= */ 
+          gen(PUSH1, 0);                       /* save address */ 
+          fetch(is);                           /* fetch left side */ 
+          } 
+        down2(oper, oper2, level1, is, is2);   /* parse right side */ 
+        if(oper) gen(POP2, 0);                 /* retrieve address */ 
+        } 
+      else {                                   /* direct target */ 
+        if(oper) {                             /* ?= */ 
+          fetch(is);                           /* fetch left side */ 
+          down2(oper, oper2, level1, is, is2); /* parse right side */ 
+          } 
+        else {                                 /*  = */ 
+          if(level1(is2)) fetch(is2);          /* parse right side */ 
+          } 
+        } 
+      store(is3);                              /* store result */ 
+      return 0; 
+      } 
+     
+    level2(is1)  int is1[]; { 
+      int is2[7], is3[7], k, flab, endlab, *before, *after; 
+      k = down1(level3, is1);                   /* expression 1 */ 
+      if(match(&quot;?&quot;) == 0) return k; 
+      dropout(k, NE10f, flab = getlabel(), is1); 
+      if(down1(level2, is2)) fetch(is2);        /* expression 2 */ 
+      else if(is2[TC]) gen(GETw1n, is2[CV]); 
+      need(&quot;:&quot;); 
+      gen(JMPm, endlab = getlabel()); 
+      gen(LABm, flab); 
+      if(down1(level2, is3)) fetch(is3);        /* expression 3 */ 
+      else if(is3[TC]) gen(GETw1n, is3[CV]); 
+      gen(LABm, endlab); 
+     
+      is1[TC] = is1[CV] = 0; 
+      if(is2[TC] &amp;&amp; is3[TC]) {                  /* expr1 ? const2 : const3 */ 
+        is1[TA] = is1[TI] = is1[SA] = 0; 
+        } 
+      else if(is3[TC]) {                        /* expr1 ? var2 : const3 */ 
+        is1[TA] = is2[TA]; 
+        is1[TI] = is2[TI]; 
+        is1[SA] = is2[SA]; 
+        } 
+      else if((is2[TC])                         /* expr1 ? const2 : var3 */ 
+           || (is2[TA] == is3[TA])) {           /* expr1 ? same2 : same3 */ 
+        is1[TA] = is3[TA]; 
+        is1[TI] = is3[TI]; 
+        is1[SA] = is3[SA]; 
+        } 
+      else error(&quot;mismatched expressions&quot;); 
+      return 0; 
+      } 
+     
+    level3 (is) int is[]; {return skim(&quot;||&quot;, EQ10f, 1, 0, level4,  is);} 
+    level4 (is) int is[]; {return skim(&quot;&amp;&amp;&quot;, NE10f, 0, 1, level5,  is);} 
+    level5 (is) int is[]; {return down(&quot;|&quot;,            0, level6,  is);} 
+    level6 (is) int is[]; {return down(&quot;^&quot;,            1, level7,  is);} 
+    level7 (is) int is[]; {return down(&quot;&amp;&quot;,            2, level8,  is);} 
+    level8 (is) int is[]; {return down(&quot;== !=&quot;,        3, level9,  is);} 
+    level9 (is) int is[]; {return down(&quot;&lt;= &gt;= &lt; &gt;&quot;,    5, level10, is);} 
+    level10(is) int is[]; {return down(&quot;&gt;&gt; &lt;&lt;&quot;,        9, level11, is);} 
+    level11(is) int is[]; {return down(&quot;+ -&quot;,         11, level12, is);} 
+    level12(is) int is[]; {return down(&quot;* / %&quot;,       13, level13, is);} 
+     
+    level13(is)  int is[];  { 
+      int k; 
+      char *ptr; 
+      if(match(&quot;++&quot;)) {                 /* ++lval */ 
+        if(level13(is) == 0) { 
+          needlval(); 
+          return 0; 
+          } 
+        step(rINC1, is, 0); 
+        return 0; 
+        } 
+      else if(match(&quot;--&quot;)) {            /* --lval */ 
+        if(level13(is) == 0) { 
+          needlval(); 
+          return 0; 
+          } 
+        step(rDEC1, is, 0); 
+        return 0; 
+        } 
+      else if(match(&quot; &quot;)) {             /*   */ 
+        if(level13(is)) fetch(is); 
+        gen(COM1, 0); 
+        is[CV] =   is[CV]; 
+        return (is[SA] = 0); 
+        } 
+      else if(match(&quot;!&quot;)) {             /* ! */ 
+        if(level13(is)) fetch(is); 
+        gen(LNEG1, 0); 
+        is[CV] = ! is[CV]; 
+        return (is[SA] = 0); 
+        } 
+      else if(match(&quot;-&quot;)) {             /* unary - */ 
+        if(level13(is)) fetch(is); 
+        gen(ANEG1, 0); 
+        is[CV] = -is[CV]; 
+        return (is[SA] = 0); 
+        } 
+      else if(match(&quot;*&quot;)) {             /* unary * */ 
+        if(level13(is)) fetch(is); 
+        if(ptr = is[ST]) is[TI] = ptr[TYPE]; 
+        else             is[TI] = INT; 
+        is[SA] =       /* no (op 0) stage address */ 
+        is[TA] =       /* not an address */ 
+        is[TC] = 0;    /* not a constant */ 
+        is[CV] = 1;    /* omit fetch() on func call */ 
+        return 1; 
+        } 
+      else if(amatch(&quot;sizeof&quot;, 6)) {    /* sizeof() */ 
+        int sz, p;  char *ptr, sname[NAMESIZE]; 
+        if(match(&quot;(&quot;)) p = 1; 
+        else           p = 0; 
+        sz = 0; 
+        if     (amatch(&quot;unsigned&quot;, 8))  sz = BPW; 
+        if     (amatch(&quot;int&quot;,      3))  sz = BPW; 
+        else if(amatch(&quot;char&quot;,     4))  sz = 1; 
+        if(sz) {if(match(&quot;*&quot;))          sz = BPW;} 
+        else if(symname(sname) 
+             &amp;&amp; ((ptr = findloc(sname)) || 
+                 (ptr = findglb(sname))) 
+             &amp;&amp; ptr[IDENT] != FUNCTION 
+             &amp;&amp; ptr[IDENT] != LABEL)    sz = getint(ptr+SIZE, 2); 
+        else if(sz == 0) error(&quot;must be object or type&quot;); 
+        if(p) need(&quot;)&quot;); 
+        is[TC] = INT; 
+        is[CV] = sz; 
+        is[TA] = is[TI] = is[ST] = 0; 
+        return 0; 
+        } 
+      else if(match(&quot;&amp;&quot;)) {             /* unary &amp; */ 
+        if(level13(is) == 0) { 
+          error(&quot;illegal address&quot;); 
+          return 0; 
+          } 
+        ptr = is[ST]; 
+        is[TA] = ptr[TYPE]; 
+        if(is[TI]) return 0; 
+        gen(POINT1m, ptr); 
+        is[TI] = ptr[TYPE]; 
+        return 0; 
+        } 
+      else { 
+        k = level14(is); 
+        if(match(&quot;++&quot;)) {               /* lval++ */ 
+          if(k == 0) { 
+            needlval(); 
+            return 0; 
+            } 
+          step(rINC1, is, rDEC1); 
+          return 0; 
+          } 
+        else if(match(&quot;--&quot;)) {          /* lval-- */ 
+          if(k == 0) { 
+            needlval(); 
+            return 0; 
+            } 
+          step(rDEC1, is, rINC1); 
+          return 0; 
+          } 
+        else return k; 
+        } 
+      } 
+     
+    level14(is)  int *is; { 
+      int k, const, val; 
+      char *ptr, *before, *start; 
+      k = primary(is); 
+      ptr = is[ST]; 
+      blanks(); 
+      if(ch == '[' || ch == '(') { 
+        int is2[7];                     /* allocate only if needed */ 
+        while(1) { 
+          if(match(&quot;[&quot;)) {              /* [subscript] */ 
+            if(ptr == 0) { 
+              error(&quot;can't subscript&quot;); 
+              skip(); 
+              need(&quot;]&quot;); 
+              return 0; 
+              } 
+            if(is[TA]) {if(k) fetch(is);} 
+            else       {error(&quot;can't subscript&quot;); k = 0;} 
+            setstage(&amp;before, &amp;start); 
+            is2[TC] = 0; 
+            down2(0, 0, level1, is2, is2); 
+            need(&quot;]&quot;); 
+            if(is2[TC]) { 
+              clearstage(before, 0); 
+              if(is2[CV]) {             /* only add if non-zero */ 
+                if(ptr[TYPE] &gt;&gt; 2 == BPW) 
+                     gen(GETw2n, is2[CV] &lt;&lt; LBPW); 
+                else gen(GETw2n, is2[CV]); 
+                gen(ADD12, 0); 
+                } 
+              } 
+            else { 
+              if(ptr[TYPE] &gt;&gt; 2 == BPW) gen(DBL1, 0); 
+              gen(ADD12, 0); 
+              } 
+            is[TA] = 0; 
+            is[TI] = ptr[TYPE]; 
+            k = 1; 
+            } 
+          else if(match(&quot;(&quot;)) {         /* function(...) */ 
+            if(ptr == 0) callfunc(0); 
+            else if(ptr[IDENT] != FUNCTION) { 
+              if(k &amp;&amp; !is[CV]) fetch(is); 
+              callfunc(0); 
+              } 
+            else callfunc(ptr); 
+            k = is[ST] = is[TC] = is[CV] = 0; 
+            } 
+          else return k; 
+          } 
+        } 
+      if(ptr &amp;&amp; ptr[IDENT] == FUNCTION) { 
+        gen(POINT1m, ptr); 
+        is[ST] = 0; 
+        return 0; 
+        } 
+      return k; 
+      } 
+     
+    primary(is)  int *is; { 
+      char *ptr, sname[NAMESIZE]; 
+      int k; 
+      if(match(&quot;(&quot;)) {                  /* (subexpression) */  
+        do k = level1(is); while(match(&quot;,&quot;)); 
+        need(&quot;)&quot;); 
+        return k; 
+        } 
+      putint(0, is, 7 &lt;&lt; LBPW);         /* clear &quot;is&quot; array */ 
+      if(symname(sname)) {              /* is legal symbol */ 
+        if(ptr = findloc(sname)) {      /* is local */ 
+          if(ptr[IDENT] == LABEL) { 
+            experr(); 
+            return 0; 
+            } 
+          gen(POINT1s, getint(ptr+OFFSET, 2)); 
+          is[ST] = ptr; 
+          is[TI] = ptr[TYPE]; 
+          if(ptr[IDENT] == ARRAY) { 
+            is[TA] = ptr[TYPE]; 
+            return 0; 
+            } 
+          if(ptr[IDENT] == POINTER) { 
+            is[TI] = UINT; 
+            is[TA] = ptr[TYPE]; 
+            } 
+          return 1; 
+          } 
+        if(ptr = findglb(sname)) {      /* is global */ 
+          is[ST] = ptr; 
+          if(ptr[IDENT] != FUNCTION) { 
+            if(ptr[IDENT] == ARRAY) { 
+              gen(POINT1m, ptr); 
+              is[TI] =  
+              is[TA] = ptr[TYPE]; 
+              return 0; 
+              } 
+            if(ptr[IDENT] == POINTER) 
+              is[TA] = ptr[TYPE]; 
+            return 1; 
+            } 
+          } 
+        else is[ST] = addsym(sname, FUNCTION, INT, 0, 0, &amp;glbptr, AUTOEXT); 
+        return 0; 
+        } 
+      if(constant(is) == 0) experr(); 
+      return 0; 
+      } 
+     
+    experr() { 
+      error(&quot;invalid expression&quot;); 
+      gen(GETw1n, 0); 
+      skip(); 
+      } 
+     
+    callfunc(ptr)  char *ptr; {      /* symbol table entry or 0 */ 
+      int nargs, const, val; 
+      nargs = 0; 
+      blanks();                      /* already saw open paren */ 
+      while(streq(lptr, &quot;)&quot;) == 0) { 
+        if(endst()) break; 
+        if(ptr) { 
+          expression(&amp;const, &amp;val); 
+          gen(PUSH1, 0); 
+          } 
+        else { 
+          gen(PUSH1, 0); 
+          expression(&amp;const, &amp;val); 
+          gen(SWAP1s, 0);            /* don't push addr */ 
+          } 
+        nargs = nargs + BPW;         /* count args*BPW */ 
+        if(match(&quot;,&quot;) == 0) break; 
+        } 
+      need(&quot;)&quot;); 
+      if(streq(ptr + NAME, &quot;CCARGC&quot;) == 0) gen(ARGCNTn, nargs &gt;&gt; LBPW); 
+      if(ptr) gen(CALLm, ptr); 
+      else    gen(CALL1, 0); 
+      gen(ADDSP, csp + nargs); 
+      } 
+     
+    /* 
+    ** true if is2's operand should be doubled 
+    */ 
+    double(oper, is1, is2) int oper, is1[], is2[]; { 
+      if((oper != ADD12 &amp;&amp; oper != SUB12) 
+      || (is1[TA] &gt;&gt; 2 != BPW) 
+      || (is2[TA])) return 0; 
+      return 1; 
+      } 
+     
+    step(oper, is, oper2) int oper, is[], oper2; { 
+      fetch(is); 
+      gen(oper, is[TA] ? (is[TA] &gt;&gt; 2) : 1); 
+      store(is); 
+      if(oper2) gen(oper2, is[TA] ? (is[TA] &gt;&gt; 2) : 1); 
+      } 
+     
+    store(is)  int is[]; { 
+      char *ptr; 
+      if(is[TI]) {                    /* putstk */ 
+        if(is[TI] &gt;&gt; 2 == 1) 
+             gen(PUTbp1, 0); 
+        else gen(PUTwp1, 0); 
+        } 
+      else {                          /* putmem */ 
+        ptr = is[ST]; 
+        if(ptr[IDENT] != POINTER 
+        &amp;&amp; ptr[TYPE] &gt;&gt; 2 == 1) 
+             gen(PUTbm1, ptr); 
+        else gen(PUTwm1, ptr); 
+        } 
+      } 
+     
+    fetch(is) int is[]; { 
+      char *ptr; 
+      ptr = is[ST]; 
+      if(is[TI]) {                                   /* indirect */ 
+        if(is[TI] &gt;&gt; 2 == BPW)     gen(GETw1p,  0); 
+        else { 
+          if(ptr[TYPE] &amp; UNSIGNED) gen(GETb1pu, 0); 
+          else                     gen(GETb1p,  0); 
+          } 
+        }  
+      else {                                         /* direct */ 
+        if(ptr[IDENT] == POINTER 
+        || ptr[TYPE] &gt;&gt; 2 == BPW)  gen(GETw1m,  ptr);  
+        else { 
+          if(ptr[TYPE] &amp; UNSIGNED) gen(GETb1mu, ptr); 
+          else                     gen(GETb1m,  ptr); 
+          } 
+        } 
+      } 
+     
+    constant(is)  int is[]; { 
+      int offset; 
+      if     (is[TC] = number(is + CV)) gen(GETw1n,  is[CV]); 
+      else if(is[TC] = chrcon(is + CV)) gen(GETw1n,  is[CV]); 
+      else if(string(&amp;offset))          gen(POINT1l, offset); 
+      else return 0; 
+      return 1; 
+      } 
+     
+    number(value)  int *value; { 
+      int k, minus; 
+      k = minus = 0; 
+      while(1) { 
+        if(match(&quot;+&quot;)) ; 
+        else if(match(&quot;-&quot;)) minus = 1; 
+        else break; 
+        } 
+      if(isdigit(ch) == 0) return 0; 
+      if(ch == '0') { 
+        while(ch == '0') inbyte(); 
+        if(toupper(ch) == 'X') { 
+          inbyte(); 
+          while(isxdigit(ch)) { 
+            if(isdigit(ch)) 
+                 k = k*16 + (inbyte() - '0'); 
+            else k = k*16 + 10 + (toupper(inbyte()) - 'A'); 
+            } 
+          } 
+        else while (ch &gt;= '0' &amp;&amp; ch &lt;= '7') 
+          k = k*8 + (inbyte() - '0'); 
+        } 
+      else while (isdigit(ch)) k = k*10 + (inbyte() - '0'); 
+      if(minus) { 
+        *value = -k; 
+        return (INT); 
+        } 
+      if((*value = k) &lt; 0) return (UINT); 
+      else                 return (INT); 
+      } 
+     
+    chrcon(value)  int *value; { 
+      int k; 
+      k = 0; 
+      if(match(&quot;'&quot;) == 0) return 0; 
+      while(ch != '\'') k = (k &lt;&lt; 8) + (litchar() &amp; 255); 
+      gch(); 
+      *value = k; 
+      return (INT); 
+      } 
+     
+    string(offset) int *offset; { 
+      char c; 
+      if(match(quote) == 0) return 0; 
+      *offset = litptr; 
+      while (ch != '&quot;') { 
+        if(ch == 0) break; 
+        stowlit(litchar(), 1); 
+        } 
+      gch(); 
+      litq[litptr++] = 0; 
+      return 1; 
+      } 
+     
+    stowlit(value, size) int value, size; { 
+      if((litptr+size) &gt;= LITMAX) { 
+        error(&quot;literal queue overflow&quot;); 
+        abort(ERRCODE); 
+        } 
+      putint(value, litq+litptr, size); 
+      litptr += size; 
+      } 
+     
+    litchar() { 
+      int i, oct; 
+      if(ch != '_S0'_T || nch == 0) return gch(); 
+      gch(); 
+      switch(ch) { 
+        case 'n': gch(); return NEWLINE; 
+        case 't': gch(); return  9;  /* HT */ 
+        case 'b': gch(); return  8;  /* BS */ 
+        case 'f': gch(); return 12;  /* FF */ 
+        } 
+      i = 3; 
+      oct = 0; 
+      while((i--) &gt; 0 &amp;&amp; ch &gt;= '0' &amp;&amp; ch &lt;= '7') 
+        oct = (oct &lt;&lt; 3) + gch() - '0'; 
+      if(i == 2) return gch(); 
+      else       return oct; 
+      } 
+     
+    /***************** pipeline functions ******************/ 
+     
+    /* 
+    ** skim over terms adjoining || and &amp;&amp; operators 
+    */ 
+    skim(opstr, tcode, dropval, endval, level, is) 
+      char *opstr; 
+      int tcode, dropval, endval, (*level)(), is[]; { 
+      int k, droplab, endlab; 
+      droplab = 0; 
+      while(1) { 
+        k = down1(level, is); 
+        if(nextop(opstr)) { 
+          bump(opsize); 
+          if(droplab == 0) droplab = getlabel(); 
+          dropout(k, tcode, droplab, is); 
+          } 
+        else if(droplab) { 
+          dropout(k, tcode, droplab, is); 
+          gen(GETw1n, endval); 
+          gen(JMPm, endlab = getlabel()); 
+          gen(LABm, droplab); 
+          gen(GETw1n, dropval); 
+          gen(LABm, endlab); 
+          is[TI] = is[TA] = is[TC] = is[CV] = is[SA] = 0; 
+          return 0; 
+          } 
+        else return k; 
+        } 
+      } 
+     
+    /* 
+    ** test for early dropout from || or &amp;&amp; sequences 
+    */ 
+    dropout(k, tcode, exit1, is) 
+      int k, tcode, exit1, is[]; { 
+      if(k) fetch(is); 
+      else if(is[TC]) gen(GETw1n, is[CV]); 
+      gen(tcode, exit1);          /* jumps on false */ 
+      }  
+     
+    /* 
+    ** drop to a lower level 
+    */ 
+    down(opstr, opoff, level, is) 
+      char *opstr;  int opoff, (*level)(), is[]; { 
+      int k; 
+      k = down1(level, is); 
+      if(nextop(opstr) == 0) return k; 
+      if(k) fetch(is); 
+      while(1) { 
+        if(nextop(opstr)) { 
+          int is2[7];     /* allocate only if needed */ 
+          bump(opsize); 
+          opindex += opoff; 
+          down2(op[opindex], op2[opindex], level, is, is2); 
+          } 
+        else return 0; 
+        } 
+      } 
+     
+    /* 
+    ** unary drop to a lower level 
+    */ 
+    down1(level, is) int (*level)(), is[]; { 
+      int k, *before, *start; 
+      setstage(&amp;before, &amp;start); 
+      k = (*level)(is); 
+      if(is[TC]) clearstage(before, 0);  /* load constant later */ 
+      return k; 
+      } 
+     
+    /* 
+    ** binary drop to a lower level 
+    */ 
+    down2(oper, oper2, level, is, is2) 
+      int oper, oper2, (*level)(), is[], is2[]; { 
+      int *before, *start; 
+      char *ptr; 
+      setstage(&amp;before, &amp;start); 
+      is[SA] = 0;                     /* not &quot;... op 0&quot; syntax */ 
+      if(is[TC]) {                    /* consant op unknown */ 
+        if(down1(level, is2)) fetch(is2); 
+        if(is[CV] == 0) is[SA] = snext; 
+        gen(GETw2n, is[CV] &lt;&lt; double(oper, is2, is)); 
+        } 
+      else {                          /* variable op unknown */ 
+        gen(PUSH1, 0);                /* at start in the buffer */ 
+        if(down1(level, is2)) fetch(is2); 
+        if(is2[TC]) {                 /* variable op constant */ 
+          if(is2[CV] == 0) is[SA] = start; 
+          csp += BPW;                 /* adjust stack and */ 
+          clearstage(before, 0);      /* discard the PUSH */ 
+          if(oper == ADD12) {         /* commutative */ 
+            gen(GETw2n, is2[CV] &lt;&lt; double(oper, is, is2)); 
+            } 
+          else {                      /* non-commutative */ 
+            gen(MOVE21, 0); 
+            gen(GETw1n, is2[CV] &lt;&lt; double(oper, is, is2)); 
+            } 
+          } 
+        else {                        /* variable op variable */ 
+          gen(POP2, 0); 
+          if(double(oper, is, is2)) gen(DBL1, 0); 
+          if(double(oper, is2, is)) gen(DBL2, 0); 
+          } 
+        } 
+      if(oper) { 
+        if(nosign(is) || nosign(is2)) oper = oper2; 
+        if(is[TC] = is[TC] &amp; is2[TC]) {               /* constant result */ 
+          is[CV] = calc(is[CV], oper, is2[CV]); 
+          clearstage(before, 0);   
+          if(is2[TC] == UINT) is[TC] = UINT; 
+          } 
+        else {                                        /* variable result */ 
+          gen(oper, 0); 
+          if(oper == SUB12 
+          &amp;&amp; is [TA] &gt;&gt; 2 == BPW 
+          &amp;&amp; is2[TA] &gt;&gt; 2 == BPW) { /* difference of two word addresses */ 
+            gen(SWAP12, 0); 
+            gen(GETw1n, 1); 
+            gen(ASR12, 0);          /* div by 2 */ 
+            } 
+          is[OP] = oper;            /* identify the operator */ 
+          } 
+        if(oper == SUB12 || oper == ADD12) { 
+          if(is[TA] &amp;&amp; is2[TA])     /*  addr +/- addr */ 
+            is[TA] = 0; 
+          else if(is2[TA]) {        /* value +/- addr */ 
+            is[ST] = is2[ST]; 
+            is[TI] = is2[TI]; 
+            is[TA] = is2[TA]; 
+            } 
+          } 
+        if(is[ST] == 0 || ((ptr = is2[ST]) &amp;&amp; (ptr[TYPE] &amp; UNSIGNED))) 
+          is[ST] = is2[ST]; 
+        } 
+      } 
+     
+    /* 
+    ** unsigned operand? 
+    */ 
+    nosign(is) int is[]; { 
+      char *ptr; 
+      if(is[TA] 
+      || is[TC] == UINT 
+      || ((ptr = is[ST]) &amp;&amp; (ptr[TYPE] &amp; UNSIGNED)) 
+        ) return 1; 
+      return 0; 
+      } 
+     
+    /* 
+    ** calcualte signed constant result 
+    */ 
+    calc(left, oper, right) int left, oper, right; { 
+      switch(oper) { 
+        case ADD12: return (left  +  right);  
+        case SUB12: return (left  -  right); 
+        case MUL12: return (left  *  right);  
+        case DIV12: return (left  /  right); 
+        case MOD12: return (left  %  right);  
+        case EQ12:  return (left  == right);  
+        case NE12:  return (left  != right); 
+        case LE12:  return (left  &lt;= right);  
+        case GE12:  return (left  &gt;= right); 
+        case LT12:  return (left  &lt;  right);  
+        case GT12:  return (left  &gt;  right); 
+        case AND12: return (left  &amp;  right); 
+        case OR12:  return (left  |  right); 
+        case XOR12: return (left  ^  right);  
+        case ASR12: return (left  &gt;&gt; right);  
+        case ASL12: return (left  &lt;&lt; right); 
+        }  
+      return (calc2(left, oper, right)); 
+      } 
+     
+    /* 
+    ** calcualte unsigned constant result 
+    */ 
+    calc2(left, oper, right) unsigned left, right; int oper; { 
+      switch(oper) { 
+        case MUL12u: return (left  *  right);  
+        case DIV12u: return (left  /  right); 
+        case MOD12u: return (left  %  right);  
+        case LE12u:  return (left  &lt;= right);  
+        case GE12u:  return (left  &gt;= right); 
+        case LT12u:  return (left  &lt;  right);  
+        case GT12u:  return (left  &gt;  right); 
+        }  
+      return (0); 
+      } 
+     
+     
+    _____________________________________________________________________ 
+                                   cc4.c 
+    _____________________________________________________________________ 
+    /* 
+    ** Small-C Compiler -- Part 4 -- Back End. 
+    ** Copyright 1982, 1983, 1985, 1988 J. E. Hendrix 
+    ** All rights reserved. 
+    */ 
+    #include &lt;stdio.h&gt; 
+    #include &quot;cc.h&quot; 
+     
+    /* #define DISOPT */       /* display optimizations values */ 
+     
+    /*************************** externals ****************************/ 
+     
+    extern char 
+      *cptr, *macn, *litq, *symtab, optimize, ssname[NAMESIZE]; 
+     
+    extern int 
+      *stage, litlab, litptr, csp, output, oldseg, usexpr, 
+      *snext, *stail, *slast; 
+     
+     
+    /***************** optimizer command definitions ******************/ 
+     
+                 /*     --      p-codes must not overlap these */ 
+    #define any     0x00FF   /* matches any p-code */ 
+    #define _pop    0x00FE   /* matches if corresponding POP2 exists */ 
+    #define pfree   0x00FD   /* matches if pri register free */ 
+    #define sfree   0x00FC   /* matches if sec register free */ 
+    #define comm    0x00FB   /* matches if registers are commutative */ 
+     
+                 /*     --      these digits are reserved for n */ 
+    #define go      0x0100   /* go n entries */ 
+    #define gc      0x0200   /* get code from n entries away */ 
+    #define gv      0x0300   /* get value from n entries away */ 
+    #define sum     0x0400   /* add value from nth entry away */ 
+    #define neg     0x0500   /* negate the value */ 
+    #define ife     0x0600   /* if value == n do commands to next 0 */ 
+    #define ifl     0x0700   /* if value &lt;  n do commands to next 0 */ 
+    #define swv     0x0800   /* swap value with value n entries away */ 
+    #define topop   0x0900   /* moves |code and current value to POP2 */ 
+     
+    #define p1      0x0001   /* plus 1 */ 
+    #define p2      0x0002   /* plus 2 */ 
+    #define p3      0x0003   /* plus 3 */ 
+    #define p4      0x0004   /* plus 4 */ 
+    #define m1      0x00FF   /* minus 1 */ 
+    #define m2      0x00FE   /* minus 2 */ 
+    #define m3      0x00FD   /* minus 3 */ 
+    #define m4      0x00FC   /* minus 4 */ 
+     
+    #define PRI      0030    /* primary register bits */ 
+    #define SEC      0003    /* secondary register bits */ 
+    #define USES     0011    /* use register contents */ 
+    #define ZAPS     0022    /* zap register contents */ 
+    #define PUSHES   0100    /* pushes onto the stack */ 
+    #define COMMUTES 0200    /* commutative p-code */ 
+     
+    /******************** optimizer command lists *********************/ 
+     
+    int 
+      seq00[] = {0,ADD12,MOVE21,0,                       /* ADD21 */ 
+                 go|p1,ADD21,0}, 
+     
+      seq01[] = {0,ADD1n,0,                              /* rINC1 or rDEC1 ? */  
+                 ifl|m2,0,ifl|0,rDEC1,neg,0,ifl|p3,rINC1,0,0}, 
+     
+      seq02[] = {0,ADD2n,0,                              /* rINC2 or rDEC2 ? */  
+                 ifl|m2,0,ifl|0,rDEC2,neg,0,ifl|p3,rINC2,0,0}, 
+     
+      seq03[] = {0,rDEC1,PUTbp1,rINC1,0,                 /* SUBbpn or DECbp */ 
+                 go|p2,ife|p1,DECbp,0,SUBbpn,0}, 
+     
+      seq04[] = {0,rDEC1,PUTwp1,rINC1,0,                 /* SUBwpn or DECwp */ 
+                 go|p2,ife|p1,DECwp,0,SUBwpn,0}, 
+     
+      seq05[] = {0,rDEC1,PUTbm1,rINC1,0,                 /* SUB_m_ COMMAn */ 
+                 go|p1,SUB_m_,go|p1,COMMAn,go|m1,0}, 
+     
+      seq06[] = {0,rDEC1,PUTwm1,rINC1,0,                 /* SUB_m_ COMMAn */ 
+                 go|p1,SUB_m_,go|p1,COMMAn,go|m1,0}, 
+     
+      seq07[] = {0,GETw1m,GETw2n,ADD12,MOVE21,GETb1p,0,  /* GETw2m GETb1p */ 
+                 go|p4,gv|m3,go|m1,GETw2m,gv|m3,0}, 
+     
+      seq08[] = {0,GETw1m,GETw2n,ADD12,MOVE21,GETb1pu,0, /* GETw2m GETb1pu */ 
+                 go|p4,gv|m3,go|m1,GETw2m,gv|m3,0}, 
+     
+      seq09[] = {0,GETw1m,GETw2n,ADD12,MOVE21,GETw1p,0,  /* GETw2m GETw1p */ 
+                 go|p4,gv|m3,go|m1,GETw2m,gv|m3,0}, 
+     
+      seq10[] = {0,GETw1m,GETw2m,SWAP12,0,               /* GETw2m GETw1m */ 
+                 go|p2,GETw1m,gv|m1,go|m1,gv|m1,0}, 
+     
+      seq11[] = {0,GETw1m,MOVE21,0,                      /* GETw2m */ 
+                 go|p1,GETw2m,gv|m1,0}, 
+     
+      seq12[] = {0,GETw1m,PUSH1,pfree,0,                 /* PUSHm */ 
+                 go|p1,PUSHm,gv|m1,0}, 
+     
+      seq13[] = {0,GETw1n,PUTbm1,pfree,0,                /* PUT_m_ COMMAn */ 
+                 PUT_m_,go|p1,COMMAn,go|m1,swv|p1,0}, 
+     
+      seq14[] = {0,GETw1n,PUTwm1,pfree,0,                /* PUT_m_ COMMAn */  
+                 PUT_m_,go|p1,COMMAn,go|m1,swv|p1,0},  
+     
+      seq15[] = {0,GETw1p,PUSH1,pfree,0,                 /* PUSHp */  
+                 go|p1,PUSHp,gv|m1,0}, 
+     
+      seq16[] = {0,GETw1s,GETw2n,ADD12,MOVE21,0,         /* GETw2s ADD2n */ 
+                 go|p3,ADD2n,gv|m2,go|m1,GETw2s,gv|m2,0}, 
+     
+      seq17[] = {0,GETw1s,GETw2s,SWAP12,0,               /* GETw2s GETw1s */ 
+                 go|p2,GETw1s,gv|m1,go|m1,GETw2s,gv|m1,0}, 
+     
+ 
+      seq18[] = {0,GETw1s,MOVE21,0,                      /* GETw2s */ 
+                 go|p1,GETw2s,gv|m1,0}, 
+     
+      seq19[] = {0,GETw2m,GETw1n,SWAP12,SUB12,0,         /* GETw1m SUB1n */ 
+                 go|p3,SUB1n,gv|m2,go|m1,GETw1m,gv|m2,0}, 
+     
+      seq20[] = {0,GETw2n,ADD12,0,                       /* ADD1n */  
+                 go|p1,ADD1n,gv|m1,0}, 
+     
+      seq21[] = {0,GETw2s,GETw1n,SWAP12,SUB12,0,         /* GETw1s SUB1n */  
+                 go|p3,SUB1n,gv|m2,go|m1,GETw1s,gv|m2,0}, 
+     
+      seq22[] = {0,rINC1,PUTbm1,rDEC1,0,                 /* ADDm_ COMMAn */  
+                 go|p1,ADDm_,go|p1,COMMAn,go|m1,0},  
+     
+      seq23[] = {0,rINC1,PUTwm1,rDEC1,0,                 /* ADDm_ COMMAn */  
+                 go|p1,ADDm_,go|p1,COMMAn,go|m1,0},  
+     
+      seq24[] = {0,rINC1,PUTbp1,rDEC1,0,                 /* ADDbpn or INCbp */  
+                 go|p2,ife|p1,INCbp,0,ADDbpn,0},  
+     
+      seq25[] = {0,rINC1,PUTwp1,rDEC1,0,                 /* ADDwpn or INCwp */  
+                 go|p2,ife|p1,INCwp,0,ADDwpn,0},  
+     
+      seq26[] = {0,MOVE21,GETw1n,SWAP12,SUB12,0,         /* SUB1n */ 
+                 go|p3,SUB1n,gv|m2,0}, 
+     
+      seq27[] = {0,MOVE21,GETw1n,comm,0,                 /* GETw2n comm */ 
+                 go|p1,GETw2n,0}, 
+     
+      seq28[] = {0,POINT1m,GETw2n,ADD12,MOVE21,0,        /* POINT2m_ PLUSn */ 
+                 go|p3,PLUSn,gv|m2,go|m1,POINT2m_,gv|m2,0}, 
+     
+      seq29[] = {0,POINT1m,MOVE21,pfree,0,               /* POINT2m */ 
+                 go|p1,POINT2m,gv|m1,0}, 
+     
+      seq30[] = {0,POINT1m,PUSH1,pfree,_pop,0,           /* ... POINT2m */ 
+                 topop|POINT2m,go|p2,0}, 
+     
+      seq31[] = {0,POINT1s,GETw2n,ADD12,MOVE21,GETb1p,0, /* GETb1s */ 
+                 sum|p1,go|p4,GETb1s,gv|m4,0}, 
+     
+      seq32[] = {0,POINT1s,GETw2n,ADD12,MOVE21,GETb1pu,0,/* GETb1su */ 
+                 sum|p1,go|p4,GETb1su,gv|m4,0}, 
+     
+      seq33[] = {0,POINT1s,GETw2n,ADD12,MOVE21,GETw1p,0, /* GETw1s */ 
+                 sum|p1,go|p4,GETw1s,gv|m4,0}, 
+     
+      seq34[] = {0,POINT1s,PUSH1,MOVE21,0,               /* POINT2s PUSH2 */ 
+                 go|p1,POINT2s,gv|m1,go|p1,PUSH2,go|m1,0}, 
+     
+      seq35[] = {0,POINT1s,PUSH1,pfree,_pop,0,           /* ... POINT2s */ 
+                 topop|POINT2s,go|p2,0}, 
+     
+      seq36[] = {0,POINT1s,MOVE21,0,                     /* POINT2s */ 
+                 go|p1,POINT2s,gv|m1,0}, 
+     
+      seq37[] = {0,POINT2m,GETb1p,sfree,0,               /* GETb1m */ 
+                 go|p1,GETb1m,gv|m1,0}, 
+     
+      seq38[] = {0,POINT2m,GETb1pu,sfree,0,              /* GETb1mu */ 
+                 go|p1,GETb1mu,gv|m1,0}, 
+     
+      seq39[] = {0,POINT2m,GETw1p,sfree,0,               /* GETw1m */ 
+                 go|p1,GETw1m,gv|m1,0}, 
+     
+      seq40[] = {0,POINT2m_,PLUSn,GETw1p,sfree,0,        /* GETw1m_ PLUSn */ 
+                 go|p2,gc|m1,gv|m1,go|m1,GETw1m_,gv|m1,0}, 
+     
+      seq41[] = {0,POINT2s,GETb1p,sfree,0,               /* GETb1s */ 
+                 sum|p1,go|p1,GETb1s,gv|m1,0}, 
+     
+      seq42[] = {0,POINT2s,GETb1pu,sfree,0,              /* GETb1su */ 
+                 sum|p1,go|p1,GETb1su,gv|m1,0}, 
+     
+      seq43[] = {0,POINT2s,GETw1p,PUSH1,pfree,0,         /* PUSHs */ 
+                 sum|p1,go|p2,PUSHs,gv|m2,0}, 
+     
+      seq44[] = {0,POINT2s,GETw1p,sfree,0,               /* GETw1s */ 
+                 sum|p1,go|p1,GETw1s,gv|m1,0}, 
+     
+      seq45[] = {0,PUSH1,any,POP2,0,                     /* MOVE21 any */ 
+                 go|p2,gc|m1,gv|m1,go|m1,MOVE21,0}, 
+     
+      seq46[] = {0,PUSHm,_pop,0,                         /* ... GETw2m */ 
+                 topop|GETw2m,go|p1,0}, 
+     
+      seq47[] = {0,PUSHp,any,POP2,0,                     /* GETw2p ... */ 
+                 go|p2,gc|m1,gv|m1,go|m1,GETw2p,gv|m1,0}, 
+     
+      seq48[] = {0,PUSHs,_pop,0,                         /* ... GETw2s */ 
+                 topop|GETw2s,go|p1,0}, 
+     
+      seq49[] = {0,SUB1n,0,                              /* rDEC1 or rINC1 ? */ 
+                 ifl|m2,0,ifl|0,rINC1,neg,0,ifl|p3,rDEC1,0,0}; 
+     
+    #define HIGH_SEQ  49 
+    int seq[HIGH_SEQ + 1];   
+    setseq() { 
+      seq[ 0] = seq00;  seq[ 1] = seq01;  seq[ 2] = seq02;  seq[ 3] = seq03; 
+      seq[ 4] = seq04;  seq[ 5] = seq05;  seq[ 6] = seq06;  seq[ 7] = seq07; 
+      seq[ 8] = seq08;  seq[ 9] = seq09;  seq[10] = seq10;  seq[11] = seq11; 
+      seq[12] = seq12;  seq[13] = seq13;  seq[14] = seq14;  seq[15] = seq15; 
+      seq[16] = seq16;  seq[17] = seq17;  seq[18] = seq18;  seq[19] = seq19; 
+      seq[20] = seq20;  seq[21] = seq21;  seq[22] = seq22;  seq[23] = seq23; 
+      seq[24] = seq24;  seq[25] = seq25;  seq[26] = seq26;  seq[27] = seq27; 
+      seq[28] = seq28;  seq[29] = seq29;  seq[30] = seq30;  seq[31] = seq31; 
+      seq[32] = seq32;  seq[33] = seq33;  seq[34] = seq34;  seq[35] = seq35; 
+      seq[36] = seq36;  seq[37] = seq37;  seq[38] = seq38;  seq[39] = seq39; 
+      seq[40] = seq40;  seq[41] = seq41;  seq[42] = seq42;  seq[43] = seq43; 
+      seq[44] = seq44;  seq[45] = seq45;  seq[46] = seq46;  seq[47] = seq47; 
+      seq[48] = seq48;  seq[49] = seq49; 
+      }  
+     
+    /***************** assembly-code strings ******************/ 
+     
+    int code[PCODES]; 
+     
+    /* 
+    ** First byte contains flag bits indicating: 
+    **    the value in ax is needed (010) or zapped (020) 
+    **    the value in bx is needed (001) or zapped (002) 
+    */ 
+    setcodes() { 
+      setseq(); 
+      code[ADD12]   = &quot;\211ADD AX,BX\n&quot;; 
+      code[ADD1n]   = &quot;\010?ADD AX,&lt;n&gt;\n??&quot;; 
+      code[ADD21]   = &quot;\211ADD BX,AX\n&quot;; 
+      code[ADD2n]   = &quot;\010?ADD BX,&lt;n&gt;\n??&quot;; 
+      code[ADDbpn]  = &quot;\001ADD BYTE PTR [BX],&lt;n&gt;\n&quot;; 
+      code[ADDwpn]  = &quot;\001ADD WORD PTR [BX],&lt;n&gt;\n&quot;; 
+      code[ADDm_]   = &quot;\000ADD &lt;m&gt;&quot;; 
+      code[ADDSP]   = &quot;\000?ADD SP,&lt;n&gt;\n??&quot;; 
+      code[AND12]   = &quot;\211AND AX,BX\n&quot;; 
+      code[ANEG1]   = &quot;\010NEG AX\n&quot;; 
+      code[ARGCNTn] = &quot;\000?MOV CL,&lt;n&gt;?XOR CL,CL?\n&quot;; 
+      code[ASL12]   = &quot;\011MOV CX,AX\nMOV AX,BX\nSAL AX,CL\n&quot;; 
+      code[ASR12]   = &quot;\011MOV CX,AX\nMOV AX,BX\nSAR AX,CL\n&quot;; 
+      code[CALL1]   = &quot;\010CALL AX\n&quot;; 
+      code[CALLm]   = &quot;\020CALL &lt;m&gt;\n&quot;; 
+      code[BYTE_]   = &quot;\000 DB &quot;; 
+      code[BYTEn]   = &quot;\000 DB &lt;n&gt;\n&quot;; 
+      code[BYTEr0]  = &quot;\000 DB &lt;n&gt; DUP(0)\n&quot;; 
+      code[COM1]    = &quot;\010NOT AX\n&quot;; 
+      code[COMMAn]  = &quot;\000,&lt;n&gt;\n&quot;; 
+      code[DBL1]    = &quot;\010SHL AX,1\n&quot;; 
+      code[DBL2]    = &quot;\001SHL BX,1\n&quot;; 
+      code[DECbp]   = &quot;\001DEC BYTE PTR [BX]\n&quot;; 
+      code[DECwp]   = &quot;\001DEC WORD PTR [BX]\n&quot;; 
+      code[DIV12]   = &quot;\011CWD\nIDIV BX\n&quot;;                 /* see gen() */ 
+      code[DIV12u]  = &quot;\011XOR DX,DX\nDIV BX\n&quot;;            /* see gen() */ 
+      code[ENTER]   = &quot;\100PUSH BP\nMOV BP,SP\n&quot;; 
+      code[EQ10f]   = &quot;\010OR AX,AX\nJE $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[EQ12]    = &quot;\211CALL __EQ\n&quot;; 
+      code[GE10f]   = &quot;\010OR AX,AX\nJGE $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[GE12]    = &quot;\011CALL __GE\n&quot;; 
+      code[GE12u]   = &quot;\011CALL __UGE\n&quot;; 
+      code[GETb1m]  = &quot;\020MOV AL,&lt;m&gt;\nCBW\n&quot;; 
+      code[GETb1mu] = &quot;\020MOV AL,&lt;m&gt;\nXOR AH,AH\n&quot;; 
+      code[GETb1p]  = &quot;\021MOV AL,?&lt;n&gt;??[BX]\nCBW\n&quot;;       /* see gen() */ 
+      code[GETb1pu] = &quot;\021MOV AL,?&lt;n&gt;??[BX]\nXOR AH,AH\n&quot;; /* see gen() */ 
+      code[GETb1s]  = &quot;\020MOV AL,&lt;n&gt;[BP]\nCBW\n&quot;; 
+      code[GETb1su] = &quot;\020MOV AL,&lt;n&gt;[BP]\nXOR AH,AH\n&quot;; 
+      code[GETw1m]  = &quot;\020MOV AX,&lt;m&gt;\n&quot;; 
+      code[GETw1m_] = &quot;\020MOV AX,&lt;m&gt;&quot;; 
+      code[GETw1n]  = &quot;\020?MOV AX,&lt;n&gt;?XOR AX,AX?\n&quot;; 
+      code[GETw1p]  = &quot;\021MOV AX,?&lt;n&gt;??[BX]\n&quot;;            /* see gen() */ 
+      code[GETw1s]  = &quot;\020MOV AX,&lt;n&gt;[BP]\n&quot;; 
+      code[GETw2m]  = &quot;\002MOV BX,&lt;m&gt;\n&quot;; 
+      code[GETw2n]  = &quot;\002?MOV BX,&lt;n&gt;?XOR BX,BX?\n&quot;; 
+      code[GETw2p]  = &quot;\021MOV BX,?&lt;n&gt;??[BX]\n&quot;; 
+      code[GETw2s]  = &quot;\002MOV BX,&lt;n&gt;[BP]\n&quot;; 
+      code[GT10f]   = &quot;\010OR AX,AX\nJG $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[GT12]    = &quot;\010CALL __GT\n&quot;; 
+      code[GT12u]   = &quot;\011CALL __UGT\n&quot;; 
+      code[INCbp]   = &quot;\001INC BYTE PTR [BX]\n&quot;; 
+      code[INCwp]   = &quot;\001INC WORD PTR [BX]\n&quot;; 
+      code[WORD_]   = &quot;\000 DW &quot;; 
+      code[WORDn]   = &quot;\000 DW &lt;n&gt;\n&quot;; 
+      code[WORDr0]  = &quot;\000 DW &lt;n&gt; DUP(0)\n&quot;; 
+      code[JMPm]    = &quot;\000JMP _&lt;n&gt;\n&quot;; 
+      code[LABm]    = &quot;\000_&lt;n&gt;:\n&quot;; 
+      code[LE10f]   = &quot;\010OR AX,AX\nJLE $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[LE12]    = &quot;\011CALL __LE\n&quot;; 
+      code[LE12u]   = &quot;\011CALL __ULE\n&quot;; 
+      code[LNEG1]   = &quot;\010CALL __LNEG\n&quot;; 
+      code[LT10f]   = &quot;\010OR AX,AX\nJL $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[LT12]    = &quot;\011CALL __LT\n&quot;; 
+      code[LT12u]   = &quot;\011CALL __ULT\n&quot;; 
+      code[MOD12]   = &quot;\011CWD\nIDIV BX\nMOV AX,DX\n&quot;;      /* see gen() */ 
+      code[MOD12u]  = &quot;\011XOR DX,DX\nDIV BX\nMOV AX,DX\n&quot;; /* see gen() */ 
+      code[MOVE21]  = &quot;\012MOV BX,AX\n&quot;; 
+      code[MUL12]   = &quot;\211IMUL BX\n&quot;; 
+      code[MUL12u]  = &quot;\211MUL BX\n&quot;; 
+      code[NE10f]   = &quot;\010OR AX,AX\nJNE $+5\nJMP _&lt;n&gt;\n&quot;; 
+      code[NE12]    = &quot;\211CALL __NE\n&quot;; 
+      code[NEARm]   = &quot;\000 DW _&lt;n&gt;\n&quot;; 
+      code[OR12]    = &quot;\211OR AX,BX\n&quot;; 
+      code[PLUSn]   = &quot;\000?+&lt;n&gt;??\n&quot;; 
+      code[POINT1l] = &quot;\020MOV AX,OFFSET _&lt;l&gt;+&lt;n&gt;\n&quot;; 
+      code[POINT1m] = &quot;\020MOV AX,OFFSET &lt;m&gt;\n&quot;; 
+      code[POINT1s] = &quot;\020LEA AX,&lt;n&gt;[BP]\n&quot;; 
+      code[POINT2m] = &quot;\002MOV BX,OFFSET &lt;m&gt;\n&quot;; 
+      code[POINT2m_]= &quot;\002MOV BX,OFFSET &lt;m&gt;&quot;; 
+      code[POINT2s] = &quot;\002LEA BX,&lt;n&gt;[BP]\n&quot;; 
+      code[POP2]    = &quot;\002POP BX\n&quot;; 
+      code[PUSH1]   = &quot;\110PUSH AX\n&quot;; 
+      code[PUSH2]   = &quot;\101PUSH BX\n&quot;; 
+      code[PUSHm]   = &quot;\100PUSH &lt;m&gt;\n&quot;; 
+      code[PUSHp]   = &quot;\100PUSH ?&lt;n&gt;??[BX]\n&quot;; 
+      code[PUSHs]   = &quot;\100PUSH ?&lt;n&gt;??[BP]\n&quot;; 
+      code[PUT_m_]  = &quot;\000MOV &lt;m&gt;&quot;; 
+      code[PUTbm1]  = &quot;\010MOV &lt;m&gt;,AL\n&quot;; 
+      code[PUTbp1]  = &quot;\011MOV [BX],AL\n&quot;; 
+      code[PUTwm1]  = &quot;\010MOV &lt;m&gt;,AX\n&quot;; 
+      code[PUTwp1]  = &quot;\011MOV [BX],AX\n&quot;; 
+      code[rDEC1]   = &quot;\010#DEC AX\n#&quot;; 
+      code[rDEC2]   = &quot;\010#DEC BX\n#&quot;; 
+      code[REFm]    = &quot;\000_&lt;n&gt;&quot;; 
+      code[RETURN]  = &quot;\000?MOV SP,BP\n??POP BP\nRET\n&quot;; 
+      code[rINC1]   = &quot;\010#INC AX\n#&quot;; 
+      code[rINC2]   = &quot;\010#INC BX\n#&quot;; 
+      code[SUB_m_]  = &quot;\000SUB &lt;m&gt;&quot;; 
+      code[SUB12]   = &quot;\011SUB AX,BX\n&quot;;                    /* see gen() */ 
+      code[SUB1n]   = &quot;\010?SUB AX,&lt;n&gt;\n??&quot;; 
+      code[SUBbpn]  = &quot;\001SUB BYTE PTR [BX],&lt;n&gt;\n&quot;; 
+      code[SUBwpn]  = &quot;\001SUB WORD PTR [BX],&lt;n&gt;\n&quot;; 
+      code[SWAP12]  = &quot;\011XCHG AX,BX\n&quot;; 
+      code[SWAP1s]  = &quot;\012POP BX\nXCHG AX,BX\nPUSH BX\n&quot;; 
+      code[SWITCH]  = &quot;\012CALL __SWITCH\n&quot;; 
+      code[XOR12]   = &quot;\211XOR AX,BX\n&quot;; 
+      } 
+     
+    /***************** code generation functions *****************/ 
+     
+    /* 
+    ** print all assembler info before any code is generated 
+    ** and ensure that the segments appear in the correct order. 
+    */ 
+    header()  { 
+      toseg(CODESEG); 
+      outline(&quot;extrn __eq: near&quot;); 
+      outline(&quot;extrn __ne: near&quot;); 
+      outline(&quot;extrn __le: near&quot;); 
+      outline(&quot;extrn __lt: near&quot;); 
+      outline(&quot;extrn __ge: near&quot;); 
+      outline(&quot;extrn __gt: near&quot;); 
+      outline(&quot;extrn __ule: near&quot;); 
+      outline(&quot;extrn __ult: near&quot;); 
+      outline(&quot;extrn __uge: near&quot;); 
+      outline(&quot;extrn __ugt: near&quot;); 
+      outline(&quot;extrn __lneg: near&quot;); 
+      outline(&quot;extrn __switch: near&quot;); 
+      outline(&quot;dw 0&quot;); /* force non-zero code pointers, word alignment */ 
+      toseg(DATASEG); 
+      outline(&quot;dw 0&quot;); /* force non-zero data pointers, word alignment */ 
+      } 
+     
+    /* 
+    ** print any assembler stuff needed at the end 
+    */ 
+    trailer()  {   
+      char *cp; 
+      cptr = STARTGLB; 
+      while(cptr &lt; ENDGLB) { 
+        if(cptr[IDENT] == FUNCTION &amp;&amp; cptr[CLASS] == AUTOEXT) 
+          external(cptr + NAME, 0, FUNCTION); 
+        cptr += SYMMAX; 
+        } 
+      if((cp = findglb(&quot;main&quot;)) &amp;&amp; cp[CLASS]==STATIC) 
+        external(&quot;_main&quot;, 0, FUNCTION); 
+      toseg(NULL); 
+      outline(&quot;END&quot;); 
+    #ifdef DISOPT 
+        { 
+        int i, *count; 
+        printf(&quot;;opt   count\n&quot;); 
+        for(i = -1; ++i &lt;= HIGH_SEQ; ) { 
+          count = seq[i]; 
+          printf(&quot;; %2u   %5u\n&quot;, i, *count); 
+          poll(YES); 
+          } 
+        }   
+    #endif  
+      } 
+     
+    /* 
+    ** remember where we are in the queue in case we have to back up. 
+    */ 
+    setstage(before, start) int *before, *start; { 
+      if((*before = snext) == 0) 
+        snext = stage; 
+      *start = snext; 
+      } 
+     
+    /* 
+    ** generate code in staging buffer. 
+    */ 
+    gen(pcode, value) int pcode, value; { 
+      int newcsp; 
+      switch(pcode) { 
+        case GETb1pu: 
+        case GETb1p: 
+        case GETw1p: gen(MOVE21, 0); break; 
+        case SUB12: 
+        case MOD12: 
+        case MOD12u: 
+        case DIV12: 
+        case DIV12u: gen(SWAP12, 0); break; 
+        case PUSH1:  csp -= BPW;     break; 
+        case POP2:   csp += BPW;     break; 
+        case ADDSP: 
+        case RETURN: newcsp = value; value -= csp; csp = newcsp; 
+        } 
+      if(snext == 0) { 
+        outcode(pcode, value); 
+        return; 
+        } 
+      if(snext &gt;= slast) { 
+        error(&quot;staging buffer overflow&quot;); 
+        return; 
+        } 
+      snext[0] = pcode; 
+      snext[1] = value; 
+      snext += 2; 
+      } 
+     
+    /* 
+    ** dump the contents of the queue. 
+    ** If start = 0, throw away contents. 
+    ** If before != 0, don't dump queue yet. 
+    */ 
+    clearstage(before, start) int *before, *start; { 
+      if(before) { 
+        snext = before; 
+        return; 
+        } 
+      if(start) dumpstage(); 
+      snext = 0; 
+      } 
+     
+    /* 
+    ** dump the staging buffer 
+    */ 
+    dumpstage() { 
+      int i; 
+      stail = snext; 
+      snext = stage; 
+      while(snext &lt; stail) { 
+        if(optimize) { 
+          restart: 
+          i = -1;  
+          while(++i &lt;= HIGH_SEQ) if(peep(seq[i])) { 
+    #ifdef DISOPT 
+            if(isatty(output)) 
+              fprintf(stderr, &quot;                   optimized %2u\n&quot;, i); 
+    #endif 
+            goto restart; 
+            } 
+          } 
+        outcode(snext[0], snext[1]); 
+        snext += 2; 
+        } 
+      } 
+     
+    /* 
+    ** change to a new segment 
+    ** may be called with NULL, CODESEG, or DATASEG 
+    */ 
+    toseg(newseg) int newseg; { 
+      if(oldseg == newseg)  return; 
+      if(oldseg == CODESEG) outline(&quot;CODE ENDS&quot;); 
+      else if(oldseg == DATASEG) outline(&quot;DATA ENDS&quot;); 
+      if(newseg == CODESEG) { 
+        outline(&quot;CODE SEGMENT PUBLIC&quot;); 
+        outline(&quot;ASSUME CS:CODE, SS:DATA, DS:DATA&quot;); 
+        } 
+      else if(newseg == DATASEG) outline(&quot;DATA SEGMENT PUBLIC&quot;); 
+      oldseg = newseg; 
+      } 
+     
+    /* 
+    ** declare entry point 
+    */ 
+    public(ident) int ident;{ 
+      if(ident == FUNCTION) 
+           toseg(CODESEG); 
+      else toseg(DATASEG); 
+      outstr(&quot;PUBLIC &quot;); 
+      outname(ssname); 
+      newline(); 
+      outname(ssname); 
+      if(ident == FUNCTION) { 
+        colon(); 
+        newline(); 
+        } 
+      } 
+     
+    /* 
+    ** declare external reference 
+    */ 
+    external(name, size, ident) char *name; int size, ident; { 
+      if(ident == FUNCTION) 
+           toseg(CODESEG); 
+      else toseg(DATASEG); 
+      outstr(&quot;EXTRN &quot;); 
+      outname(name); 
+      colon(); 
+      outsize(size, ident); 
+      newline(); 
+      } 
+     
+    /* 
+    ** output the size of the object pointed to. 
+    */ 
+    outsize(size, ident) int size, ident; { 
+      if(size == 1 
+      &amp;&amp; ident != POINTER 
+      &amp;&amp; ident != FUNCTION)      outstr(&quot;BYTE&quot;); 
+      else if(ident != FUNCTION) outstr(&quot;WORD&quot;); 
+      else                       outstr(&quot;NEAR&quot;); 
+      } 
+     
+    /* 
+    ** point to following object(s) 
+    */ 
+    point() { 
+      outline(&quot; DW $+2&quot;); 
+      } 
+     
+    /* 
+    ** dump the literal pool 
+    */ 
+    dumplits(size) int size; { 
+      int j, k; 
+      k = 0; 
+      while (k &lt; litptr) { 
+        poll(1);                     /* allow program interruption */ 
+        if(size == 1) 
+             gen(BYTE_, NULL); 
+        else gen(WORD_, NULL); 
+        j = 10; 
+        while(j--) { 
+          outdec(getint(litq + k, size)); 
+          k += size; 
+          if(j == 0 || k &gt;= litptr) { 
+            newline(); 
+            break; 
+            } 
+          fputc(',', output); 
+          } 
+        } 
+      } 
+     
+    /* 
+    ** dump zeroes for default initial values 
+    */ 
+    dumpzero(size, count) int size, count; { 
+      if(count &gt; 0) { 
+        if(size == 1) 
+             gen(BYTEr0, count); 
+        else gen(WORDr0, count); 
+        } 
+      } 
+     
+    /******************** optimizer functions ***********************/ 
+     
+    /* 
+    ** Try to optimize sequence at snext in the staging buffer. 
+    */ 
+    peep(seq) int *seq; { 
+      int *next, *count, *pop, n, skip, tmp, reply; 
+      char c; 
+      next = snext; 
+      count = seq++; 
+      while(*seq) { 
+        switch(*seq) { 
+          case any:   if(next &lt; stail)       break;      return (NO); 
+          case pfree: if(isfree(PRI, next))  break;      return (NO); 
+          case sfree: if(isfree(SEC, next))  break;      return (NO); 
+          case comm:  if(*next &amp; COMMUTES)   break;      return (NO); 
+          case _pop:  if(pop = getpop(next)) break;      return (NO); 
+          default:    if(next &gt;= stail || *next != *seq) return (NO); 
+          } 
+        next += 2; ++seq; 
+        } 
+     
+      /****** have a match, now optimize it ******/ 
+     
+      *count += 1; 
+      reply = skip = NO; 
+      while(*(++seq) || skip) { 
+        if(skip) { 
+          if(*seq == 0) skip = NO; 
+          continue; 
+          } 
+        if(*seq &gt;= PCODES) { 
+          c = *seq &amp; 0xFF;            /* get low byte of command */ 
+          n = c;                      /* and sign extend into n */ 
+          switch(*seq &amp; 0xFF00) { 
+            case ife:   if(snext[1] != n) skip = YES;  break; 
+            case ifl:   if(snext[1] &gt;= n) skip = YES;  break; 
+            case go:    snext += (n&lt;&lt;1);               break; 
+            case gc:    snext[0] =  snext[(n&lt;&lt;1)];     goto done; 
+            case gv:    snext[1] =  snext[(n&lt;&lt;1)+1];   goto done; 
+            case sum:   snext[1] += snext[(n&lt;&lt;1)+1];   goto done; 
+            case neg:   snext[1] = -snext[1];          goto done; 
+            case topop: pop[0] = n; pop[1] = snext[1]; goto done; 
+            case swv:   tmp = snext[1]; 
+                        snext[1] = snext[(n&lt;&lt;1)+1]; 
+                        snext[(n&lt;&lt;1)+1] = tmp; 
+            done:       reply = YES; 
+                        break; 
+            } 
+          } 
+        else snext[0] = *seq;         /* set p-code */ 
+        } 
+      return (reply); 
+      } 
+     
+    /* 
+    ** Is the primary or secondary register free? 
+    ** Is it zapped or unused by the p-code at pp 
+    ** or a successor?  If the primary register is 
+    ** unused by it still may not be free if the 
+    ** context uses the value of the expression. 
+    */ 
+    isfree(reg, pp) int reg, *pp; { 
+      char *cp; 
+      while(pp &lt; stail) { 
+        cp = code[*pp]; 
+        if(*cp &amp; USES &amp; reg) return (NO); 
+        if(*cp &amp; ZAPS &amp; reg) return (YES); 
+        pp += 2; 
+        } 
+      if(usexpr) return (reg &amp; 001);   /* PRI =&gt; NO, SEC =&gt; YES at end */ 
+      else       return (YES); 
+      } 
+     
+    /* 
+    ** Get place where the currently pushed value is popped? 
+    ** NOTE: Function arguments are not popped, they are 
+    ** wasted with an ADDSP. 
+    */ 
+    getpop(next) int *next; { 
+      char *cp; 
+      int level;  level = 0; 
+      while(YES) { 
+        if(next &gt;= stail)                     /* compiler error */ 
+          return 0; 
+        if(*next == POP2) 
+          if(level) --level; 
+          else return next;                   /* have a matching POP2 */ 
+        else if(*next == ADDSP) {             /* after func call */ 
+          if((level -= (next[1]&gt;&gt;LBPW)) &lt; 0) 
+            return 0; 
+          } 
+        else { 
+          cp = code[*next];                   /* code string ptr */ 
+          if(*cp &amp; PUSHES) ++level;           /* must be a push */ 
+          }  
+        next += 2; 
+        } 
+      } 
+     
+    /******************* output functions *********************/ 
+     
+    colon() { 
+      fputc(':', output); 
+      } 
+     
+    newline() { 
+      fputc(NEWLINE, output); 
+      } 
+     
+    /* 
+    ** output assembly code. 
+    */ 
+    outcode(pcode, value) int pcode, value; { 
+      int part, skip, count; 
+      char *cp, *back; 
+      part = back = 0; 
+      skip = NO; 
+      cp = code[pcode] + 1;          /* skip 1st byte of code string */ 
+      while(*cp) { 
+        if(*cp == '&lt;') { 
+          ++cp;                      /* skip to action code */ 
+          if(skip == NO) switch(*cp) { 
+            case 'm': outname(value+NAME); break; /* mem ref by label */ 
+            case 'n': outdec(value);       break; /* numeric constant */ 
+            case 'l': outdec(litlab);      break; /* current literal label */ 
+            } 
+          cp += 2;                   /* skip past &gt; */ 
+          } 
+        else if(*cp == '?') {        /* ?..if value...?...if not value...? */ 
+          switch(++part) { 
+            case 1: if(value == 0) skip = YES; break; 
+            case 2: skip = !skip;              break; 
+            case 3: part = 0; skip = NO;       break; 
+            } 
+          ++cp;                      /* skip past ? */ 
+          } 
+        else if(*cp == '#') {        /* repeat #...# value times */ 
+          ++cp; 
+          if(back == 0) { 
+            if((count = value) &lt; 1) { 
+              while(*cp &amp;&amp; *cp++ != '#') ; 
+              continue; 
+              } 
+            back = cp; 
+            continue; 
+            } 
+          if(--count &gt; 0) cp = back; 
+          else back = 0; 
+          } 
+        else if(skip == NO) fputc(*cp++, output); 
+        else ++cp; 
+        } 
+      } 
+     
+    outdec(number)  int number; { 
+      int k, zs; 
+      char c, *q, *r; 
+      zs = 0; 
+      k = 10000; 
+      if(number &lt; 0) { 
+        number = -number; 
+        fputc('-', output); 
+        } 
+      while (k &gt;= 1) { 
+        q = 0; 
+        r = number; 
+        while(r &gt;= k) {++q; r = r - k;} 
+        c = q + '0'; 
+        if(c != '0' || k == 1 || zs) { 
+          zs = 1; 
+          fputc(c, output); 
+          } 
+        number = r; 
+        k /= 10; 
+        } 
+      } 
+     
+    outline(ptr)  char ptr[];  { 
+      outstr(ptr); 
+      newline(); 
+      } 
+     
+    outname(ptr) char ptr[]; { 
+      outstr(&quot;_&quot;); 
+      while(*ptr &gt;= ' ') fputc(toupper(*ptr++), output); 
+      } 
+     
+    outstr(ptr) char ptr[]; { 
+      poll(1);           /* allow program interruption */ 
+      while(*ptr &gt;= ' ') fputc(*ptr++, output); 
+      } 
+
+</PRE>
+<P>
+<P>
+<CENTER>
+Go to <a href="appd.htm">Appendix D</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

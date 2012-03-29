@@ -1,0 +1,62 @@
+
+
+<HTML>
+<PRE>
+       <B>PSEUDOCODE                                          COMMENTS</B><P> 
+   
+     1 parse primary operand or subexpression              primary() 
+     2 advance to next token 
+     3 if token == [ or ( 
+     4     loop: 
+     5         if token == [                               subscript 
+     6             if operand not in symbol table 
+     7                  issue &quot;can't subscript&quot; 
+     8                  bypass subscript expression        skip() 
+     9                  enforce ] token 
+    10                  return &lt;request no fetch&gt; 
+    11             if operand is an address 
+    12                  FETCH INTO PRIMARY if necessary 
+    13             else 
+    14                  issue &quot;can't subscript&quot; 
+    15                  set &lt;request no fetch&gt; for return  k=0 
+    16             save staging buffer address             setstage() 
+    17             set &lt;not constant&gt; in temporary array   is2[TC]=0 
+    18             parse subscript expression              level1() 
+    19             enforce ] token 
+    20             if subscript is a constant              ...[constant] 
+    21                  purge subscript code               clearstage() 
+    22                  if subscript is not zero 
+    23                       if operand is an integer 
+    24                            double constant 
+    25                            generate GETw2n 
+    26                       else generate GETw2n 
+    27                       generate ADD12 
+    28             else if operand is an integer           ...[variable] 
+    29                       generate DBL1 
+    30                   generate ADD12 
+    31             pass &lt;not an address&gt;                   is[TA]=0 
+    32             pass indirect type from symbol table    is[TI] 
+    33             set &lt;request fetch&gt; for return          k=1 
+    34         else  
+    35             if token == (                           function call 
+    36                  if not symbol table reference 
+    37                       INDIRECT CALL                 callfunc(0) 
+    38                  else if not a function reference 
+    39                            if &lt;request fetch&gt; 
+    40                            and not already fetched  is[CV]==0 
+    41                                FETCH OPERAND        fetch() 
+    42                            INDIRECT CALL            callfunc(0) 
+    43                       else DIRECT CALL              callfunc(ptr) 
+    44                  pass &lt;not symbol table reference&gt;  is[ST]=0 
+    45                  pass &lt;not constant&gt;                is[TC]=0 
+    46                  pass &lt;reference fetched&gt;           is[CV]=0 
+    47                  set &lt;request no fetch&gt; for return  k=0 
+    48             else return &lt;pre-set fetch request&gt; 
+    49     loop back 
+    50 if operand is in symbol table and is a function     no ( 
+    51     generate POINTm 
+    52     pass &lt;not symbol table reference&gt;               is[ST]=0 
+    53     return &lt;request no fetch&gt; 
+    54 return &lt;fetch request from below&gt; 
+</PRE> 
+</HTML>

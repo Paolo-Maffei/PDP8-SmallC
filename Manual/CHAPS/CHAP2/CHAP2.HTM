@@ -1,0 +1,245 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 2:<P>
+TOKENS<P></H1>
+</CENTER>
+</B>The smallest elements in the syntax of a language are called 
+<I>tokens</I>.  A token may be a single character or a sequence 
+of characters that form a single item.  The first order of 
+business for a compiler is to recognize the individual tokens 
+from which the program is built.  It then tries to recognize 
+patterns of tokens as language constructs.  And, finally, it 
+generates code to perform the activities which the language 
+constructs specify.  Since tokens are the building blocks of 
+programs, we begin our study of the Small C language by defining its tokens.<P>
+
+<B>ASCII Character Set<P>
+
+</B>First we look at the character set from which tokens are 
+constructed.  Small C uses the ASCII character set.  As <a href="../append/appa.htm">Appendix 
+A</a> indicates, there are 128 defined characters in the ASCII set.  
+The first 32 (values 0-31) and the last one (127) are classified 
+as <I>control characters</I>.  Among them are the horizontal tab 
+(9), the carriage return (13), and the line feed (10) which are 
+commonly found in C programs.  These characters, and the space 
+(32) character, are often called <I>white space</I> characters
+ since they form the gaps which usually separate tokens.<P>
+Codes 32-126 include the &quot;normal&quot; characters; these 
+include the space (32), the numeric digits (48-57), the uppercase 
+alphabetics (65-90), the lowercase alphabetics (97-122), and the 
+special characters (all other values).  From these are built the 
+tokens of the Small C language.<P>
+
+<B>Constants<P>
+
+</B><I>Numeric constants</I> consist of an uninterrupted sequence 
+of digits which is delimited by white space or special characters 
+(operators or punctuation).  Since only integers are known to 
+Small C, the period cannot appear in numeric constants.  They may 
+be written with a leading plus or minus sign, however.  For more 
+about numeric constants see 
+<a href="../chap3/chap3.htm">Chapter 3</a>.<P>
+<I>Character constants</I> are written by enclosing an ASCII 
+character in apostrophes.  We would write <B>'a'</B> for a 
+constant with the ASCII value of the lowercase <B>a</B> (97).  
+There are variations on this idea, as we shall see in Chapter 3.
+<P>
+<I>String constants</I> are written as a sequence of ASCII 
+characters bounded by quotation marks.  Thus, <B>&quot;abc&quot;
+</B> describes a string of characters containing the first three 
+letters of the alphabet in lowercase.  See <a href="../chap3/chap3.htm">Chapter 3</a> for more 
+about string constants too.<P>
+
+<B>Keywords<P>
+
+</B><I>Keywords</I> (sometimes called<I> reserved words</I>), are 
+the tokens which look like words or abbreviations and serve to 
+distinguish between the different language constructs.  Examples 
+are <B>int</B> in<P>
+
+<PRE>		int i, j, k;<P>
+</PRE>
+
+and <B>while</B> in<P>
+
+<PRE>		while (i &lt; 5) x[i++] = 0;<P>
+</PRE>
+
+Perhaps the first thing noticed in 
+<a href="../chap1/ls1-1.gif">Listing 1-1</a> was 
+that, for the most part, the program is written in 
+lowercase letters.  In fact, all keywords in the C language are 
+written in lowercase.<P>
+
+<B>Names<P>
+
+</B><I>Names</I> (also called <I>identifiers</I> or <I>symbols</I>)
+ are used to identify specific variables, functions, and macros. 
+ Small C names may be any length; however, only the first eight 
+characters have significance.  Trailing characters are ignored.  
+Thus, the names <B>nameindex1</B> and <B>nameindex2</B> are both 
+seen by the compiler as <B>nameinde</B>.  This limit of eight 
+characters, while common, is not universal among C compilers.<P>
+Names must begin with a letter and the remaining characters must 
+be either letters or digits.  The underscore character counts as 
+a letter, however.  Thus, the name <B>_abc</B> is perfectly 
+legal, as is <B>a_b_c</B>.<P>
+
+Names may be written with both upper and lowercase letters, which 
+are equivalent.  It is customary, however, to generally use 
+lowercase except for macro symbols.  The practice of naming 
+macros in uppercase calls attention to the fact that they are not 
+variable names but defined symbols.  To improve readability, one 
+common practice is to capitalize the first letter of each term 
+that goes into a name.  <B>GetTwo</B>, for instance, reads better 
+than <B>gettwo</B>.<P>
+
+Every global name defined to the Small C compiler generates an 
+assembly language label of the same name, but preceded by an 
+underscore.  The purpose of the underscore is to avoid clashes 
+with the assembler's reserved words.  As you study the Small C 
+library (<a href="../append/appd.htm">Appendix D
+</a>) you will notice that global variables and 
+some functions are named with leading underscores.  This common 
+practice is to avoid clashing with names a programmer might 
+choose.  So, as a matter of practice, we should not ordinarily 
+name globals with leading underscores.<P>
+
+Since the compiler adds its own underscore, names written with a 
+leading underscore appear in the assembly file with two leading 
+underscores.<P>
+
+Locals cannot clash with assembler-reserved words or library 
+globals.  This is because locals are allocated on the stack and 
+are referenced relative to the stack frame instead of by name.<P>
+
+<B>Punctuation<P>
+
+</B>Punctuation in C is done with semicolons, colons, commas, 
+apostrophes, quotation marks, braces, brackets, and parentheses.  
+Semicolons are primarily used as statement terminators.  One is 
+placed at the end of every simple statement.  As illustrated by<P>
+
+<PRE>		{ x = j; j = k; k = x; }<P>
+</PRE>
+
+even the last statement in a block requires one.<P>
+Preprocessor directives are an exception since they are not part 
+of the C language proper, and each one exists in a line by 
+itself.  Semicolons also separate the three expressions in a <B>
+for</B> statement (<a href="../chap10/chap10.htm">Chapter 10</a>), as illustrated by<P>
+
+<PRE>		for (i = 0; i &lt; 10; i = i + 1) x[i] = 0;<P>
+</PRE>
+
+Since C has a <B>goto</B> statement, there must be a way of 
+designating the destination address for a jump.  This is done by 
+writing an ordinary name followed by a colon.  Such a name is 
+called a <I>label</I>.  An example is<P>
+
+<PRE>
+		loop:
+		...
+		goto loop;<P>
+</PRE>
+
+Colons also terminate <B>case</B>, and <B>default</B> 
+prefixes which appear in <B>switch</B> statements (<a href="../chap10/chap10.htm">Chapter 10</a>).  
+Consider<P>
+
+<PRE>
+		switch (var) {
+			case  3: putchar('x');
+			case  2: putchar('x');
+			case  1: putchar('x');
+			default: putchar(' ');
+			}<P>
+</PRE>
+
+for example.  These prefixes may be thought of as special 
+labels since they are in fact targets for a transfer of control.<P>
+
+Commas separate items that appear in lists.  Thus, three integers 
+may be declared by<P>
+
+<PRE>		int i, j, k;<P>
+</PRE>
+
+for instance.  Or, a function requiring four arguments might 
+be called with the statement<P>
+
+<PRE>		func (arg1, arg2, arg3, arg4);<P>
+</PRE>
+
+Commas are also used to separate lists of expressions.  
+Sometimes it adds clarity to a program if related variables are 
+modified at the same place.  For example,<P>
+
+<PRE>		while (++i, --k) abc ();<P>
+</PRE>
+
+The value of a list of expressions is always the value of the 
+last expression in the list.<P>
+
+Square brackets enclose array <I>dimensions</I> (in declarations) 
+and <I>subscripts</I> (in expressions).  Thus,<P>
+
+<PRE>		char string[80];<P>
+</PRE>
+
+declares a character array named <B>string</B> consisting of 80 
+characters numbered from 0 through 79, and<P>
+
+<PRE>		ch = string[4];<P>
+</PRE>
+
+assigns the fifth character of that array to the variable <B>ch</B>.<P>
+
+As we saw in <a href="../chap1/ls1-1.gif">Listing 1-1</a>, parentheses 
+enclose argument lists 
+which are associated with function declarations and calls.  They 
+are required even if there are no arguments.<P>
+
+As with all programming languages, C uses parentheses to control 
+the order in which expressions are evaluated.  Thus, (6+2)/2 
+yields 4, whereas 6+2/2 yields 7. <P>
+
+The backslash character (<B>\</B>) may be used in character and 
+string constants as an escape character.  The presence of a 
+backslash gives the following character(s) special meaning.<P>
+
+<B>Operators<P>
+
+</B>As <a href="../chap9/tb9-1.gif">Table 9-1
+</a> illustrates, numerous special characters are used as <I>
+expression operators</I>.  They specify every sort of operation 
+that can be performed on operands.  There are operators for:<P>
+<OL>
+<LI>assignments
+<LI>mathematical operations
+<LI>relational comparisons
+<LI>Boolean operations
+<LI>bitwise operations
+<LI>shifting values
+<LI>calling functions
+<LI>subscripting
+<LI>obtaining the size of an object
+<LI>obtaining the address of an object
+<LI>referencing an object through its address
+<LI>choosing between alternate subexpressions
+</OL>
+
+Since there are so many operators, in many cases it was 
+necessary to form operators from two or more characters.  
+Thus <B>&lt;= </B>and <B>&lt;&lt;=</B> are each operators.  Small C 
+requires that such operators be written without white space or 
+comments between the characters.<P>
+
+<CENTER>Go to <a href="../chap3/chap3.htm">Chapter 3</a>      Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

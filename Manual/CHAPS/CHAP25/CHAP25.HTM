@@ -1,0 +1,421 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 25:<P>
+LOW LEVEL PARSING<P></H1>
+</CENTER>
+</B>
+
+At this point in our tour of the Small C compiler we investigate the third- and fourth-level parsing functions--the ones that handle statements and local declarations.  This is where the big picture begins taking shape.  Figure 25-1 illustrates how the major low level parsing functions relate to each another.<P>
+
+<CENTER>
+<img src="fg25-1.gif">
+</CENTER>
+<CENTER><B>Figure 25-1: Primary Low-Level Parsing Functions<P>
+</CENTER></B>
+
+As we saw in <a href="../chap24/chap24.htm">Chapter 24</a>, the high point in<B> dofunction()</B> is where it calls<B> statement()</B>, since that is where the entire body of a function is parsed.  This should seem appropriate since the body of a function is really just a single compound statement. <P>
+
+<B>Statement()</B> in turn calls the lower-level functions shown in Figure 25-1.  <B>Declloc()</B> declares local variables.  <B>Compound()</B> handles compound statements, while<B> doif()</B>,<B> dowhile()</B>,<B> dodo()</B>, <B>dofor()</B>, and<B> doswitch()</B> parse <B>if</B>, <B>while</B>, <B>do</B>, <B>for</B>, and <B>switch</B> statements respectively.  These six functions are special because they each call<B> statement()</B> recursively.  Notice that each of these constructs controls 
+one or two dependent statements.  And these, in turn, might contain further instances of these six control statements.  This nesting could go on to any depth.  It will be important to remember that this recursion exists, not only when studying these six functions but when studying all of the functions (except<B> dofunction()</B>) in Figure 25-1 since they all can be reached through recursion.<P>
+
+As with the preceding six functions, the others parse the constructs that their names imply.  <B>Doasm()</B> was described in <a href="../chap24/chap24.htm">Chapter 24</a> and so is not repeated here.  Neither is<B> doexpr()</B>, since it comprehends the expression analyzer which is has been reserved for <a href="../chap26/chap26.htm">Chapter 26</a>. <P>
+
+<B>Third-Level Parsing<P>
+</B>
+
+<B>Statement()</B> <P>
+
+Each call to<B> statement()</B> parses a single statement.  Sequences of statements only occur within a compound statement (or block), so the loop that recognizes statement sequences is to be found in<B> compound()</B>.<P>
+First,<B> statement()</B> looks for a data declaration, introduced by <B>char</B>, <B>int</B>, <B>unsigned</B>, <B>unsigned char</B>, or <B>unsigned int</B>.  Finding one of these, it calls<B> declloc()</B>, passing it the data type (<B>CHR</B>, <B>INT</B>, <B>UCHR</B>, or <B>UINT</B>).  It then enforces the presence of a semicolon.<P>
+If that fails, it looks for one of the tokens that introduces an executable statement.  If that succeeds, the corresponding parsing function is called, and the global variable <B>lastst</B> is set to a value indicating which statement was parsed.  Table 25-1 lists these keywords, their parsers, and their <B>lastst</B> values. <P>
+
+<CENTER>
+<img src="tb25-1.gif">
+</CENTER>
+</B><CENTER><B>Table 25-1: Statement Tokens, Parsers, and Lastst Values  <P>
+</CENTER></B>
+
+Several cases deserve special comment.  First, no value is assigned to <B>lastst</B> following a compound statement.  This is because <B>lastst</B> must represent the last elementary statement that is guaranteed to have executed when control reaches the end of the function.  Assigning a value after a compound statement would wipe out the desired information.  Recall from <a href="../chap24/chap24.htm">Chapter 24</a> that <B>lastst</B> is tested by <B>dofunction()</B>, after parsing a function's body, to decide whether 
+or not to generate a default return.  At first glance, it would appear that assigning a value to <B>lastst</B> after each statement would not give reliable results.  For instance, a function might end with<P>
+
+<PRE>		...
+		if(a==b) return;
+		} <P>
+</PRE>
+
+If this should leave <B>lastst</B> with the value <B>STRETURN</B> then the default <B>RET</B> would not be generated and the consequences would be disastrous.  However, that does not happen because the <B>if</B> statement recursively calls<B> statement()</B> to parse the <B>return</B>.  Therefore, as the recursion unwinds, <B>lastst</B> is first assigned <B>STRETURN</B> and then <B>STIF</B>.<P>
+
+Labels are handled differently since the colon which identifies them is not a prefix token, but a suffix.  In this case<B> dolabel()</B> is called to determine whether or not a label is present and, if so, to handle it.  It returns true on success.<P>
+
+Null statements--semicolons--are also special because no parsing is needed.  However, <B>errflag</B> is reset to reenable error reporting if it had been disabled previously.  Small C has a policy of reporting only the first error message for a simple statement since the cascade of messages which usually follows are more likely to be spurious than correct.  In practice, this works quite well.<P>
+
+If no other statement is recognized, it is assumed that the current token is the beginning of an expression, and so <B>statement()</B> calls<B> doexpr()</B>.  Recall that in C an isolated expression is a legal statement.  If it is not clear at this point how a function is called, then remember that functions are called from within expressions.<P>
+
+<B>Fourth-Level Parsing<P>
+</B>
+
+<B>Declloc()<P>
+</B>
+
+<B>Declloc()</B> parses local declarations (see <a href="../chap19/ls19-6.gif">Listing 19-6</a> for examples).  This function is roughly parallel to<B> declglb()</B>, although major differences exist.  First, local declarations may appear only at the beginning of a block, before the executable statements.  This means that all of the local variables in a block can be allocated on the stack at one time with<P>
+
+<PRE>		ADD SP,-<I>n</I><P>
+</PRE>
+
+in which <I>n</I> is the total number of bytes being allocated.  If a data declaration is encountered after an executable statement, &quot;<B>must declare first in block</B>&quot; is issued.<P>
+
+Since local variables are referenced relative to the base pointer BP, no labels are generated.  Rather, the local symbol table contains the offsets from BP to the variables.<P>
+
+Another difference is found in the fact that local variables are not initialized, and so initializers do not have to be parsed.  Also, Small C restricts local function declarations to pointers; that is, only function declarations of the form<P>
+
+<PRE>		(*<I>name</I> )()<P>
+</PRE>
+
+are acceptable at the local level.  These factors further simplify the task of<B> declloc()</B>.<P>
+
+Two other restrictions on local declarations need to be considered.  First, local declarations are not allowed in the body of a <B>switch</B> statement.  This is because, control enters a <B>switch</B> statement at arbitrary points without passing through the head of a block where the local variables would be allocated.  Thus, it would be possible to reference variables that were never allocated.  Therefore, attempting to declare locals within a <B>switch</B> statement yields 
+the message &quot;<B>not allowed in switch</B>.&quot; An example of such an illegal statement is:<P>
+
+<PRE>		switch(i) {
+			int j;
+			case 1: j = i; ...
+			...
+			}
+</PRE>
+
+Control cannot reach the point, before the first case prefix, where <B>j</B> is allocated space on the stack.<P>
+The other restriction has a similar basis.  <B>Goto</B> statements and locals (declared below the highest-level block) are not allowed in combination--either is allowed, but not both.  This is because jumping into a block in which locals are declared would bypass the code that allocates the locals.  Local declarations at the highest level in the body of a function present no problem since they precede all executable statements, and so are guaranteed to be allocated.  A violation of this restriction 
+is greeted with either &quot;<B>not allowed with goto</B>&quot; or &quot;<B>not allowed with block-locals</B>.&quot;  An illegal example is:<P>
+
+<PRE>		func() {
+			if(i) {
+				int j;
+				target: j = 0;
+				...
+				}
+			goto target;
+			}<P>
+</PRE>
+
+On entry from<B> statement()</B>, the data type (<B>char</B>, <B>int</B>, <B>unsigned</B>, <B>unsigned char</B>, or <B>unsigned int</B>) has already been recognized, bypassed, and passed to this function as an argument.  <B>Declloc()</B> then finds itself facing a list of objects to define (reserve storage for).  Each iteration of an infinite loop processes the next object in the list.  Two statements test for return conditions.  At the top of the loop<P>
+
+<PRE>		if(endst()) return;<P>
+</PRE>
+
+tests for the end of the statement (semicolon or end of input) and returns if so.  And at the bottom<P>
+
+<PRE>		if(match(&quot;,&quot;)==0) return;<P>
+</PRE>
+
+returns when an object declaration is not followed by a comma.  Between these,<B> declloc()</B>:<P>
+
+<OL>
+<LI> Calls <b>decl()</b> to determine the identity (POINTER, VARIABLE, ARRAY) and size of the object, saving them in the local variables id and sz.  Decl() also fetches and verifies the object's name.
+<LI> Using <b>id</b> and <b>sz</b>, adds an entry to the symbol table so the object can be referenced.<p>
+</OL>
+
+First, within<B> decl()</B>, a check is made for an open parenthesis, introducing a function pointer declaration--<B>(*...)()</B>.  Next<B> *</B> is sought; if present the identity is set to <B>POINTER</B>; otherwise, <B>VARIABLE</B> is assumed.  Then,<B> symname()</B> is called to verify and fetch the name.  If a legal name is not there,<B> illname()</B> complains.  Next, if an open parenthesis was found, the closing parenthesis is bypassed.  Then, if another open parenthesis is found, a 
+function pointer is being declared.  In that case, failure to supply the leading <B>(*</B> produces &quot;<B>try (*...)()</B>&quot; as an error message.  In any case the final closing parenthesis is required.<P>
+
+Next, if the identity is <B>VARIABLE</B> (not <B>POINTER</B>), then a check is made for an open bracket, indicating <B>ARRAY</B>.  This overrides the initial assumption of <B>VARIABLE</B>.  Next,<B> needsub()</B> evaluates the dimension expression and enforces the closing bracket.  Its returned value is the specified dimension--a constant.  If the dimension is missing or evaluates to zero, then <B>&quot;need array size</B>&quot; is issued.  The array dimension is multiplied by the size of an element 
+to determine the total size of the array.  Last of all, the size of the declared object is returned to<B> declloc()</B>.<P>
+
+Finally,<B> declloc()</B> calls<B> addsym()</B> to enter the declared object into the local symbol table.<P>
+
+Notice that nothing is done to actually generate code to allocate the declared object.  That step is postponed until the first executable statement is reached.  The global variable <B>declared</B> accumulates a running total of the number of bytes that have been declared--the number that must be allocated.  Notice that it gets reset to zero by <B>compound()</B> at the beginning of a block.  Then as each object is declared, it gets incremented by the size of the object.  Finally, when<B> statement()</B> 
+sees something other than a declaration, the statement<P>
+
+<PRE>		gen(ADDSP, csp-declared);<P>
+</PRE>
+
+generates code to adjust the stack so as to reserve enough space for the variables.  It also sets <B>declared</B> to -1 as a signal to<B> declloc()</B> that further declarations are to be rejected with the message &quot;<B>must declare first in block</B>.&quot;<P>
+
+<B>Compound()<P>
+</B>
+
+<B>Compound()</B> parses compound statements.  The essence of this function is captured in the lines<P>
+
+<PRE>		++ncmp;
+		while(match(&quot;}&quot;) == 0)
+			if(eof) {
+				error(&quot;no final }&quot;);
+				break;
+				}
+			else statement();
+		if(--ncmp &amp;&amp; lastst != STRETURN &amp;&amp; lastst != STGOTO)
+			gen(ADDSP, savcsp);<P>
+</PRE>
+
+The global variable <B>ncmp</B> indicates the level of nesting of compound statements.  Notice that it gets increased before the statements between the braces are parsed, and decreased afterward.  On entry, the opening brace has already been recognized and bypassed, so the next thing should be the first statement.  The loop continues until the closing brace or the end of input text has been reached.  Since the program should not end in an unclosed block, &quot;<B>no final }</B>&quot; is issued in that
+ case.  With each iteration of the loop,<B> statement()</B> is called recursively.  Notice that, since<B> statement()</B> calls <B>compound()</B>, any of these inner statements may itself be compound, causing other instances of this same loop to be activated within a single iteration of this one.  A closing brace will terminate the innermost instance of the loop, thereby properly matching the last open brace--a happy consequence of recursion.<P>
+
+Now, what happens before and after the main loop?  First, <B>csp</B> and <B>locptr</B> are saved so they can be restored after the block is parsed.  The statements<P>
+
+<PRE>		savcsp = csp;
+		savloc = locptr;
+</PRE>
+
+accomplish this.  Also, <B>declared</B> is set to zero so that local declarations will be enabled.<P>
+
+After parsing the block, the stack may require adjusting to deallocate any locals that were declared, the local symbol table is purged of symbols that were declared in the block, and <B>declared</B> is set to <B>-1</B> to ensure that locals cannot be declared until another block is opened.<P>
+
+There is no need to generate stack restoring code, however, if the last unconditional statement in the block is a <B>return</B> or <B>goto</B>.  In the first case, the stack adjusting code is generated before the <B>return</B> and in the second it is not needed because it cannot be reached.  So <B>lastst</B> is checked and<P>
+
+<PRE>		gen(ADDSP, savcsp);<P>
+</PRE>
+
+is performed only if necessary.  Whether or not code is generated to deallocate locals, <B>csp</B> is restored to its original value for further parsing.<P>
+
+It would be tempting to purge locals from the symbol table simply by means of<P>
+
+<PRE>		locptr = savloc;<P>
+</PRE>
+
+That would purge everything declared in the current block and leave everything declared in superior blocks.  However, it would wipe out labels along with objects.  And that would not do since labels must be seen throughout a function's body.  Therefore, before restoring <B>locptr</B>, a sweep from <B>savloc</B> to <B>locptr</B> finds each label entry, moves it to <B>savloc</B> and advances <B>savloc</B> over the relocated entry.  Only then is <P>
+
+<PRE>              locptr = savloc;<P>
+</PRE>
+
+allowed to discard local objects that were declared in the current block.<P>
+
+<PRE>		Doif()<P>
+</PRE>
+
+This function and the next three are very similar.  They do essentially the same things but in different sequences.  Therefore, we shall examine this one very closely and then simply describe differences in the others.<P>
+
+The task of<B> doif()</B> is to scan an <B>if</B> statement from left to right, generating assembly code that faithfully represents the statement to the CPU.  Figure 25-2 illustrates the general form of the C and assembly code for both forms of the <B>if</B> statement.  We shall make one pass through<B> doif()</B> observing how it handles both types of statement--with and without an <B>else</B> clause.<P>
+
+<CENTER>
+<img src="fg25-2.gif">
+</CENTER>
+<CENTER><B>Figure 25-2: Structure of IF and IF/ELSE Statements<P>
+</CENTER></B>
+
+First, a label number must be reserved for use in jumping around the first (or only) controlled statement.  In Figure 25-2, this label is designated false: although its actual appearance in the output file is<B> _n:</B> where <B>n</B> is the number of the label.  The statement<P>
+
+<PRE>		test(flab1 = getlabel(), YES);<P>
+</PRE>
+
+obtains a unique label number for the false label, assigns it to <B>flab1</B>, and calls<B> test()</B> to scan the expression (or list of expressions) in parentheses and generate code to evaluate it and test the result.  This code, which appears as<B> EXPR?</B> in Figure 25-2, contains a jump on the false condition to the false label.  If the expression evaluates true, however, the jump is not taken and control falls down to whatever follows.  Since the next thing in the C syntax is the statement that
+ should execute under the true condition, that statement is parsed by calling<B> statement()</B> to generate code for it (<B>STATEMENT</B> and <B>STATEMENT1</B> in Figure 25-2).  Since it closely relates to expression analysis, the examination of <B>test()</B> has been postponed to <a href="../chap26/chap26.htm">Chapter 26</a>.<P>
+
+Now, if the <B>else</B> clause is not present, we only have to generate the false label with<P>
+
+<PRE>		gen(LABm, flab1);<P>
+</PRE>
+
+and return.<P>
+
+However, if an <B>else</B> clause is present, there must be another call to<B> statement()</B>.  But we don't want the second statement to execute after the first one, so a jump from the end of the first statement around the second one is needed.  Therefore,<P>
+
+<PRE>		flab2 = getlabel();<P>
+</PRE>
+
+reserves another label number for this purpose and<P>
+
+<PRE>		gen(JMPm, flab2);<P>
+</PRE>
+
+generates the jump.  Notice, however, that the jump is not always generated.  It is not needed if the true statement (or the last statement in it) is a <B>return</B> or a <B>goto</B>.  In either case the jump could never be reached, so a bit of optimizing is done here.<P>
+
+Now the false label is generated by<P>
+
+<PRE>		gen(LABm, flab1);<P>
+</PRE>
+
+and the second statement is parsed by calling<B> statement()</B>.  Finally, the exit label is generated by<P>
+
+<PRE>		gen(LABm, flab2);<P>
+</PRE>
+
+and the <B>else</B> clause has been parsed.<P>
+
+Notice that calls to<B> statement()</B> are recursive, so any legal statement--even another <B>if</B>--could occur at that point.  Try mapping out, as in Figure 25-2, the form of the code generated by<P>
+
+<PRE>		if(<I>expr1</I>)
+			if(<I>expr2</I>) <I>statement1</I>
+			else <I>statement2</I>
+		else <I>statement3</I>
+</PRE>
+
+to show that the <B>else</B> clauses are correctly matched with their antecedents.<P>
+
+As we saw, this is a very simple, straight forward function.  It is not difficult to understand if we know what the underlying functions do.  This function is typical of the next three; essentially, they differ only in order and complexity, but not in concept.<P>
+
+<B>Dowhile()<P>
+</B>
+
+Figure 25-3 illustrates the general form of the C and assembly code for the <B>while</B> statement. <P>
+
+<CENTER>
+<img src="fg25-3.gif">
+</CENTER>
+<CENTER><B>Figure 25-3: Structure of a WHILE Statement<P>
+</CENTER></B>
+
+Although this function is smaller and more straight forward than the previous one, it does introduce calls to<B> addwhile()</B> and<B> delwhile()</B>.  These were discussed in <a href="../chap20/chap20.htm">Chapter 20</a> with the while queue.<P>
+
+<B>Addwhile()</B> establishes a new entry in the while queue to represent the present level of nesting of this control structure.  It contains the stack level on entry to the current statement, the number of a target label for continuing the loop, and the number of a target label for breaking out of the loop.  These three elements, are also stored in<B> wq[]</B>, a local copy of the new while queue entry.  Next, the loop label (<B>loop:</B> in Figure 25-3) is generated by<P>
+
+<PRE>		gen(LABm, wq[WQLOOP]);<P>
+</PRE>
+
+Then<P>
+
+<PRE>		test(wq[WQEXIT], YES);<P>
+</PRE>
+
+generates code to evaluate the expression and test the result (<B>EXPR?</B> in Figure 25-3).  This contains a jump on the false condition to the exit label.  After that,<B> statement()</B> is called recursively to parse the controlled statement.  This is followed by an unconditional jump to the loop label.  And, finally, the exit label is generated and the current entry in the while queue is deleted.<P>
+
+As we can see in Figure 25-3, the generated code first evaluates the expression in parentheses.  If it tests true the controlled statement is executed and the process repeats.  When the expression tests false, control goes to the exit point and continues on with whatever follows.<P>
+
+<B>Dodo()<P>
+</B>
+
+Figure 25-4 illustrates the general form of the C and assembly code for the <B>do</B> statement.<P>
+
+<CENTER>
+<img src="fg25-4.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 25-4: Structure of a DO Statement<P>
+</CENTER></B>
+
+There is very little difference between this function and <B>dowhile()</B>.  Essentially, the order of the expression evaluation and the controlled statement are reversed.  The statement is executed first and then the condition is tested.  Besides that, there is just the additional requirement of the token <B>while</B>.<P>
+
+<B>Dofor()<P>
+</B>
+
+Figure 25-5 illustrates the general form of the C and assembly code for the <B>for</B> statement.<P>
+
+<CENTER>
+<img src="fg25-5.gif">
+</CENTER>
+<CENTER><B>Figure 25-5: Structure of a FOR Statement<P>
+</CENTER></B>
+
+This function is larger and more complex than the previous ones, but it is really no more difficult to understand, since it contains nothing that we have not already seen.  By way of reminder, the proper order for the performance of a <B>for</B> statement is:<P>
+
+<OL>
+<LI> Evaluate the first expression.
+<LI> Evaluate and test the second expression for the exit condition.
+<LI> Execute the controlled statement.
+<LI> Evaluate the third expression.
+<LI> go back to step 2.<p>
+</OL>
+
+As we can see from Figure 25-5, the generated code does just that.  Two of the unconditional jumps are necessary because the parts of the <B>for</B> statement are not executed in the order of their appearance in the syntax.  Specifically, the third expression is evaluated after the controlled statement.  But, since it precedes the statement in the syntax, Small C generates the code for it before the code for the statement.  The first two jumps are needed to keep the chronology of events straight.<P>
+
+Any of the three expressions may be omitted, as long as the two semicolons are present.  Notice what happens when they are absent.  If the first one is missing, there is no code generated for it and the statement begins with the evaluation of the second expression.  If the second one is missing, there is no code generated for it or for testing it; and, since the false jump is not there, the missing expression is always interpreted as true.  Finally, if the last expression is missing, no code is generated 
+for it so, after the controlled statement executes, the last jump transfers control to the second one which immediately transfers it to the first one.  It should be clear why an infinite <B>while</B> loop is preferable.<P>
+
+<B>Doswitch()<P>
+</B>
+
+Figure 25-6 illustrates the general form of the C and assembly code for a <B>switch</B> statement.<P>
+
+<CENTER>
+<img src="fg25-6.gif">
+</CENTER>
+<CENTER><B>Figure 25-6: Structure of a SWITCH Statement<P>
+</CENTER></B>
+
+This is easily the most devious statement that has to be parsed.  Since <B>__switch</B> plays a crucial role in the execution of <B>switch</B> statements, reviewing its description in <a href="../chap18/chap18.htm">Chapter 18</a> may be in order at this point.<P>
+
+As with the other statements, code for the various parts of the <B>switch</B> statement is generated in the order of appearance with jumps inserted to keep the order of execution straight.  Thus, the expression under test is evaluated first, leaving its value in the primary register (AX).  Next a jump skips around the controlled statements to a call to <B>__switch</B>.  This routine compares AX to the table of label/value pairs following the call.  Each label corresponds to a case statement; 
+its corresponding value is the value of the case expression.  The table is terminated with a word containing zero, which cannot possibly be an address.  When a match is found--AX equals a case value--a jump is executed from <B>__switch</B> directly to the corresponding label.  This is shown in the figure as a jump from a table entry to the target label.  If the end of the table is reached without finding a match, <B>__switch </B>simply returns control to the address following the end of the table.  In our example, 
+since there is a <B>default</B> statement, a jump to the default label was generated immediately after the table, so control goes there.  Had there been no <B>default</B> statement, the jump would not have been generated, and control would have gone to the exit label from which it would have continued on to whatever follows.<P>
+
+Notice that since there is no <B>break</B> following <B>statement1</B>, if the expression evaluates to 15 then both of the first two statements execute.  The first of the two jumps to the exit label was generated by the <B>break</B> statement, but the last one is always generated to make control exit properly at the end of the last statement.<P>
+
+With one exception, this function uses the while queue like the previous ones.  Since <B>switch</B> statements do not have a continuation point, specifying zero for a loop label prevents a <B>continue</B> statement from seeing this entry in the queue.<P>
+
+Everything between braces (top of Figure 25-6) is generated by a single recursive call to<B> statement()</B> since the body of a <B>switch</B> is really just an ordinary compound statement in which <B>case</B>, <B>default</B>, and <B>break</B> statements are allowed.<P>
+
+Since nesting is possible, there must be multiple instances of three variables--<B>swactive</B>, <B>swdefault</B>, and <B>swnext</B>.  When true, <B>swactive</B> allows <B>case</B> and <B>default</B> statements to be accepted.  When not zero, <B>swdefault</B> contains the label number of the <B>default</B> prefix.  And <B>swnext</B> points to the next available switch table entry.  These three variables are declared globally, but are saved locally on each entry to<B> doswitch()</B> and restored on exit.  
+
+Therefore, they always contain values that are appropriate to any given level of nesting.<P>
+
+Recall from <a href="../chap20/chap20.htm">Chapter 20</a> that the purpose of the switch table is to store label/value pairs that are created by <B>case</B> statements.  They must be retained until the end of the body of the <B>switch</B> is reached, at which point they can be generated in the output.  Because of nesting, pairs from several different nesting levels may be present in the table at one time.  However, the lowest level entries are at the end of the table from which they are released as unnesting occurs.  
+
+By restoring <B>swnext</B> to its value when<B> doswitch()</B> was entered, only those entries at the lowest level are released.<P>
+
+<B>Docase()<P>
+</B>
+
+<B>Docase()</B> is a small function.  Basically it does three things.  It generates a label for the <B>case</B> statement.  It evaluates the constant expression associated with the <B>case</B> statement.  And it places both in the next available entry of the switch table.  As we saw, these label/value pairs accumulate in the table until<B> doswitch()</B> dumps them at the end of the <B>switch</B> statement.<P>
+
+Four errors are caught.  If <B>swactive</B> is zero, &quot;<B>not in switch</B>&quot; is issued.  If the switch table overflows, &quot;<B>too many cases</B>&quot; is issued.  If the <B>case</B> expression does not yield a constant, &quot;<B>must be constant expression</B>&quot; is issued.  And if the terminating colon is not found, &quot;<B>missing token</B>&quot; is issued.<P>
+
+<B>Dodefault()<P>
+</B>
+
+Basically, this function only generates a default label and saves its number in the global variable <B>swdefault</B>, telling <B>doswitch()</B> to generate (after the label/value table) a jump to the default label.<P>
+
+Three errors are detected.  If <B>swactive</B> is zero, &quot;<B>not in switch</B>&quot; is issued.  If <B>swdefault</B> is already non-zero, &quot;<B>multiple defaults</B>&quot; is issued.  And if the terminating colon is not found, &quot;<B>missing token</B>&quot; is issued.<P>
+
+<B>Dobreak()<P>
+</B>
+
+<B>Dobreak()</B> generates a jump to the exit label of the innermost <B>while</B>, <B>for</B>, <B>do</B>, or <B>switch</B> statement as indicated by the last entry in the while queue.  First, it calls<B> readwhile()</B> to obtain a pointer to the last entry in the while queue.  If the queue is empty, &quot;<B>out of context</B>&quot; is issued and the jump is not generated since there is no active control statement.  That failing, code to adjust the stack back to its original value is generated, after
+ which a jump to the exit label is also generated.<P>
+
+<B>Docont()<P>
+</B>
+
+<B>Docont()</B> does the same thing as<B> dobreak()</B> except for two differences.  First, it targets the loop label instead of the exit label.  Then, since the <B>switch</B> statement does not have a loop label, this function must search backward through the while queue for the last entry with a loop label number.  This is done by<P>
+
+<PRE>		while(1) {
+			if((ptr = readwhile(ptr)) == 0) return;
+			if(ptr[WQLOOP]) break;
+			}<P>
+</PRE>
+
+Since<B> readwhile()</B> returns the address of the entry preceding the one passed to it, each iteration backs up one entry until an entry with a loop label number is found or<B> readwhile()</B> issues &quot;<B>out of context</B>&quot; and returns zero.<P>
+
+<B>Dogoto()<P>
+</B>
+
+<B>Dogoto()</B> is a simple function that generates a jump to a designated label in the current function.  If the target label name is legal,<B> addlabel()</B> is called to add the name to the local symbol table and associate with it a label number.  Since the target label may precede or follow the <B>goto</B> statement, the label may or may not be in the table already.  If it is,<B> addlabel()</B> does nothing; otherwise, it adds the label to the table.  In either case, it returns the label 
+number which <B>dogoto()</B> passes to<B> gen()</B> as the target label number.  With this arrangement, the programmer's label name never appears in the output.  A corresponding numbered label acts as a synonym.  This prevents &quot;<B>multiply defined</B>&quot; errors from being issued by the assembler when more than one function contains the same label name.<P>
+
+Notice that there is no attempt to adjust the stack before executing the jump.  This is because Small C, by disallowing local declarations except prior to executable statements (and labels), guarantees that the stack level will be uniform throughout the function.  This exclusion is initiated by the occurrence of the first <B>goto</B> in the function.  On the other hand, if a declaration in a nested block appears first, then <B>goto</B> statements are disallowed.  In other words, the two are 
+mutually exclusive; whichever appears first is allowed and the other is excluded.<P>
+
+Four errors are possible.  If local variables have been declared in a nested block, &quot;<B>not allowed with block-locals</B>&quot; is issued.  If the label name is found in the local symbol table, but the entry is not for a label, &quot;<B>not a label</B>&quot; is issued.  If the token following the keyword <B>goto</B> is not a legal symbol &quot;<B>bad label</B>&quot; is issued.  And if a semicolon does not terminate the statement, &quot;<B>no semicolon</B>&quot; is issued.<P>
+
+<B>Dolabel()<P>
+</B>
+
+<B>Dolabel()</B> generates labels at the points where they appear in the function.  This function must first decide whether or not the current token in the input line is a label.  It begins by passing over white space to locate the token in question.  It then saves <B>lptr</B>, the source line pointer, so that if the token is not a label, <B>lptr</B> can be restored to prevent further scanning from missing the current token.  If the token is not a legal symbol, it is not passed over and false 
+is returned to<B> statement()</B>.  However, if it is a legal symbol, it is copied into<B> ssname[]</B> and bypassed in the source line.  If the next token is a colon, then the extracted symbol is taken for a label.  <B>Addlabel()</B> is called to add it to the symbol table (if not already there), the numeric form of the label is generated in the output, and true is returned.  On the other hand, if the symbol is not followed by a colon, <B>bump()</B> is called to move the current position back to the start of the
+ token, and false is returned.<P>
+
+<B>Doreturn()<P>
+</B>
+
+<B>Doreturn()</B> recognizes a <B>return</B> statement and generates<P>
+
+<PRE>		MOV SP,BP
+		POP BP
+		RET<P>
+</PRE>
+
+in the output file.  The first instruction is generated only if the <B>return</B> occurs within the scope of local variables.  In that case, SP must be adjusted back to its value before the first local object was allocated.  Also, <B>csp</B> must be adjusted back to its global value of zero.  All of this is done by<P>
+
+<PRE>		gen(RETURN, 0);<P>
+</PRE>
+
+Before that, however, the return expression, if present, is evaluated by calling<B> doexpr()</B> (<a href="../chap26/chap26.htm">Chapter 26</a>).  If no expression is there, no code is generated.  In either case, whatever is in AX becomes the return value of the function.<P>
+
+Notice that <B>csp</B> is preserved across the generation of the return code.  This is because the return may be executed conditionally, and so more code may follow.  In that case, the stack level on entry to the <B>return</B> statement applies to the following code.  If the return is not taken, SP is not adjusted and <B>csp</B> is preserved. <P>
+
+<CENTER>
+Go to<a href="../chap26/chap26.htm"> Chapter 26</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

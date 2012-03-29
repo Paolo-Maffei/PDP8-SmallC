@@ -1,0 +1,202 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 24:<P>
+HIGH LEVEL PARSING<P></H1></B>
+</CENTER>
+
+A parser might employ any of a number parsing methods of which there are two broad categories--top-down methods and bottom-up methods.  For a comparative study of parsing methods, you are referred to references in the <a href="../append/biblio.htm">Bibliography</a> under the heading <B>Compiler Writing</B>.  Specifically, I suggest Chapter 6 of Calingaert[19] for a quick survey, and Tremblay and Sorenson[24], for more detail.  Small C uses a popular top down parsing method called <I>recursive descent</I>.  If a program were to be 
+successively divided into smaller and smaller components, it would form a tree based on the grammar of the language.  At the root would be the entire program, at the interior nodes would be instances of constructs like statements, expressions, and functions; and at the leaves would be tokens. <P>
+
+The recursive descent method starts at the root of such an imaginary tree for the program and looks for a sequence of global constructs.  When it recognizes the beginning of one, it then tries to recognize the constituent parts.  These, in turn, are broken down into smaller parts, until the smallest lexical units (the tokens) are reached. <P>
+
+In the case of Small C, this activity is accomplished by having a high level function<B> parse()</B> look for the global constructs.  <B>Parse()</B>, in turn, calls (descends to) lower-level functions which recognize the next most inclusive constructs, and so on.  When the bottom (token level) is reached, control returns back up to the lowest level at which a construct was recognized; from there it descends again to find the next part of the construct.  When the construct has been fully parsed, 
+control migrates up to the next higher level at which a construct was recognized, and thence down again.  As the parser &quot;walks&quot; this imaginary tree, it emits object code which represents the program in a lower-level &quot;target&quot; language.  This process continues until control reverts back to the highest level and there remain no more global constructs. <P>
+
+ To repeat, the parse tree for the program is only imaginary, it does not exist as such; the parser only performs a linear scan of the source program.  On the other hand, instantaneous points on this imaginary tree do have a real existence in the compiler in the form of nested stack frames for the parsing functions that are active at any point in the process. <P>
+
+Recursion enters the picture because it is implicit in the grammar of the language.  For example, a statement might be a compound statement, containing other statements.  Therefore, the parsing function<B> statement()</B> might call the lower-level function<B> compound()</B> which in turn calls<B> statement()</B>. <P>
+
+The various function calls and returns effectively travel down and up the branches of the parse tree for the program being compiled.  Generally speaking, movement down the tree (toward the leaves) corresponds to successful efforts to recognize language constructs, and movement up the tree corresponds to the generation of code based on what has been recognized.  <P>
+
+<B>Top-Level Parsing<P>
+</B>
+
+<B>Parse()<P></B>
+
+Small C begins parsing in<B> parse()</B> which recognizes the global declarations (data and functions) that constitute a complete program.  In addition, as mentioned in <a href="../chap22/chap22.htm">Chapter 22</a>, it also recognizes the<B> #include</B>, <B>#define</B>, and <B>#asm</B> directives.  <B>Parse()</B> hangs in a loop until <B>eof</B> is true--the end of the last source file has been reached.  With each iteration it attempts to recognize the current token as the start of a declaration (<B>int</B>, <B>char</B>,
+ <B>unsigned</B>, <B>extern</B>) or one of the directives <B>#asm</B>, <B>#include</B>, or <B>#define</B>.  Should these fail, it assumes it has a function definition.  Each of these constructs is further parsed by one of the second-level functions indicated in Figure 24-1.  These five functions parse the entire program.<P>
+
+<CENTER>
+<img src="fg24-1.gif">
+</CENTER>
+<CENTER><B>Figure 24-1: Primary High-Level Parsing Functions<P>
+</CENTER></B>
+
+Unlike the other four functions,<B> dodeclare()</B> is called in anticipation of a declaration.  If it finds one, it parses it and returns true; not finding one, it returns false.  It handles both external and static declarations.  If<B> parse()</B> sees the keyword <B>extern</B> it calls<B> dodeclare()</B> passing it the constant <B>EXTERNAL</B> as a signal that the external storage class applies; otherwise, it passes <B>STATIC</B> for the static storage class.<P>
+
+Recall from <a href="../chap22/chap22.htm">Chapter 22</a> that<B> amatch()</B> and<B> match()</B>, which recognize literal strings in the source, take care of numerous low level, front end tasks.  These include bypassing white space, bypassing recognized tokens, reading and preprocessing new source lines, and even closing one source file and opening the next one if necessary.  They return true only when the specified string is recognized.  <B>Amatch()</B> differs from<B> match()</B> by assuming that an alphanumeric comparison is being made
+ on an entire token--the token must exactly match the string and the first character after the token must not be alphanumeric.  Whereas,<B> match()</B> is satisfied if the string matches only the beginning of the token, regardless of what follows.  <P>
+
+<B>Parsing Global Data Declarations<P>
+</B>
+
+<B>Dodeclare()<P></B>
+
+<B>Dodeclare()</B> is a small function that tries to match on <B>char</B>, <B>int</B>, <B>unsigned</B>, <B>unsigned char</B>, or <B>unsigned</B> int.  Finding none of these, it assumes <B>int</B> if the storage class is <B>EXTERN</B>; this agrees with normal C syntax in which the keyword <B>int</B> may be omitted following <B>extern</B>.  Failing these conditions, control returns to<B> parse()</B> indicating false.  If a declaration is recognized, however,<B> dodeclare()</B> calls<B> declglb()</B>, 
+passing it the data type (<B>CHR</B>, <B>INT</B>, <B>UCHR</B>, or <B>UINT</B>) and the storage class.  After that, it calls<B> ns()</B> to enforce the terminal semicolon, and returns true.  <P>
+
+<B>Declglb()<P>
+</B>
+
+<B>Declglb()</B> parses global declarations (see <a href="../chap19/ls19-2.gif">Listing 19-2</a>, for example).  On entry from<B> dodeclare()</B> the optional storage class (<B>extern</B>) and the data type (<B>char</B>, <B>int</B>, <B>unsigned</B>, <B>unsigned char</B>, or <B>unsigned int</B>) have already been recognized, skipped over, and passed to this function which finds itself now facing a list of names to declare and possibly define (reserve storage and initialize). <P>
+
+Each iteration of an infinite loop processes the next name in the list.  Two statements test for return conditions.  At the top of the loop <P>
+
+<PRE>		if(endst()) return;<P>
+</PRE>
+
+calls<B> endst()</B> to test for the end of the statement (semicolon or end of input) and returns if true.  And, at the bottom,<P>
+
+<PRE>		if(match(&quot;,&quot;) == 0) return;<P>
+</PRE>
+
+returns when a declaration is not followed by a comma.  Between these,<B> declglb()</B>: <P>
+
+<OL>
+<LI> Determines the identity (POINTER, VARIABLE, ARRAY, FUNCTION) of the object, saving it in the local variable id.
+<I>Note: Small C recognizes either the * prefix (for POINTER) or the [ suffix (for ARRAY), but not both.  It cannot handle an array of pointers.  If both are specified, an error message is issued.</I>
+<LI> Determines the number of occurrences of the object, saving it in the local variable <b>dim</b>.  This may be greater than one for an array.
+<LI> Fetches and verifies the object's name.
+<LI> Verifies that the name has not already been declared--does not yet exist in the symbol table.
+<LI> Using <b>id</b> and <b>dim</b>, generates appropriate code to define the object if it is not a function.  Predeclared functions are only added to the symbol table.
+<LI> Using <b>id</b> and <b>dim</b>, adds an entry to the symbol table so the object can be referenced.<p>
+</OL>
+
+First, a check is made for <B>*</B> indicating <B>POINTER</B>.  That failing, the assumption is <B>VARIABLE</B>.  Then,<B> symname()</B> is called to verify the name and copy it from the source line into <B>ssname[]</B>.  Next,<B> findglb()</B> is called to verify that the name is not yet in the symbol table.  After that, if the identity is <B>VARIABLE</B>, checks are made for<B> [</B> or <B>(</B> indicating <B>ARRAY</B> or <B>FUNCTION</B> respectively.  These override the initial 
+determination of <B>VARIABLE</B>.  Notice that these checks are not made if the name was previously identified as a pointer.  In that case, if these tokens are present, the loop terminates after declaring the pointer, and an error results when <B>dodeclare()</B> tries to enforce the terminal semicolon. <P>
+
+The function<B> needsub()</B> is called (1) to evaluate the dimension expression following<B> [</B> and (2) to enforce the presence of a closing <B>]</B>.  Its returned value is the specified dimension--a constant. <P>
+
+Next, if the storage class is <B>EXTERNAL</B>,<B> external()</B> (<a href="../chap21/chap21.htm">Chapter 21</a>) is called to make the declaration to the assembler.  Otherwise, if the identity is not <B>FUNCTION</B> (i.e., data is being declared)<B> initials()</B> (see below) is called to define and initialize the object(s).  Finally,<B> addsym()</B> (also below) is called to enter the declared object into the global symbol table.  <P>
+
+<B>Initials()<P>
+</B>
+
+<B>Initials()</B> is passed the size of the object <B>(type&gt;&gt;2</B>), its identity (POINTER, VARIABLE, or ARRAY), and the number of occurrences (<B>dim</B>) to define.  Internally, these are called <B>size</B>, <B>ident</B>, and <B>dim</B> respectively.  First, the declared symbol name, in <B>ssname[]</B>, is declared to the assembler as an entry point by calling<B> public()</B>.  This guarantees that it can be reached from every module of the program.  Next, <B>initials()</B> scans for<P>
+
+<PRE>		= <I>Value</I>
+</PRE>
+
+or<P>
+
+<PRE>		= { <I>Value</I>, <I>Value</I>, ..., <I>Value</I> }
+</PRE>
+
+where each <I>Value</I> is evaluated by<B> init()</B>.  The values are stored in the literal pool until the end of the initializer is reached and then dumped to the output as either <B>DB</B> or <B>DW</B> directives.  After that, to account for the fact that the number of initial values may not be as great as the dimension of an array,<B> dumpzero()</B> is called to fill out the remaining elements with zeroes.  This means that an array will be the size of the larger of its dimension 
+or the number of initial values it has.  <B>Initials()</B> can be called with <B>dim</B> equal to zero under two conditions--a pointer is being declared or an array of dimension zero is being declared.  Therefore, after calling<B> init()</B>, which decrements <B>dim</B> for each initial value, a check is made to see if <B>dim</B> started at zero and is still zero.  If so, an uninitialized pointer or an uninitialized and undimensioned array is being declared.  In the first case,<B> initials()</B> assumes a value of zero; in the
+ second, it complains with &quot;<B>need array size</B>.&quot;  <P>
+
+<B>Init()<P>
+</B>
+
+<B>Init()</B> recognizes two types of initializer--character strings and constant expressions.  There are restrictions on which type is legal for a given object (see <a href="../chap7/tb7-1.gif">Table 7-1</a>), so <B>init()</B> detects violations and reports them. <P>
+
+First,<B> init()</B> calls<B> string()</B> to test for a quoted string.  Finding one,<B> string()</B> (1) saves it in the literal pool (giving<B> init()</B> the starting offset as a side effect in the local integer <B>value</B>), (2) skips the closing quote, (3) terminates the string in the pool with a null byte, and (4) returns true.  Otherwise, it returns false. <P>
+
+In fetching the characters from the string,<B> string()</B> calls <B>litchar()</B> to translate escape sequences to individual characters.  If a string is found and the object being initialized is not a character array or character pointer, the message &quot;<B>must assign to char pointer or char array</B>&quot; is issued.  Next, the dimension variable in<B> initials()</B> is reduced by the length of the string (the new literal pool offset <B>litptr</B> minus the original offset <B>value</B>).  
+
+Finally, if the object being defined is a pointer, then space for it is allocated and initialized to the address of the string.  In this case, since the string will be dumped immediately following the pointer,<P>
+
+<PRE>		DW $+2<P>
+</PRE>
+
+is generated by calling<B> point()</B>.<P>
+
+If a quoted string is not found in the input line, <B>constexpr()</B> is called to look for a constant expression.  On finding one, a test is made to see if the object being defined is a pointer; if so, the message &quot;<B>cannot assign to pointer</B>&quot; is issued.  In any case, the constant value is stored in the literal pool and the dimension (in<B> initials()</B> ) is reduced by one.  <P>
+
+<B>Parsing Preprocessor Directives<P>
+</B>
+
+<B>Doasm()<P>
+</B>
+
+<B>Doasm()</B> is a small and very simple routine for handling assembly language code.  It differs from the other second-level parsing functions in that it may be called from <B>parse()</B> or<B> statement()</B>.  This is because Small C allows assembly code to appear not only at the global level, but anywhere a statement is allowed as well.  When called, the lead-in<B> #asm</B> has already been recognized and bypassed, so <B>doasm()</B> merely drops into a loop copying lines of input 
+to the output until a line beginning with<B> #endasm</B> is reached.  Of course, the end-of-input condition also terminates the loop.  Finally, the terminating line is discarded by calling <B>kill()</B>, and control returns to the caller.  <P>
+
+<B>Doinclude()<P>
+</B>
+
+<B>Doinclude()</B> is also a very simple function.  When called, the keyword<B> #include</B> has already been recognized and bypassed, and a filename, delimited by quotation marks or angle brackets, is next up (Note that Small C also accepts it without delimiters).  <B>Doinclude()</B> skips the leading quote or angle bracket, if present, and copies the filename into the local character array <B>str[]</B> until the trailing delimiter or the next white space is reached.  
+
+Then it calls the library function<B> fopen()</B>, passing it <B>str</B> for the filename and <B>&quot;r&quot;</B> (retrieval) for the mode.  If the open is successful, <B>input2</B> is assigned the new file descriptor, thereby causing <B>inline()</B> to fetch future input from that file instead of the primary file indicated by <B>input</B>.  Should the open fail, however, <B>input2</B> is again assigned its normal value of <B>EOF</B>, and &quot;<B>open failure on include file</B>&quot; is issued.  Finally,<B> kill()</B> is called 
+to discard the current line so that the next token will have to come from the new file.  <P>
+
+
+<B>Dodefine()<P>
+</B>
+
+<B>Dodefine()</B> is another small routine.  It processes<B> #define </B>directives by adding the macro name to the macro name table and then copying the remaining text into the macro text queue.  When called, the keyword<B> #define</B> has been recognized and bypassed, and the macro name is next up.  <B>Symname()</B> is called to verify that the name is legal and to fetch it into <B>msname[]</B>.  If it is not a valid name, &quot;<B>illegal name</B>&quot; is issued, the line is discarded, and control
+ returns.  Otherwise,<B> search()</B> is called to look for the name in the macro name table.  If not found, <B>cptr</B> is left pointing to an available entry into which the name is copied.  In case the name is not found and there is no more space available, <B>cptr</B> is set to zero and &quot;<B>macro name table full</B>&quot; is issued before control returns.  Regardless of whether a new entry was established or an existing one was found, the entry designated by <B>cptr</B> is pointed to the location 
+in <B>macq</B> where the new replacement text will be stored--in the first case a new macro is being defined and in the second case an old one is being redefined.  Finally, the remaining text in the line, starting with the next token, is copied into the text queue where it is terminated by a null byte.  If there is insufficient room, &quot;<B>macro string queue full</B>&quot; is issued and the run aborts.  <P>
+
+<B>Parsing Function Definitions<P>
+</B>
+
+As mentioned before, if<B> parse()</B> does not recognize any of the lead-in keywords for declarations or the directives which it handles, it assumes that a function is being defined, and so it calls<B> dofunction()</B>.  This large function:<P>
+
+<OL>
+<LI>Initializes the literal pool, obtains a label number for the literals that will be dumped at the end of the function, and clears the local symbol table.
+<LI>Bypasses the optional keyword void if there is one.
+<LI>Lists the current line on the screen if monitoring was requested.
+<LI>Verifies that the current token (the function name) is a legal symbol and fetches it into <b>ssname[]</b>.  That failing, "illegal function or declaration" is issued, the line is discarded, and control returns to parse().
+<LI>Determines whether or not the symbol is already in the global symbol table.  If so, the current definition might be an illegal redefinition.  This would be the case if the table entry is not a function or is a function and was created by a previous definition.  Conversely, if it was created by an earlier function reference (recognized by a storage class of AUTOEXT), the current definition is proper and the class is changed to STATIC.
+<I>Note: Functions that are referenced, but not defined, are automatically declared external at the end of the program by</I><B><I> trailer()</B></I><I>; hence the name </I><B><I>AUTOEXT</B></I><I>.</I><P>
+If no entry matching the current function name is found in the table, one is created with:<P>
+<PRE>
+	NAME = ssname
+	IDENT = FUNCTION
+	CLASS = STATIC
+	TYPE = INT
+	SIZE = 0
+	OFFSET = 0<P>
+</PRE>
+<LI>Generates the string in <b>ssname[]</b> as a label and entry point by calling <b>public()</b>.
+<LI>Requires the opening parentheses for the argument list.  Failure to find it yields "no open paren."
+<LI>Declares each formal argument in the local symbol table.  This is done in a loop looking for the closing parenthesis (also terminated abnormally by the <b>endst()</b> condition).  With each iteration:
+<UL><LI>The current token is determined to be a legal name and is fetched into <b>ssname[]</b>; otherwise, "illegal argument name" is issued and the illegal name is bypassed.
+<LI> If the name is not already in the local symbol table, it is added with:<p>
+</UL>
+<PRE>
+	NAME = ssname
+	IDENT = 0
+	CLASS = AUTOMATIC
+	TYPE = 0
+	SIZE = 0
+	OFFSET = 0, 2, 4, ... for the 1st, 2nd, 3rd, ... argument
+</PRE>
+<UL><LI>If it is in the table already, <b>multidef()</b> issues "already defined." 
+Note that IDENT and TYPE cannot be established until the declarations following the closing parenthesis are parsed.  If the following token is not a right parenthesis or a comma, "no comma" is issued.<p>
+</UL>
+<LI>Determines the identity and type of each declared argument.  This is done in another loop in which the variable <b>argstk</b>--used above for assigning OFFSET values--counts down to zero.  With each iteration, a declaration list is processed by calling <b>doargs()</b> which decrements <b>argstk</b> by two for each argument it parses.  Before each call, <b>int</b>, <b>char</b>, <b>unsigned</b>, <b> unsigned int</b>, or <b>unsigned char</b> must be recognized to introduce the declaration list (and a semicolon afterward).  If one of these keywords is not found, "wrong  number of arguments" is issued since, because  <b>argstk</b> is not zero, not every argument has been typed and something other than a declaration has been found.<P>
+Each call to<B> doargs()</B> accepts the data type from <B>dofunction()</B> and determines the identity and size of a list of arguments.  The function<B> decl()</B> is called to determine these. <P>
+<B>Decl()</B> is also used for local declarations.  In this case, however, since the argument <B>aid</B> (array id) has the value <B>POINTER</B>, arrays are assigned identities of <B>POINTER</B>.  This makes sense because their addresses are passed to the function on the stack, making them <b>lvalues</b>.  Whether<B> decl()</B> is handling argument or local declarations, it requires that functions have the syntax of a pointer; otherwise, &quot;<B>try (*...)()</B>&quot; is issued.  <B>Decl()</B> issues &quot;<B>i
+llegal symbol</B>&quot; if an improper name is found. <P>
+<B>Doargs()</B> issues &quot;<B>not an argument</B>&quot; if a name in the list cannot be found in the local symbol table.  Having found the argument's entry in the local symbol table,<B> doargs()</B> sets the <B>IDENT</B>, <B>TYPE</B>, <B>SIZE</B>, and <B>OFFSET</B> fields to complete the declaration.  As we saw, it gets <B>IDENT</B> and <B>SIZE</B> from<B> decl()</B>, and it receives <B>TYPE</B> as an argument.  It inverts the <B>OFFSET</B> field (to account for the fact that Small C pushes actual argum
+ents onto the stack from left to right) and adjusts it to account for the presence of a return address and the saved value of BP on top of the stack when the function receives control.  For example, if three arguments are being passed, step (8b) would have established their <B>OFFSET</B>s as 0, 2, and 4.  Then this step would invert and adjust them to 8, 6, and 4 respectively.  From this point on, arguments are treated just like local variables.  The only difference being that they are placed on the stack
+ before the call of the function.  Whereas, local variables are allocated on the stack after the call. <P>
+<LI>Calls <b>statement()</b>.  This is the central event in <b>dofunction()</b> because statement() parses the entire body of the function! More will be said about this important step in <a href="../chap25/chap25.htm">Chapter 25</a>. 
+<LI>Generates the default return, that passes control back to the caller, when it reaches the end of the function body.  This is done only if the last statement in the function is not a return or goto; otherwise, the default return could never be reached. 
+<LI>Finally, if any literal strings were defined within the function they are dumped from the literal pool to the output.  This involves generating the label that was reserved in step (1) (and referenced in the function body) and generating the necessary DB directives.<p>
+</OL>
+
+Now that we have surveyed the steps that declare a function, in the next chapter we shall look deeper into the heart of the compiler by examining<B> statement()</B> and its subordinate functions. <P>
+
+<CENTER>
+Go to <a href="../chap25/chap25.htm">Chapter 25 </a>    Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

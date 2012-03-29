@@ -1,0 +1,62 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER><B><H1>Appendix B:</H1><P>
+</CENTER></B>    <P>
+<CENTER><B><H1>The 8086-Family Processors</H1><P>
+</CENTER></B>This appendix gives an overview of the Intel 8086 central processing unit (CPU) architecture.  The 8086 is the base processor for a family of CPUs which execute the 8086 instruction set or super sets thereof.  A chief difference between the CPUs in the family is the width of their data buses--8, 16, or 32 bits.<P>
+The original IBM PC used the 8088 CPU which is a scaled down 8086 with an 8-bit data bus.  The 8088 executes the same instruction set as the 8086.  Higher performance CPUs based on the 8086 include the 80186, 80188, and the 80286.  These have additional capabilities and execute a superset of the 8086 instructions.<P>
+The 80386 is a high speed 32-bit multi-mode CPU.  In real address mode, it emulates an 8086 with some additional instructions.  In virtual 8086 mode, it emulates an 8086 and can also switch quickly to protected mode to realize the full power of the 32-bit CPU.  Switching back to virtual 8086 mode can also be done quickly.<P>
+Since the MS-DOS Small C compiler uses only the instructions of the basic 8086 CPU, it is compatible with all of these processors.  The following material describes the basic architecture of the 8086 family of CPUs.<P>
+Figure B-1 is a diagram of the 8086 central processing unit and its view of memory.  Memory is simply an array of bytes.  Each byte consists of eight bits and has a unique address.  The first byte has an address of 0, the second 1, and so on through 1,048,575.  In hexadecimal the highest address is FFFFF, a 20-bit value.<P>
+The 8086 family CPUs employ a memory segmentation scheme which permits 16 bit values to address more than 65,536 bytes.  The CPU derives absolute addresses from two components--a 16-bit segment address and a 16-bit offset.  The segment component comes from one of the four segment registers CS, DS, SS, or ES.  The offset component comes from one of the other registers or the instruction being executed.  These are added together with the segment address shifted left four bits; i.e., multiplied by 16.  The r
+esult is the requisite 20-bit address.<P>
+<CENTER>
+<img src="b-1.gif">
+</CENTER>   
+<CENTER><B> Figure B-1: 8086 CPU Architecture<P>
+</CENTER></B>A segment is a contiguous area of memory which begins on a paragraph boundary and has a maximum size of 65536 bytes.  Paragraph boundaries are addresses which are divisible by 16.  Shifting the 16-bit paragraph address left four bits converts it to a memory address that must fall on a paragraph boundary.<P>
+The CPU is designed around the assumption that programs will usually consist of at least three segments--a code segment containing the program's instructions, a data segment containing global data, and a stack segment containing the program's stack.  The extra segment register (ES) allows a program to have an additional data segment.  Of course, a program could have more than one of each type of segment if it changed the values in the segment registers appropriately.  On the other hand, all four segment r
+egisters could contain the same value, so that all of the program resides in a single segment.<P>
+When the CPU fetches an instruction for execution, the instruction is derived from the code segment (CS) and instruction pointer (IP) registers, as shown in Figure B-2.<P>
+When the CPU performs stack operations, it derives the stack address from the stack segment register (SS) and the stack pointer (SP) or the base pointer (BP).  Figure B-3 illustrates the case for push and pop instructions.  On the left is the situation before an operand is pushed onto the stack.  On the right is the situation after the push.  If a pop finds the situation on the right, it will leave it as on the left.  The operand is not placed on the stack until the push instruction executes.<P>
+<CENTER>
+<img src="b-2.gif">
+</CENTER>
+<CENTER><B>Figure B-2: 8086 Instruction Address<P>
+</CENTER></B>When the CPU makes an operand reference, it combines the data segment register (DS) with one or more offset values.  In some cases the extra segment register (ES) is used instead.  The default choice of DS for operand references can be overridden by an instruction prefix so that instructions can access any segment.<P>
+<CENTER>
+<img src="b-3.gif">
+</CENTER>
+<CENTER><B>Figure B-3: 8086 Stack Address<P>
+</CENTER></B>8086 instructions access operands through any of six addressing modes.  Table B-1 lists these modes.<P>
+<CENTER>
+<img src="tbb-4.gif">
+</CENTER>
+<CENTER><B>Table B-1: 8086 Operand Addressing Modes<P>
+</CENTER></B>In the immediate mode, the operand is a constant which is contained in the instruction.  Immediate operands are fetched with the instruction, so they have no address references.  In the register mode, the operand is contained in a register.  The instruction only specifies which register contains the operand; therefore, no memory address is needed in that case either.<P>
+The remainder of the addressing modes require the CPU to compose a physical memory address for the operand.  In the direct mode, the instruction contains an offset which is added to DS to derive the physical address of the operand.  In the register indirect mode, a register contains an offset which is added to DS to produce the physical address of the operand.  In the based mode, a base register is added to an offset contained in the instruction (a displacement) and to DS to produce the physical address o
+f the operand.  The instruction displacement is optional.  In the indexed mode, an index register is added to a displacement in the instruction and to DS to produce the physical address of the operand.  The instruction displacement is optional.  In the based and indexed mode, a base register is added to an index register, a displacement in the instruction, and to DS to produce the physical address of the operand.  The instruction displacement is optional.  Figure B-4 illustrates an example of based and in
+dexed addressing.<P>
+<CENTER>
+<img src="b-4.gif">
+</CENTER>
+<CENTER><B>Figure B-4: Four Component Data Address<P>
+</CENTER></B>Many instructions can operate in any of the addressing modes.  Instructions which have two operands are restricted as to which combinations of addressing modes are legal.  Despite these restrictions, most instructions are symmetrical with respect to which is the source and which is the destination operand.<P>
+IP holds the offset of the next instruction to be fetched for execution.  Normally, when an instruction is fetched, IP is incremented by the instruction's length, causing a sequential execution of instructions.  However, jump, call, and return instructions break this sequence by placing a new value into IP.<P>
+SP and BP are used as offsets into the stack segment.  BP establishes the base of a stack frame, whereas SP always points to the item at the top of the stack.  BP is only changed by moving new values into it, whereas SP is also altered by push and pop instructions.<P>
+The index registers--source index (SI) and destination index (DI)--are used by certain string instructions as offsets into data segments.  By default SI is associated with DS and DI with ES.<P>
+Sixteen bit values (words) are stored in memory as consecutive bytes with the low-order byte first.  Thirty-two-bit values (double words) are stored as consecutive 16-bit values with the low-order word first.  Addresses that are a multiple of 2 and 4 are referred to as word and double-word boundaries.  Depending on the width of the data bus, significant improvements in speed can be realized by placing word items on word boundaries, and double-word items on word or double-word boundaries.<P>
+Four data registers are included in the CPU.  They are AX, BX, CX, and DX.  Each of these 16-bit registers consists of a pair of 8-bit registers--a high register and a low register.  Thus, AX consists of AH and AL, and so on.  Instructions can reference the data registers as four 16-bit registers or eight 8-bit registers.<P>
+The flag register is a collection of condition flags which are set or cleared by conditions resulting from the execution of arithmetic and logical instructions.  The flag bits can be tested individually.  The 8086 CPU uses nine flag bits.<P>
+The carry flag (CF) is set by a carry into the high-order bit or a borrow from the high- order bit.  The auxiliary flag (AF) is set by a carry out of the lowest nibble (4 bits) or a borrow into the lowest nibble.  The overflow flag (OF) is set when an arithmetic overflow occurs.  The sign flag (SF) is set when the high-order bit of the result is set to one.  The parity flag (PF) is set when the result contains an even number of bits.  The zero flag (ZF) is set when the result is zero.<P>
+Three of the flags control the CPU rather than reflect conditions resulting from an arithmetic or logical instruction.  The direction flag (DF) determines the direction in which string operations are performed.  When clear, string operations proceed from left to right, and vice versa.  The interrupt-enable flag (IF) determines whether or not external (maskable) interrupts can be recognized.  When clear, these interrupts are disabled, and vice versa.  The trap flag (TF), when set, places the CPU in single 
+step mode.  In that mode, the CPU generates an interrupt after each instruction.  This enables a debugger to receive control after each instruction. <P>
+<P>
+<CENTER>
+Go to <a href="appc.htm">Appendix C</a>  Return to <a href="../toc1.htm">Table of Contents</a>
+<P>
+</CENTER>
+</HTML>

@@ -1,0 +1,71 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 17:<P>COMPILING THE COMPILER</H1><P>
+</CENTER>
+</B><B>How to Compile the Compiler<P>
+</B>
+
+Since the Small C compiler is really just another Small C program, we follow the steps in <a href="../chap16/chap16.htm">Chapter 16</a> to compile it just as we would any other program.  The only difference is the number of source files and their names.  Whereas <a href="../chap16/fg16-1.gif">Figure 16-1</a> illustrates the general procedure, Figure 17-1 is specific to the compiler itself.<P>
+
+<CENTER>
+<img src="fg17-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 17-1. Compiling the Compiler<P>
+</CENTER></B>
+
+The compiler is organized into four parts, each of which is compiled and assembled separately.  The <B>OBJ</B> files are then combined by the linker with modules from the library <B>CLIB.LIB</B> to produce the new <B>CC.EXE </B>file.  Each source file includes two header files, <B>STDIO.H</B> and <B>CC.H</B>.  In addition, the first source file includes <B>NOTICE.H</B> which contains the signon notice.  Listing 17-1 shows a batch file that will perform the entire operation.  This file 
+uses the Microsoft assembler.  It assumes that we have sufficient disk space and that the <B>PATH</B> environment variable is properly set so that the assembler and linker can be found by <B>MS-DOS</B>.  If this is not so, then adjustments will have to made accordingly.<P>
+
+<CENTER>
+<img src="ls17-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Listing 17-1: Batch File to Compile the Compiler<P>
+</CENTER></B>
+
+The four parts of the compiler are divided functionally so that changes to one part will not normally require changes to the other parts.  Having compiled the entire compiler once and having kept the <B>OBJ</B> files, it is then only necessary to compile and assemble the parts that are actually affected by a change.  Notice that the batch file in Listing 17-1 deletes the <B>ASM</B> files, but retains the <B>OBJ</B> files for just that reason.  Listing 17-2 shows a batch file 
+for recompiling just one part of the compiler.<P>
+
+<CENTER>
+<img src="ls17-2.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Listing 17-2: Batch File to Recompile One Part of the Compiler<P>
+</CENTER></B>
+
+Notice that the link step is optional in case two or three parts must be recompiled.  We can perform the link step only with the last part.  The  <B>%1</B> in this file stands for the first command line argument.  If the batch file were named <B>CCC.BAT</B>, then to invoke it for part three of the compiler we would enter<P>
+
+<PRE>		CCC 3<P>
+</PRE>
+
+<B>General Advice<P>
+</B>
+
+<B>CC.H</B> contains <B>#define</B> statements that pertain to the compiler as a whole.  Changes to this file usually require that the entire compiler be recompiled.  However, by keeping track of which symbols in <B>CC.H</B> have changed, we can use a text editor to perform a global search on each of the source files to determine which ones must be recompiled. <P>
+
+The symbol <B>DISOPT</B> is contained in a <B>#define</B> directive in <B>CC4.C</B> where the code generation and optimizing logic resides.  Currently the directive is contained in a comment so that it will be ignored by the compiler.  However, if we remove the comment delimiters and recompile <B>CC4.C,</B> the new compiler will list on <B>stdout</B> the frequencies of the optimization cases it applies.  This is handy when working with the optimizer; it helps us to decide whether or not a given optimizati
+on is likely to be worth its cost in performance and compiler size.  There is no point in having the optimizer look for cases that seldom arise. <P>
+
+Notice in Figure 17-1 the new executable compiler <B>CC.EXE</B> replaces the previous one.  This has ramifications.  What is the probability that the new compiler will work properly?  Closer to zero, no doubt.  So we have just replaced our production compiler with something containing bugs.  Failure to realize this, when we recompile the compiler to fix it, leads to interesting results.  The buggy compiler may run without a complaint.  And the new compiler may also link properly.  But when we run the new 
+compiler, look out.  Chances are that it will go berserk--if our bug caused bad code to be generated that is.  If we are on our toes, we will recognize the symptoms and realize what happened.  But the symptoms of many compiler bugs are not obvious, and some are not even predictable. <P>
+
+Of course, we have a copy of the original, unaltered compiler somewhere, do we not?  Sure we do.  So we can restore <B>CC.EXE</B> from that copy and proceed to recompile our fixed compiler properly.  To avoid the loss of time, we will probably want to keep a reliable copy of the compiler handy and make sure to use it for each new compilation.  Eventually, when we are convinced of the dependability of our revised compiler, we will want to begin using it as our production compiler so future versions of the 
+compiler can incorporate new features that are supported by the revised compiler.<P>
+
+Now, suppose we add support for some new constructs.  We place the new compiler in production status, and proceed to use the new constructs in future revisions of the compiler.  By making the source code dependent on the enhanced compiler, we are committing to its reliability.  If we should get down the road a way, and discover that our production compiler has problems, then falling back to the previous production compiler will not work because the old compiler will choke on the new constructs which 
+we have put in the source files.  At that point we will have to resort to some messy patching of the source files to make them acceptable to the old compiler.  This will probably involve commenting out logic that implements enhancements and/or rewriting the new constructs in the old way.  We must then fix the previously undiscovered bug, recompile, test, reinstall this as the production compiler, remove the temporary patches, and recompile again.  Finally, we will be back where we were.  The point is that time
+ saved in testing may well be spent in even more disagreeable ways.  <P>
+
+<B> Conclusion<P>
+</B>
+
+At this point, we know the Small C language, we know its repertoire of library functions, we know how to use the compiler, and we know how to compile new versions of the compiler.  Now we come to the interesting part--what goes on inside the compiler. <P>
+<CENTER>
+Go to <a href="../part3/part3.htm">Part 3</a>         Return to <a href="../toc1.htm">Table of Cotents</a>
+</CENTER>
+</HTML>

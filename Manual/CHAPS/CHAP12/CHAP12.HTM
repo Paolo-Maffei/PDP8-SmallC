@@ -1,0 +1,732 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 12:<P>
+LIBRARY FUNCTIONS<P></H1>
+</CENTER>
+</B>
+
+This chapter presents the functions in Small C's standard library.  These functions exist as object modules which are automatically fetched by the linker when they are needed.  All we have to do in our programs is call these functions when we require their services.  The compiler automatically declares them to be external, and the linker automatically fetches them from the library and links them to our programs as it builds executable files. <P>
+
+We are free to define in our programs functions that have the same names as library functions.  When we do, the defined functions override their library counterparts.  The overridden library functions cannot be reached from such programs. <P>
+
+To enhance the portability of programs, C compilers (including Small C) implement a large subset of their library functions in a standard way--with the same names, arguments, return values, and functionality.  However, some functions are unique to the particular compiler.  Functions which are unique to Small C are identified below as Small C functions.  Their use will detract from the portability of programs.  However, since the source code for the library is available, we have the option of porting these
+ unique functions together with our programs.  In many cases no changes will be required.  In other cases alterations may be necessary.  And in some cases porting the functions will be out of the question; changing our programs would be easier. <P>
+
+The file <B>STDIO.H</B> should be included at the beginning of every program by writing the directive <P>
+
+<PRE>	#include &lt;stdio.h&gt; <P>
+</PRE>
+
+This header file contains the definitions of a set of standard symbols which are used as file descriptors (below) and as values that are returned by the library functions.  They are: <P>
+
+<PRE>
+       #define stdin    0  /* fd for standard input file */
+       #define stdout   1  /* fd for standard output file */
+       #define stderr   2  /* fd for standard error file */
+       #define stdaux   3  /* fd for standard comm port (COM1:) */
+       #define stdprn   4  /* fd for standard printer port (LPT1:) */
+       #define ERR     -2  /* error condition return value */
+       #define EOF     -1  /* end of file return value */
+       #define NULL     0  /* null value */<P>
+</PRE>
+
+Also included in <B>STDIO.H</B> are some miscellaneous definitions which are handy to have around.  They are:<P>
+
+<PRE>
+       #define YES      1  /* Boolean true value */
+       #define NO       0  /* Boolean false value */
+       #define NULL     0  /* a null pointer or ASCII byte */
+       #define CR      13  /* ASCII carriage return */
+       #define LF      10  /* ASCII line feed */
+       #define BELL     7  /* ASCII bell */
+       #define SPACE  ' '  /* ASCII space */
+       #define NEWLINE LF  /* the Small C newline character */<P>
+</PRE>
+
+<B>Input/Output Functions<P></B>
+
+The functions in this group give programs access to the outside world through the reading and writing of files.  Even the keyboard, the screen, and devices connected to the serial and parallel ports are treated as files. <P>
+
+Small C differs somewhat from full C in the way it designates which file an I/O function is to reference.  Full C compilers refer to I/O functions in two ways.  Their high level I/O functions accept a pointer to a file-control structure as a means of identifying the pertinent file; each open file has such a structure.  But their low level functions employ a small integer value, called a <I>file descriptor</I> (fd), instead.  They have separate high and low level open functions that return a 
+pointer or a file descriptor respectively for the newly opened file.  The returned value is retained by the program and used thereafter to reference the file. <P>
+
+Small C, on the other hand, uses file descriptors exclusively.  This may seem like a major difference, but in fact it is not very significant.  It matters not whether the value returned by an open function is a pointer or integer.  In either case, the program simply holds on to it, and passes it back to functions that expect it.  When Small C programs are ported to full C compilers, their file descriptors may have to be redeclared as pointers.  When both low and high level functions are used, 
+it will be necessary to define pointers in addition to the existing file descriptors.  Full C provides functions for mapping between pointers and file descriptors.  <P>
+
+Five standard files are automatically opened and waiting for use whenever a Small C program begins execution.  Their file descriptors have fixed values as defined by the first five <B>#define</B> directives above.  Table 12-1 also shows their default open modes, and redirection capabilities.  These files should be referenced by means of their standard names.<P>
+
+<CENTER>
+<img src="tb12-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 12-1: Standard File-Descriptor Assignments<P>
+</CENTER></B>
+
+The <I>standard input</I> file (<B>stdin</B>) is automatically opened for reading and is assigned to the console keyboard by default.  However, when the program is invoked, this assignment can be <I>redirected</I> from the keyboard to any other input device or file simply by placing a redirection specification (<a href="../chap15/chap15.htm">Chapter 15</a>) in the command line.  The advantage of this arrangement is obvious: it provides file independence.  Programs can be written without reference to 
+a specific input file or device name.  They can then be associated with any given file at run time.  If no redirection specification is given, <B>stdin</B> reads the keyboard. <P>
+
+The <I>standard output</I> file (<B>stdout</B>) is automatically opened for writing and is assigned to the console screen by default.  This file, too, can be redirected at run time to any other output device or file (<a href="../chap15/chap15.htm">Chapter 15</a>). <P>
+
+The <I>standard error</I> file (<B>stderr</B>) is also automatically opened for writing and is also assigned to the console screen.  It differs from <B>stdout</B>, however, in that it cannot be redirected.  This file is intended for the writing of error messages.  By separating normal program output from error messages, only useful output data gets redirected with <B>stdout</B> while error messages continue to go to the screen.  Of course, <B>stderr</B> is suitable for all kinds of operator communication,
+ not just error messages. <P>
+
+These are the traditional standard files for C programs.  However, since other MS-DOS C compilers implement standard files for the first serial and parallel ports, Small C does too.  The <I>standard auxiliary</I> file (<B>stdaux</B>) is automatically opened for reading and writing, and is assigned to the first serial port (COM1:).  And the <I>standard printer</I> file (<B>stdprn</B>) is automatically opened for writing and is assigned to the first parallel port (LPT1:). <P>
+
+Although three of the standard files cannot be redirected, they can be closed and reopened for reading and/or writing with assignment to any device or file--as can any file. <P>
+
+Lest I leave the impression that redirection is the only means of achieving file/device independence in C programs, let us note that it is not.  As we shall see momentarily, arguments of any type (even file names) can be conveyed from the command line that invokes a program to the program itself.  So there is no reason why file and device names cannot be supplied to programs through this means and used to open files.  While this method does require the fetching of command line arguments and the opening of
+ files, it is not limited to just one input and one output file as the redirection mechanism is. <P>
+
+When a file is opened, it receives the lowest unused file descriptor value.  If the standard files are not closed, then other files receive file descriptors beginning at 5.  A maximum of 20 files can be open simultaneously in Small C programs. <P>
+
+The data transfer functions in the Small C library fall into two groups.  There are high level, <I>character stream </I>(ASCII) functions which incorporate the words <B>get</B> and <B>put</B> in their names, and there are the low level, <I>binary functions</I> that incorporate the words <B>read</B> and <B>write</B>.  These groups of functions differ uniformly with respect to whether or not they process the data which passes through them.  This processing is sometimes called <I>cooking</I>.  
+
+As we might expect, uncooked data is said to be raw.  The ASCII functions cook the data, whereas the binary functions do not.  Small C does most of the cooking in the functions <B>fgetc()</B> and <B>fputc()</B>.  Since the other <B>get</B> and <B>put</B> functions call these functions, they also cook their data.  The cooking process differs according to whether the data transfer is in or out.  On input, the following actions occur: <P>
+
+<OL>
+<LI>If the file is assigned to the keyboard, the input characters are echoed to the screen.  If the character is a carriage return it is echoed as a two character sequence--carriage return, line feed. 
+<LI>If the file is assigned to the keyboard and the character is a control-C, the program immediately terminates execution with an exit code of 2.  This code can be tested in batch files.  The control-C character does not echo.
+<LI>If the file is assigned to the keyboard and the character is an ASCII DEL (0x7F) it is changed to a backspace.  Therefore, both the backspace and delete keys cause a rubout of the last character when input is through the string input functions. 
+<LI>Regardless of the source of the data, if the character is a line feed it is discarded, and if it is a carriage return it is changed to the value of the Small C newline character ('\n').  The effect is to represent the end of a line with a single newline character.
+<LI>Regardless of the source of the data, if the character is a control-Z the end-of-file status is set and the character is changed to EOF as defined in STDIO.H.<p>
+</OL>
+
+On output, the following occurs:<P>
+
+<OL>
+<LI>If the character has the value EOF, it is changed to the DOS end-of-file character--control-Z.
+<LI>If the character is the newline character ('\n') it is written as the sequence carriage return, line feed.<p>
+</OL>
+
+Notice how the end of a line is handled.  While it may be represented externally by two characters, internally it is represented by just one character with the value of the character constant<B> '\n'</B> (Chapter 3).  This two-to-one mapping is a standard feature of ASCII I/O transfers in the C language.  Although the value of <B>'\n'</B> is defined by <B>NEWLINE</B> in the header file <B>STDIO.H</B>, we should always use the escape sequence rather than <B>NEWLINE</B> or its value when 
+testing for the end of a line.  Not all C compilers assign the same value to<B> '\n'</B> and none of them define <B>NEWLINE</B> in their <B>STDIO.H</B> files. <P>
+
+The backspace and control-X characters have special meanings to the string input functions<B> fgets()</B> and<B> gets()</B>.  If input is from the keyboard, a backspace (recall that <B>DEL</B> becomes a backspace) causes these functions to rubout the last character received.  In so doing they echo a backspace, space, backspace sequence to the screen to erase the previous character and reposition the cursor over it.  Furthermore, a control-X from the keyboard causes them to wipeout the entire line 
+in a similar manner.  This allows the operator to restart his input from scratch.  These functions are also sensitive to <B>EOF</B> (externally control-Z) as the end-of-file indicator.  Upon receipt of this value, they cease input, terminate the input string with a null byte, and return to the user. <P>
+
+Remember that only the <B>get</B> and <B>put</B> functions cook the data.  The <B>read</B> and <B>write</B> functions simply transfer it without change.  In addition, there is a special function called<B> poll()</B> which polls the keyboard without waiting for a key to be struck. <P>
+
+This scheme of dividing the data transfer functions into ASCII and binary groups is unique to Small C.  Full C compilers do this by providing open modes that indicate whether or not cooking is to be done.  When porting Small C programs to full C compilers, the new open modes must specify the same actions as the Small C functions. <P>
+
+We now look at the I/O functions individually. <P>
+
+<B>fopen (name, mode) char *name, *mode;<P>
+</B>
+
+This function attempts to open the file named by the character string pointed to by <B>name</B>.  <B>Name</B> is an ordinary MS-DOS file specification, possibly including drive, path, filename, and extension.  Only the filename is required.  The drive and path will assume the defaults as established by MS-DOS.  Obviously, the wild card characters (<B>?</B> and <B>*</B>) are not allowed. <P>
+
+<B>Mode</B> points to a string indicating the use for which the file is being opened.  The following values are accepted:        <P>
+
+<PRE>
+		<B>&quot;r&quot;	</B>read<P>
+		<B>&quot;w&quot;	</B>write<P>
+		<B>&quot;a&quot;	</B>append<P>
+</PRE>
+
+<I>Read</I> mode opens an existing file for input.  <I>Write</I> mode creates a new file.   If a file with the same name already exists, it is replaced by the new file.  Since the new file starts out empty, writing begins with the first byte.   <I>Append</I> mode allows writing which begins at the end of an existing file or the beginning of a new one.  If a file with the same name already exists, it is opened and positioned after the last byte.  If no file with the specified name is found, one is created. <P>
+
+In addition, there are variations on these three modes which permit both reading and writing (<I>updating</I>).  They are: <P>
+
+<PRE>
+		<B>&quot;r+&quot;</B>	update read<P>
+		<B>&quot;w+&quot;</B>	update write<P>
+		<B>&quot;a+&quot;</B>	update append        <P>
+</PRE>
+
+In terms of their effects at open time, these modes are the same as their non-update counterparts; however, these modes support both input and output operations.  We can freely mix them in any order that we find useful.  Each file has a current position from which the next read or write operation begins.  After each operation, the current position is set to the byte following the last one transferred.  Therefore, successive I/O operations reference successive byte strings in the file.  This 
+sequential behavior can be altered by calls to functions which directly alter the current position to provide a random accessing capabilities. <P>
+
+If the attempt to open a file is successful,<B> fopen()</B> returns an fd value for the open file; otherwise, it returns <B>NULL</B>.  The fd should be kept for use with subsequent I/O function calls.  A typical statement that opens a file might look like <P>
+
+<PRE>  if(!(data_fd = fopen(&quot;data.fil&quot;, &quot;r&quot;))) error(&quot;can't open: data.fil&quot;); <P>
+</PRE>
+
+where<B> error()</B> is some error handling function in the program.  Only the standard files may be used without first calling <B>fopen()</B>. <P>
+
+<B>fclose (fd) int fd;<P>
+
+</B>This function closes the specified file.  Since Small C buffers disk file data, when a disk file (opened for writing or updating) is closed, its buffer is flushed to the disk if it contains pending data.  This function returns <B>NULL</B> if the file closes successfully, and <B>ERR</B> if an error occurs. <P>
+
+When a program exits, either by reaching the end of <B>main()</B> or by calling<B> exit()</B> or<B> abort()</B>, all open files are closed automatically.  However when a program dies a hard death (loss of system power or rebooting the system), buffered data may be lost.  <P>
+
+<B>freopen (name, mode, fd) char *name, *mode; int fd;<P>
+</B>
+
+This function closes the previously opened file indicated by  <B>fd</B> and opens a new one whose name is in the character string at  <B>name</B>.  <B>Mode</B> specifies the new open mode just as for<B> fopen()</B>.  On success, this function returns the original value of  <B>fd</B>.  On failure, however, it returns <B>NULL</B>. <P>
+
+Note that since the  <B>fd</B> for the standard input file is zero there is no way of distinguishing success from failure in that case.  It is best to simply leave  <B>stdin</B> open even if it will not be used.  <P>
+
+<B>getc (fd) int fd; <P>
+</B>
+
+Same as <B>fgetc()</B>.<P>
+
+<B>fgetc (fd) int fd;<P>
+</B>
+
+This function returns the next character from the file indicated by <B>fd</B>.  If no more characters remain in the file, or an error condition occurs, it returns <B>EOF</B>.  The end of the file is detected by an occurrence of the end-of-file character (control-Z) or the physical end of the file.  <P>
+
+<B>getchar ()<P>
+</B>
+
+This function is equivalent to the call <B>fgetc(stdin)</B>.  It presumes to use the standard input file.<P>
+
+<B>fgets (str, sz, fd) char *str; int sz, fd;<P>
+</B>
+
+This function reads up to <B>sz-1</B> characters into memory from the file indicated by <B>fd</B>.  The target buffer in memory is indicated by <B>str</B>.  Input terminates after transferring a newline character.  A null character is appended behind the newline.  If no newline is found after transferring <B>sz-1</B> characters input also terminates and a null character is appended after the last character transferred.<B>  Fgets()</B> returns <B>str</B> if the operation is successful.  If the 
+end of the file is reached while attempting to obtain another character, or if an error occurs, it returns <B>NULL</B>.  <P>
+
+<B>ungetc (c, fd) char c; int fd;<P>
+</B>
+
+This function logically (not physically) pushes the character <B>c</B> back into the input file indicated by <B>fd</B>.  The next read from the file will retrieve the ungotten character first.  Only one character at a time (per file) may be kept waiting in this way.  This function returns the character itself on success, or <B>EOF</B> if a previously pushed character is being held or if  <B>c</B> has the value <B>EOF</B>.  We cannot push <B>EOF</B> back into a file.  Performing a seek or 
+rewind operation on a file causes the ungotten character to be forgotten.  <P>
+
+<B>fread (ptr, sz, cnt, fd) char *ptr; int sz, cnt, fd;<P>
+</B>
+
+This function reads, from the file indicated by <B>fd</B>, <B>cnt</B> items of data of length <B>sz</B>.  The target buffer is indicated by <B>ptr</B>.  A binary transfer is performed and only the physical end of the file is recognized.  A count of the actual number of items read is returned to the caller.  This could be less than <B>cnt</B> if the end of the file is reached.  This is the usual way to tell when the end of the file is reached.  However, we may call<B> feof()</B> to determine 
+when the data has been exhausted, and <B>ferror()</B> to detect errors.  <P>
+
+<B>read (fd, ptr, cnt) int fd, cnt; char *ptr;<P>
+</B>
+
+This function reads, from the file indicated by <B>fd</B>, <B>cnt</B> bytes of data into memory at the address indicated by  <B>ptr</B>.  This function performs a binary transfer and recognizes only the physical end of the file.  A count of the actual number of bytes read is returned to the caller.  This could be less than <B>cnt</B> if the end of the file was encountered.  This is the usual way of telling when the end of the file is reached.  However, we may call <B>feof()</B> to determine 
+for certain when the data is exhausted, and<B> ferror()</B> to detect errors.  <P>
+
+<B>gets (str) char *str;<P>
+</B>
+
+This function reads characters from <B>stdin</B> into memory starting at the address indicated by <B>str</B>.  Input is terminated at the end of a line, but the newline character is not transferred.  A null character terminates the input string.<B>  Gets()</B> returns <B>str</B> for success; otherwise, it returns <B>NULL</B> for end-of-file or an error.  Since this function has no way of knowing the size of the destination buffer, it is possible that an input line might overrun the allotted space.  We
+ must check the size of the input string to verify that it was not too large.  <P>
+
+<B>putc (c, fd) char c; int fd;<P>
+</B>
+
+Same as <B>fputc()</B>.<P>
+
+<B>fputc (c, fd) char c; int fd;<P>
+</B>
+
+This function writes the character <B>c</B> to the file indicated by <B>fd</B>.  It returns the character itself on success; otherwise, <B>EOF</B>.  <P>
+
+<B>putchar (c) char c;<P>
+</B>
+
+This function is equivalent to the call <B>fputc(c, stdout)</B>.  It presumes to use the standard output file.  <P>
+<B>fputs (str, fd) char *str; int fd;<P>
+</B>
+
+This function writes a string of characters, beginning at the address indicated by <B>str</B>, to the file indicated by  <B>fd</B>.  Successive characters are written until a null byte is found.  The null byte is not written and a newline character is not appended to the output.  It is the programmer's responsibility to see that the necessary newline characters are in the string itself.  <P>
+
+<B>puts (str) char *str;<P>
+</B>
+
+This function is almost like the call <B>fputs(str, stdout)</B>.  It presumes to write to the standard output file.  Unlike <B>fputs()</B>, however, it appends a newline to the output.  <P>
+<B>fwrite (ptr, sz, cnt, fd) char *ptr; int sz, cnt, fd;<P>
+</B>
+
+This function writes, to the file indicated by <B>fd</B>, <B>cnt</B> items of <B>sz</B> bytes from the memory buffer indicated by  <B>ptr</B>.  It returns a count of the number of items written.  An error condition may cause the number of items written to be less than <B>cnt</B>.<B>  Ferror()</B> should be called to verify error conditions, however.  This function performs a binary transfer.  <P>
+<B>write (fd, ptr, cnt) int fd, cnt; char *ptr;<P>
+</B>
+
+This function writes, to the file indicated by <B>fd</B>, <B>cnt</B> bytes from the memory buffer indicated by <B>ptr</B>.  It returns a count of the number of bytes written.  An error condition may cause the number of items written to be less than <B>cnt</B>. <B> Ferror()</B> should be called to verify error conditions, however.  This function performs a binary transfer.  <P>
+<B>printf (str, arg1, arg2, ...) char *str;<P>
+</B>
+
+This function writes to the standard output file a formatted string which is the string at <B>str</B> with the ASCII equivalents of <B>arg1</B>, <B>arg2</B>, <B>...</B> inserted at specified points. <P>
+
+It returns a count of the total number of characters written.  The string at <B>str</B> is called the <I>control string</I>.  The control string is required, but the other arguments are optional.  The control string contains ordinary characters and groups of characters called <I>conversion specifications</I>.  Each conversion specification tells<B> printf()</B> how to convert its corresponding argument into an ASCII string for output.  The converted argument replaces its conversion specification 
+in the output.  The character <B>%</B> signals the start of a conversion specification and one of the letters <B>b</B>, <B>c</B>, <B>d</B>, <B>o</B>, <B>s</B>, <B>u</B>, or <B>x</B> terminates it. <P>
+
+Between the start and end of a conversion specification, the following optional fields may be found (in the order listed, without intervening blanks): <P>
+
+<OL>
+<LI>a minus sign (-),
+<LI>a decimal integer constant (nnn), and/or
+<LI>a decimal fraction (.mmm).<p>
+</OL>
+
+These subfields are all optional.  In fact, one frequently sees conversion specifications without them.  The minus sign indicates that the string, produced by applying a specified conversion to its argument, is to be left adjusted in its output field.  The decimal integer indicates the minimum width of the output field (in characters).  If more space is needed it will be used, but at least the number of positions indicated will be generated.  The decimal fraction is used where the argument is itself 
+a character string (more correctly, the address of a character string).  In this case the fraction indicates the maximum number of characters to take from the string.  If there is no fraction in the specification, then all of the string is used. <P>
+
+The terminating letter indicates the type of conversion to be applied to the argument.  It may be one of the following: <P>
+
+<B>b</B>	-- The argument should be considered an unsigned integer and converted to binary format for output.  No leading zeroes are generated.  This specification is unique to Small C.        <P>
+<B>c</B> -- The argument should be output as a character without conversion.  The high-order byte is to be ignored.<P>
+<B>d</B>	-- The argument should be considered a signed integer and converted to a (possibly signed) decimal digit string for output.  No leading zeroes are generated.  The left most character is reserved for the sign--blank if positive, hyphen if negative.<P>
+<B>o</B> -- The argument should be considered an unsigned integer and converted to octal for output.  No leading zeroes are generated.<P>
+<B>s</B>	-- The argument is the address of a string which should be output according to the justification, minimum width, and maximum size  specifications indicated.<P>
+<B>u</B>	-- The argument should be considered an unsigned integer and converted to unsigned decimal for output.  No leading zeroes are generated.<P>
+<B>x</B>	-- The argument should be considered an unsigned integer and converted to hexadecimal for output.  No leading zeroes are generated.  If a <B>%</B> is followed by anything other than a valid specification, it is ignored and the following character is written without change.  Thus <B>%%</B> writes  <B>%</B>.<P>
+
+<B>Printf()</B> scans the control string from left to right, sending everything to <B>stdout</B> until it finds a <B>%</B>.  It then evaluatesthe conversion specification and applies it to the first argument (following the control string).  The resulting string is written to <B>stdout</B>.  It then resumes writing from the control string until it finds the next conversion specification which it applies to the second argument.  The continues until the control string is exhausted.  
+
+The result is a formatted output message consisting of both literal and variable data.  See Table 12-2 for examples. <P>
+
+<CENTER>
+<img src="tb12-2.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 12-2: Printf Examples<P>
+</CENTER></B>
+
+<B>fprintf (fd, str, arg1, arg2, ...) int fd; char *str;<P>
+</B>
+
+This function works exactly like<B> printf()</B> except that output goes to the file indicated by <B>fd</B> instead of <B>stdout</B>.  <P>
+
+<B>scanf (str, arg1, arg2, ...) char *str;<P>
+</B>
+
+This function reads a series of fields from the standard input file, converts them to internal format according to conversion specifications contained in the control string <B>str</B>, and stores them at the locations indicated by the arguments <B>arg1,arg2,...</B> . <P>
+
+It returns a count of the number of fields read.  A field in the input stream is a contiguous string of graphic characters.  It ends with the next white space (blank, tab, or newline) or, if its conversion specification indicates a maximum field width (below), it ends when the field width is exhausted.  A field normally begins with the first graphic character after the previous field; that is, leading white space is skipped.  Since the newline character is skipped while searching for the next 
+field,<B> scanf()</B> reads as many input lines as necessary to satisfy the conversion specifications in the control string.  Each of the arguments following the control string must yield an address value. <P>
+
+The control string contains conversion specifications and white space (which is ignored).  Each conversion specification informs<B> scanf()</B> how to convert the corresponding field into internal format, and each argument following <B>str</B> gives the address where the corresponding converted field is to be stored.  The character % signals the start of a conversion specification and one of the letters <B>b</B>, <B>c</B>, <B>d</B>, <B>o</B>, <B>s</B>, <B>u</B>, or <B>x</B> ends it. <P>
+
+Between these may be found, with no intervening blanks, an asterisk and/or a decimal integer constant.  These subfields are both optional.  In fact, conversion specifications are frequently written without them. <P>
+
+The asterisk indicates that the corresponding field in the input stream is to be skipped.  Skip specifications do not have corresponding arguments. <P>
+
+The numeric field indicates the maximum field width in characters.  If present, it causes the field to be terminated when the indicated number of characters has been scanned, even if no white space is found.  However, if white space is found before the field width is exhausted, the field is terminated at that point. <P>
+
+The terminating letter indicates the type of conversion to be applied to the field.  It may be one of the following: <P>
+
+<B>b</B> -- The field should be considered a binary integer and converted to an integer value.  The corresponding argument should be an integer address.  Leading zeroes are ignored.  This specification is unique to Small C.<P>
+<B>c</B> -- The field should be accepted as a single  character without conversion.  This specification inhibits the normal skip over white space; blanks are transferred just like other characters.  The argument for such a field should be a character address.<P>
+<B>d</B> -- The input field should be considered a (possibly signed) decimal integer and converted into an integer value.  The corresponding argument should be an integer address.  Leading zeroes are ignored.<P>
+<B>o</B> -- The field should be considered an unsigned octal integer and converted to an integer value.  The corresponding argument should be an integer address.  Leading zeroes are ignored.<P>
+<B>s</B> -- The field should be considered a character string and stored with a null terminator at the character address indicated by its argument.  There must be enough space at that address to hold the string and its terminator.  Remember, a maximum field width can be specified to prevent overflow.  The specification <B>%1s</B> will read one character.  It differs from <B>%c</B> in that it skips white space, whereas the latter reads the next character, whatever it is.<P>
+<B>u</B> -- The field should be considered an unsigned decimal integer and converted to an integer value.  The corresponding argument should be an integer address.  Leading zeroes are ignored.  This specification is unique to Small C.<P>
+<B>x</B> --  The field should be considered an unsigned hexadecimal number and converted to an integer value.  The corresponding argument should be an integer address.  Leading zeroes or a leading <B>0x</B> or <B>0X</B> will be ignored. <P>
+
+<B>Scanf()</B> scans the control string from left to right, processing input fields until the control string is exhausted or a field is found which does not match its conversion specification.  If the value returned by <B>scanf()</B> is less than the number of conversion specifications, an error has occurred or the end of the input file has been reached.  <B>EOF</B> is returned if no fields are processed because the end of the file has been reached. <P>
+
+If the statement <P>
+
+<PRE>	scanf(&quot;%s %c %c %*s %d %3d %d&quot;, str, &amp;c1, &amp;c2, &amp;i1, &amp;i2, &amp;i3);<P>
+</PRE>
+
+is executed when the input stream contains <P>
+
+<PRE>	&quot;abc defg    -12   345678 9&quot; <P>
+</PRE>
+
+the values stored would be: <P>
+
+<PRE>
+<B>		&quot;abc\0&quot;	</B>at<B> str<P>
+		' '	</B>in<B> c1<P>
+		'd'	</B>in<B> c2<P>
+		-12	</B>in<B> i1<P>
+		345	</B>in<B> i2<P>
+		678	</B>in<B> i3</B><P>
+</PRE>
+
+Future input from the file would begin with the space following <B>345678</B>.  <P>
+
+<B>fscanf (fd, str, arg1, arg2, ...) int fd; char *str;<P>
+</B>
+
+This function works like<B> scanf()</B> except that the input is taken from the file indicated by <B>fd</B>, instead of <B>stdin</B>.<P>
+
+<B>rewind (fd) int fd;<P>
+</B>
+
+This function positions the file indicated by <B>fd</B> to its beginning.  It is equivalent to a seek to the first byte of the file.  It returns <B>NULL</B> on success; otherwise, <B>EOF</B>. <P>
+
+<B>bseek (fd, offset, from) int fd, offset[], from;<P>
+</B>
+
+This Small C function positions the MS-DOS file pointer for <B>fd</B> to the byte indicated by a double length integer offset.  <B>Offset</B> must be given as the address of an integer array of two elements such that <B>offset[0]</B> is the low-order half and <B>offset[1]</B> is the high-order half.   <B>From</B> determines the base location from which the offset is applied.  It may have one of the values: <P>
+
+<PRE>
+		0	beginning of file<P>
+		1	current byte in file<P>
+		2	end of file <P>
+</PRE>
+
+The last case should be used with a minus offset.   <B>Bseek()</B> returns <B>NULL</B> on success; otherwise, <B>EOF</B>.  It works like the UNIX<B> fseek()</B> except that the offset is an address instead of the actual value.  This is necessary since Small C does not support long variables.  <P>
+
+<B>btell (fd, offset) int fd, offset[];<P>
+</B>
+
+This Small C function returns the offset to the current byte in the file indicated by <B>fd</B>.  The current byte is the next one that will be read from or written to the file.  No account of<B> ungetc()</B> calls is taken.  <B>Offset</B> is a double length integer and must be specified as the address of an integer array of two elements such that  <B>offset[0]</B> is the low-order half and <B>offset[1]</B> is the high-order half.  The array at <B>offset</B> receives the offset value of the 
+current byte in the file.  <B>Btell()</B> returns <B>NULL</B> on success; otherwise, <B>ERR</B>.  <P>
+
+<B>cseek (fd, offset, from) int fd, offset, from;<P>
+</B>
+
+This Small C function positions the file indicated by <B>fd</B> to the beginning of the 128-byte block which is  <B>offset</B> positions from the first block, current block, or end of the file depending on whether <B>from</B> is 0, 1, or 2 respectively.  Subsequent reads and writes proceed from that point.<B>  Cseek()</B> returns <B>NULL</B> for success; otherwise, <B>EOF</B>.  <P>
+
+<B>cseekc (fd, offset) int fd, offset;<P>
+</B>
+
+This Small C function positions  <B>fd</B> on the character indicated by <B>offset</B> within the current 128-byte block.  The current byte must be on a block boundary when this function is called.  Used in combination with<B> cseek()</B> this function allows us to seek to any given byte in a file by tracking file positions in two parts--the block offset and the byte offset within the block.<B>  Cseekc()</B> returns <B>NULL</B> on success; otherwise, <B>EOF</B>.  <P>
+
+<B>ctell (fd) int fd;<P>
+</B>
+
+This Small C function returns the position of the current block of the file indicated by <B>fd</B>.  The returned value is the offset of the current 128-byte block with respect to the beginning of the file.  If <B>fd</B> is not assigned to a disk file, <B>ERR</B> is returned.  <P>
+
+<B>ctellc (fd) int fd;<P>
+</B>
+
+This Small C function returns the offset (0-127) to the current byte in the current block for <B>fd</B>.  The current byte is the next one that will be read from or written to the file.  No account of<B> ungetc()</B> calls is taken.  <P>
+
+<B>rename (old, new) char *old, *new;<P>
+</B>
+
+This Small C function changes the name of the file specified by <B>old</B> to the name indicated by <B>new</B>.  It returns <B>NULL</B> on success; otherwise, <B>ERR</B>.  <P>
+
+<B>delete (name) char *name;<P>
+</B>
+
+Same as <B>unlink()</B>.<P>
+
+<B>unlink (name) char *name;<P>
+</B>
+
+This function deletes the file indicated by the character string at <B>name</B>.  It returns <B>NULL</B> on success; otherwise, <B>ERR</B>.<P>
+
+<B>feof (fd) int fd;<P>
+</B>
+
+This function returns true if the file designated by <B>fd</B> has reached its end.  Otherwise, it returns false.<P>
+
+<B>ferror (fd) int fd;<P>
+</B>
+
+This function returns true if the file designated by <B>fd</B> has encountered an error condition since it was last opened.  Otherwise, it returns false.  <P>
+
+<B>clearerr (fd) int fd;<P>
+</B>
+
+This function clears the error status for the file indicated by <B>fd</B>.<P>
+
+<B>iscons (fd) int fd;<P>
+</B>
+
+This Small C function returns true if <B>fd</B> is assigned to the console; otherwise, false.<P>
+
+<B>isatty (fd) int fd;<P>
+</B>
+
+This function returns true if  <B>fd</B> is assigned to a device rather than a disk file; otherwise, false.<P>
+
+<B>auxbuf (fd, size) int fd, size;<P>
+</B>
+
+This Small C function allocates an auxiliary buffer of <B>size</B> bytes for use with <B>fd</B>.  It returns zero for success and <B>ERR</B> if it fails.  <B>Fd</B> may or may not be open.  <B>Size</B> must be greater than zero and less than the amount of free memory.  If  <B>fd</B> is a device, the buffer is allocated, but ignored.  This implementation of Small C uses file handle type MS-DOS calls; it reads and writes in chunks the size of the auxiliary buffer.  Extra buffering is useful in reducing 
+disk head movement and drive switching during sequential operations.  Once an auxiliary buffer is allocated it remains for the duration of program execution, even if <B>fd</B> is closed.  Calling this function a second time for <B>fd</B> is allowed; however, the original buffer continues to occupy space in memory.  Alternating read and write operations and performing seeks with auxiliary buffering is also allowed.<B>  Ungetc()</B> will operate normally.  Ordinarily, it is unnecessary and wasteful to alloc
+ate auxiliary buffers to both input and output files.  <P>
+
+<B>Format Conversion Functions<P>
+</B>
+
+<B>atoi (str) char *str;<P>
+</B>
+
+This function converts the decimal number in the string at <B>str</B> to an integer, and returns its value.  Leading white space is skipped and an optional sign <B>(+</B> or <B>-</B>) may precede the left-most digit.  The first non-numeric character terminates the conversion.  <P>
+
+<B> atoib (str, base) char *str; int base; <P>
+</B>
+
+This Small C function converts the unsigned integer of base <B>base</B> in the string at <B>str</B> to an integer, and returns its value.  Leading white space is skipped.  The first non-numeric character terminates the conversion.  <P>
+
+<B>itoa (nbr, str) int nbr; char *str;<P>
+</B>
+
+This function converts the number <B>nbr</B> to its decimal string representation at <B>str</B>.  The result is left justified at <B>str</B> with a leading minus sign if <B>nbr</B> is negative.  A null character terminates the string which must be large enough to hold the result. <P>
+
+<B>itoab (nbr, str, base) int nbr; char *str; int base;<P>
+</B>
+
+This Small C function converts the unsigned integer <B>nbr</B> to its string representation at <B>str</B> in base <B>base</B>.  The result is left justified at <B>str</B>.  A null character terminates the string which must be large enough to hold the result.  <P>
+
+<B>dtoi (str, nbr) char *str; int *nbr;<P>
+</B>
+
+This Small C function converts the (possibly signed) decimal number in the string at <B>str</B> to an integer at <B>nbr</B> and returns the length of the numeric field found.  The conversion stops when the end of the string or a non-decimal character is reached.<B>  Dtoi()</B> will use a leading sign and at most five digits.<B>  Dtoi()</B> returns <B>ERR</B> if the absolute value of the number exceeds 32767.  <P>
+
+<B>otoi (str, nbr) char *str; int *nbr;<P>
+</B>
+
+This Small C function converts the octal number in the string at <B>str</B> to an integer at <B>nbr</B> and returns the length of the octal field.  The conversion stops when the end of the string or a non-octal character is reached.  <B>Otoi()</B> will use at most six digits.  A number larger than 177777 will cause<B> otoi()</B> to return <B>ERR</B>.  <P>
+
+<B>utoi (str, nbr) char *str; int *nbr;<P>
+</B>
+
+This Small C function converts the unsigned decimal number in the string at  <B>str</B> to an integer at  <B>nbr</B> and returns the length of the numeric field.  The conversion stops when the end of the string or a non-decimal character is reached.  <B>Utoi()</B> will use at most five digits.  A number larger than 65535 will cause<B> utoi()</B> to return  <B>ERR</B>.  <P>
+
+<B>xtoi (str, nbr) char *str; int *nbr; <P>
+</B>
+
+This Small C function converts the hexadecimal number in the string at <B>str</B> to an integer at <B>nbr</B> and returns the length of the hexadecimal field.  The conversion stops when the end of the string or a non-hexadecimal character is reached.<B>  Xtoi()</B> will use at most four digits.  If more hex digits are present, it returns <B>ERR</B>.  <P>
+
+<B>itod (nbr, str, sz) int nbr, sz; char *str; <P>
+</B>
+
+This Small C function converts <B>nbr</B> to a (possibly signed) signed character string at <B>str</B>.  The result is right justified and blank filled in <B>str</B>.  The sign and possibly high-order digits are truncated if the destination string is too small.  It returns <B>str</B>.  <B>Sz</B> indicates the length of the string.  If <B>sz</B> is greater than zero, a null byte is placed at <B>str[sz-1]</B>.  If  <B>sz</B> is zero, a search for the first null byte following <B>str</B> locates the end 
+of the string.  If <B>sz</B> is less than zero, all <B>sz</B> characters of <B>str</B> are used including the last one.  <P>
+
+<B>itoo (nbr, str, sz) int nbr, sz; char *str; <P>
+</B>
+
+This Small C function converts <B>nbr</B> to an octal character string at <B>str</B>.  The result is right justified and blank filled in the destination string.  High-order digits are truncated if the destination string is too small.  It returns <B>str</B>.  <B>Sz</B> indicates the length of the string.  If <B>sz</B> is greater than zero, a null byte is placed at <B>str[sz-1]</B>.  If <B>sz</B> is zero, a search for the first null byte following <B>str</B> locates the end of the string.  If <B>sz</B> 
+is less than zero, all <B>sz</B> characters of <B>str</B> are used including the last one.  <P>
+
+<B>itou (nbr, str, sz) int nbr, sz; char *str;  <P>
+</B>
+
+This Small C function converts <B>nbr</B> to an unsigned decimal character string at <B>str</B>.  It works like<B> itod()</B> except that the high-order bit of <B>nbr</B> is taken as a magnitude bit.  <P>
+
+<B> itox (nbr, str, sz) int nbr, sz; char *str;<P>
+</B>
+
+This Small C function converts <B>nbr</B> to a hexadecimal character string at <B>str</B>.  The result is right justified and blank filled in the destination string.  High-order digits are truncated if the destination string is too small.  It returns <B>str</B>.   <B>Sz</B> indicates the length of the string.  If <B>sz</B> is greater than zero, a null byte is placed at <B>str[sz-1]</B>.  If <B>sz</B> is zero, a search for the first null byte following <B>str</B> locates the end of the string.  
+If <B>sz</B> is less than zero, all <B>sz</B> characters of <B>str</B> are used including the last one.<P>
+
+<B>String Manipulation Functions<P>
+</B>
+
+<B>left (str) char *str;<P>
+</B>
+
+This Small C function left adjusts the character string at <B>str</B>.  Starting with the first non-blank character and proceeding through the null terminator, the string is moved to the address indicated by <B>str</B>.  This function can be used to left adjust the output of the <B>ito?()</B> functions above.  For example, <P>
+
+<PRE>		left(itod(i, str, 6)); <P>
+</PRE>
+
+will convert <B>i</B> to a decimal string which is left adjusted in <B>str</B>.  <P>
+
+<B>strcat (dest, sour) char *dest, *sour;<P>
+</B>
+
+This function appends the string at <B>sour</B> to the end of the string at <B>dest</B>.  The null character at the end of <B>dest</B> is replaced by the leading character of <B>sour</B>.  A null character terminates the new <B>dest</B> string.  The space reserved for <B>dest</B> must be large enough to hold the result.  This function returns <B>dest</B>.  <P>
+
+<B>strncat (dest, sour, n) char *dest, *sour; int n;<P>
+</B>
+
+This function works like<B> strcat()</B> except that a maximum of <B>n</B> characters from the source string will be transferred to the destination string.  <P>
+
+<B>strcmp (str1, str2) char *str1, *str2;<P>
+</B>
+
+This function returns an integer less than, equal to, or greater than zero depending on whether the string at  <B>str1</B> is less than, equal to, or greater than the string at <B>str2</B>.  The strings are compared left to right, character by character, until a difference is found or they end simultaneously.  Comparison is based on the numeric values of the characters.  <B>Str1</B> is considered less than <B>str2</B> if <B>str1</B> is equal to but shorter than  <B>str2</B>, and vice versa.  <P>
+
+<B>strncmp (str1, str2, n) char *str1, *str2; int n;<P>
+</B>
+
+This function works like<B> strcmp()</B> except that a maximum of <B>n</B> characters are compared.  <P>
+
+<B>strcpy (dest, sour) char *dest, *sour;<P>
+</B>
+
+This function copies the string at <B>sour</B> to <B>dest</B>.  <B>Dest</B> is returned.  The space at <B>dest</B> must be large enough to hold the string at <B>sour</B>.  A null character follows the last character placed in the destination string.  <P>
+
+<B>strncpy (dest, sour, n) char *dest, *sour; int n;<P>
+</B>
+
+This function works like<B> strcpy()</B> except that <B>n</B> characters are placed in the destination string regardless of the length of the source string.  If the source string is too short, null padding occurs.  If it is too long, it is truncated in <B>dest</B>.  A null character follows the last character placed in the destination string.  <P>
+
+<B>strlen (str) char *str;<P>
+</B>
+
+This function returns a count of the number of characters in the string at <B>str</B>.  It does not count the null character that terminates the string.  Since the length of a string can be found only by scanning it from beginning to end, this function can be time consuming.  To minimize this overhead, the current Small C library implements this function in assembly language with a repeat prefix attached to the 8086 string-compare instruction for the fastest possible speed.  <P>
+
+<B>strchr (str, c) char *str, c;<P>
+</B>
+
+This function returns a pointer to the first occurrence of the character <B>c</B> in the string at <B>str</B>.  It returns  <B>NULL</B> if the character is not found.  Searching ends at the null terminator.  <P>
+
+<B>strrchr (str, c) char *str, c;<P>
+</B>
+
+This function works like<B> strchr()</B> except that the right-most occurrence of the character is sought.  <P>
+
+<B>reverse (str) char *str;<P>
+</B>
+
+This function reverses the order of the characters in the null terminated string at <B>str</B>.  <P>
+
+<B>pad (str, ch, n) char *str, ch; int n;<P>
+</B>
+
+This Small C function fills the string at <B>str</B> with  <B>n</B> occurrences of the character <B>ch</B>.  <P>
+
+<B>Character Classification Functions<P>
+</B>
+
+The following functions determine whether or not a character belongs to a designated class of characters.  They return true if it does and false if not.  Since these functions are identical except for the condition for which they test, they are simply listed below with their conditions: <P>
+
+<UL>
+<LI>isalnum  (c) char c;	alphanumeric ('A'-'Z','a'-'z','0'-'9')
+<LI>isalpha  (c) char c;	alphabetic ('A'-'Z','a'-'z')
+<LI>isascii  (c) char c;	ASCII (0-127)
+<LI>iscntrl  (c) char c;	control character (0-31, 127)
+<LI>isdigit  (c) char c;	digit ('0'-'9')
+<LI>isgraph  (c) char c;	graphic (33-126)
+<LI>islower  (c) char c;	lowercase letter ('a'-'z')
+<LI>isprint  (c) char c;	printable (32-126)
+<LI>ispunct  (c) char c;	punctuation (not cntrl, alnum, space)
+<LI>isspace  (c) char c;	white space (SP, HT, VT, CR, LF, or FF)
+<LI>isupper  (c) char c;	uppercase letter ('A'-'Z')
+<LI>isxdigit (c) char c;	hexadecimal digit ('0'-'9','A'-'F','a'-'f')<p>
+</UL>
+
+Except for<B> isascii()</B>, only characters in the ASCII set (0-127) should be tested.  Characters greater than 127 will yield unpredictable answers.<P>
+
+<B>Character Translation Functions<P>
+</B>
+
+<B>toascii (c) char c;<P>
+</B>
+
+This function returns the ASCII equivalent of <B>c</B>.  Since MS-DOS systems use the ASCII character set, it merely returns <B>c</B> unchanged.  This function makes it possible to use the properties of the ASCII code set without introducing implementation dependencies into programs.  <P>
+
+<B>tolower (c) char c;<P>
+</B>
+
+This function returns the lowercase equivalent of <B>c</B> if  <B>c</B> is an uppercase letter; otherwise, it returns <B>c</B> unchanged.  <P>
+
+<B>toupper (c) char c;<P>
+</B>
+
+This function returns the uppercase equivalent of <B>c</B> if  <B>c</B> is a lowercase letter; otherwise, it returns <B>c</B> unchanged.  <P>
+
+<B>Lexicographical Comparison Functions<P>
+</B>
+
+<B>lexcmp (str1, str2) char *str1, *str2;<P>
+</B>
+
+This Small C function works like<B> strcmp()</B> except that a lexicographical comparison is used.  For meaningful results, only characters in the ASCII character set (codes 0-127) should appear in the strings.  Alphabetic characters are compared without case sensitivity; i.e., uppercase and lowercase letters are equivalent.  Overall, the sequence is: (1) control characters, (2) special characters (in ASCII order), (3) numerics, (4) alphabetics, and (5) the delete character (DEL).  <P>
+
+<B>lexorder (c1,c2) char c1, c2;<P>
+</B>
+
+This Small C function returns an integer less than, equal to, or greater than zero depending on whether <B>c1</B> is less than, equal to, or greater than <B>c2</B> lexicographically.  For meaningful results, only characters in the ASCII character set (codes 0-127) should be passed.  Alphabetic characters are compared without case sensitivity; i.e., uppercase and lowercase letters are equivalent.  Overall, the sequence is: (1) control characters, (2) special characters (in ASCII order), 
+(3) numerics, (4) alphabetics, and (5) the delete character (<B>DEL</B>).  <P>
+
+
+<B>Mathematical Functions<P>
+</B>
+
+<B>abs (nbr) int nbr;<P>
+</B>
+
+This function returns the absolute value of <B>nbr</B>.<P>
+
+<B>sign (nbr) int nbr;<P>
+</B>
+
+This function returns -1, 0, or +1 depending on whether  <B>nbr</B> is less than, equal to, or greater than zero respectively.<P>
+
+<B>Program Control Functions<P>
+</B>
+
+<B>avail (abort) int abort;<P>
+</B>
+
+This Small C function returns the number of bytes of free memory which exists between the memory heap and the stack.  It also checks to see if the stack overlaps the heap; if so and if abort is not zero, the program is aborted with an exit code of 1.  However, if abort is zero,<B> avail()</B> returns zero to the caller.  This function makes it possible to make full use of the data segment.  However, care should be taken to leave enough space for the stack to grow.  <P>
+
+<B>calloc (nbr, sz) int nbr, sz;<P>
+</B>
+
+This function allocates <B>nbr*sz</B> bytes of zeroed memory.  It returns the address of the allocated memory block.  If insufficient memory exists, the request fails and zero is returned.  If the stack and the heap are found to overlap, then the program aborts with an exit code of 1.  <P>
+
+<B>malloc (nbr) int nbr;<P>
+</B>
+
+This function allocates <B>nbr</B> bytes of uninitialized memory.  It returns the address of the allocated memory block.  If insufficient memory is available, the request fails and zero is returned.  If the stack and the heap are found to overlap, then the program aborts with an exit code of 1.  <P>
+<B>free (addr) char *addr;<P>
+</B>
+
+Same as <B>cfree()</B>.<P>
+
+<B>cfree (addr) char *addr;<P>
+</B>
+
+This function releases a block of previously allocated heap memory beginning at <B>addr</B>.  It returns <B>addr</B> on success, otherwise <B>NULL</B>. <P>
+
+Small C uses a simplified memory allocation scheme.  It allocates memory in a heap that starts after the last global item in the data segment and expands in the direction of the stack.  Furthermore, it does not keep track of memory which has already been allocated; it only maintains a single pointer to the end of the heap.  Because of this, blocks of allocated memory must be freed in the reverse order from which they were allocated. <P>
+
+Since the open functions allocate buffer space on the heap and the close function does not free it, freeing memory which was allocated before opening a file must be avoided.  <P>
+
+<B>getarg (nbr, str, sz, argc, argv) char *str; int nbr, sz, argc, *argv;<P>
+</B>
+
+This Small C function locates the command-line argument indicated by <B>nbr</B>, moves it (null terminated) into the string at <B>str</B> (maximum size <B>sz</B>), and returns the length of the field obtained.  <B>Argc</B> and <B>argv</B> must be the same values provided to<B> main()</B> when the program is started.  If <B>nbr</B> is one the first argument (following the program name) is requested, if two the second argument is requested, and so on.  If there is no argument 
+for <B>nbr</B>,<B> getarg()</B> puts a null byte at <B>str</B> and returns <B>EOF</B>.  <P>
+
+
+<B>poll (pause) int pause;<P>
+</B>
+This Small C function polls the keyboard for operator input.  If no input is waiting, zero is returned.  If a character is waiting, the value of <B>pause</B> determines what happens.  If <B>pause</B> is zero the character is returned immediately.  If <B>pause</B> is not zero and the character is a control-S, there is a pause in program execution; when the next character is entered, zero is returned.  If the character is a control-C, program execution is terminated with an exit code of 2.  All 
+other characters are returned to the caller immediately.  <B>Poll()</B> calls<B> _getkey()</B> and so translates auxiliary keystrokes accordingly (Table 12-3).  <P>
+
+<B>abort (errcode) int errcode;<P>
+</B>
+
+Same as <B>exit()</B>.<P>
+
+<B>exit (errcode) int errcode;<P>
+</B>
+
+This function closes all open files and returns to MS-DOS.  The value of <B>errcode</B> determines whether or not a normal exit is to be taken.  If it is not zero, then the message <P>
+
+<PRE>		Exit Code: n <P>
+</PRE>
+
+ (where <B>n</B> is the decimal value of <B>errcode</B>) is displayed on the screen before control returns to MS-DOS.  In either case,  <B>errcode</B> is returned to MS-DOS for checking in batch files.<P>
+
+<B>Primitive Functions<P>
+</B>
+
+The following functions are not normally needed in programs.  But they exist in the standard Small C library and are documented here in case they may be of use.  Since they are in the module <B>CSYSLIB</B>, which is linked with every Small C program, there is no incremental memory cost associated with their use.<P>
+
+<B>_hitkey()<P>
+</B>
+
+This Small C function calls the Basic I/O System (BIOS) to test the keyboard for a pending keystroke.  It returns true or false according to whether or not a key has been hit.  <P>
+
+<B>_getkey()<P>
+</B>
+
+This Small C function calls the BIOS to return the next byte from the keyboard.  It returns immediately if a keystroke is pending; otherwise, it waits for one.  By testing the keyboard with<B> _hitkey()</B> before calling this function, we can avoid blocking the program until a key is pressed.  This is how<B> poll()</B> obtains its input.  All input from the keyboard, regardless of the input function, is obtained through this function. <P>
+
+Most keystrokes have obvious ASCII values.  However, there are numerous auxiliary codes that can be generated through the use of special keys and various key combinations.  The BIOS assigns values to auxiliary keystrokes which overlap the ASCII codes.  To distinguish between these,<B> _getkey()</B> adds an offset of 113 (decimal) to the BIOS's auxiliary codes, placing them in the range 128-245.  The only exception is the traditional (with ASCII terminals) key combination control-@ which usually generates 
+a value of zero.  The BIOS's auxiliary code for this (and the unshifted ctrl-2) is 3 which<B> _getkey()</B> translates directly to zero.  Table 12-3 lists the special keystrokes and the values transmitted through the standard Small C input functions. <P>
+
+<P>
+<CENTER>
+<img src="tb12-3.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 12-3: Small C Codes for Auxiliary Keystrokes<P>
+</CENTER></B>
+
+<B>_bdos2(ax, bx, cx, dx) int ax, bx, cx, dx;<P>
+</B>
+
+This Small C function provides a general means of making interrupt-21 calls to the Basic Disk Operating System (BDOS).  The digit <B>2</B> in its name signifies that <B>_bdos2()</B> is designed for use with the new, version 2.0 MS-DOS services.  Except for the keyboard servicing functions above, all other interactions with a Small C program's environment pass through this function. <P>
+
+This function takes four 16-bit arguments--the values to place in the AX, BX, CX, and DX registers before issuing the interrupt.  On return, if there was no error, zero is returned.  If something went wrong, however, the returned value contains the standard MS-DOS error code. <P>
+
+Since MS-DOS draws attention to the its error code by setting the carry flag (apparently not consistently though) this function also passes on that information by negating the error codes.  If the carry flag is set, indicating an error, the error codes are subtracted from zero to form a negative value (two's complement of the original).  So, if we want to trust MS-DOS's carry flag error indicator, we can just test for a value less than zero.  On the other hand, a more dependable test for errors is 
+any non-zero value.  If we want to analyze the specific error, then we must negate the code again if it is negative. <P>
+
+Refer to other material for details on the BDOS calls and the standard error codes.  <a href="../append/biblio.htm">Peter Norton[15]</a> and <a href="../append/biblio.htm">Ray Duncan[16]</a> are good sources for this information.<P>
+
+<P>
+<CENTER>Go to <a href="../chap13/chap13.htm">Chapter 13</a>             Return to <a href="../toc1.htm">Table of Contents</a>
+<P>
+</HTML>

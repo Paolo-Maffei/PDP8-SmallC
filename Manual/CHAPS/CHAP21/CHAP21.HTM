@@ -1,0 +1,565 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 21:<P>
+BACK END FUNCTIONS</H1><P>
+</CENTER>
+</B>
+
+This chapter describes the back end of the Small C compiler.  The functions which comprise this part all reside in the fourth source file--<B>CC4.C</B>.  They fall into three general categories: (1) code generation functions, (2) code optimizing functions, and (3) output functions.  Since optimizing is a major topic, and since the optimizing functions are pretty much self-contained, that part of the back end is covered in a chapter of its own (<a href="../chap27/chap27.htm">Chapter 27</a>). <P>
+
+As you reach each function's description in the following text, turn to that function in the listings (<a href="../append/appc.htm">Appendix C</a>) and familiarize yourself with it.  Then continue studying it as you read the description.  Refer to Appendix H to find the function in the listings.  <P>
+
+<B>Code Generation Functions<P></B>
+
+<B>Header()<P></B>
+
+<B>Header()</B> is called once from<B> main()</B> before parsing begins.  It initiates the code and data segments each with a dummy word to ensure that all addresses are non-zero.  The choice of a word, instead of a byte, preserves word alignment in the data segment.  <B>Header()</B> also declares external, each of the routines in the <B>CALL</B> module.  This ensures that the <B>CALL</B> module will be linked with the program and that its routines can be accessed.  Each segment is 
+introduced by calling <B>toseg()</B>.<P>
+
+<B>Toseg()<P></B>
+
+<B>Toseg()</B> This function is called whenever a transition between the code and data segments is needed.  The global integer <B>oldseg</B> remembers which segment is current.  It initially contains zero, meaning that neither segment is current.  On entry,<B> toseg()</B> accepts an integer argument indicating which is to be the new segment.  The value one (defined as <B>DATASEG</B>) indicates the data segment, two (defined as <B>CODESEG</B>) indicates the code segment, and zero indicates that 
+no segment is to be initiated but the current segment is to be terminated. <P>
+
+First, if the new segment matches the current segment, no action is taken and control returns to the caller.  That failing, a switch is to be made, so the current segment, if there is one, is terminated first.  If <B>oldseg</B> equals <B>CODESEG</B>, then <P>
+
+<PRE>		CODE ENDS<P>
+</PRE>
+
+is generated, and if <B>oldseg</B> equals <B>DATASEG</B>, then<P>
+
+<PRE>		DATA ENDS<P>
+</PRE>
+
+is generated.  If <B>oldseg</B> is zero, nothing is written.<P>
+
+Next, if <B>newseg</B> is non-zero, the new segment is initiated with either <P>
+
+<PRE>		DATA SEGMENT PUBLIC<P>
+</PRE>
+
+or<P>
+
+<PRE>		CODE SEGMENT PUBLIC
+		ASSUME CS:CODE, SS:DATA, DS:DATA<P>
+</PRE>
+
+depending on the value of <B>newseg</B>.  Finally, <B>newseg</B> is moved to <B>oldseg</B> to remember which segment is current.  <P>
+
+<B>Trailer()<P></B>
+
+<B>Trailer()</B> is called by<B> main()</B> after parsing is finished.  It performs five tasks. <P>
+
+First, it generates external references for all undeclared external functions.  It does this by searching the global symbol table for function entries with a storage class of <B>AUTOEXT</B>--established by<B> primary()</B>, in the expression analyzer.  When it finds an undeclared name,<B> primary()</B> assumes it to be a function and establishes it as such in the global symbol table with this storage class.  If the function should be defined later in the program, then the storage class would be changed to
+ a different value so that it will not also be declared to the assembler as external. <P>
+
+Next, if the function<B> main()</B> exists in the global symbol table, then<B> _main()</B> is declared to the assembler to be external.  This refers to a function in the library module <B>CSYSLIB</B> which sets up conditions for the program to initially receive control, and in turn calls<B> main()</B> within the program.  This external declaration guarantees that <B>CSYSLIB</B> will be linked with the program.  Subprograms that do not contain <B>main()</B> do not generate this external reference.  This pr
+events a &quot;duplicate definition&quot; error at assembly time when <B>CSYSLIB.C</B> is compiled. <P>
+
+Next, which ever segment (data or code) is current at the end of the program, is terminated by calling<B> toseg()</B> with zero for the new segment.  This terminates the current segment without opening another one. <P>
+
+Then, the assembler directive <B>END</B> is written to terminate the source file. <P>
+
+The last task performed by<B> trailer()</B> is to display optimizer statistics.  This logic is not compiled into the production compiler.  However, if the <B>#define</B> of <B>DISOPT</B> (in <B>CC4.C</B>) is &quot;de-commented,&quot; the fourth part of the compiler is recompiled, and the compiler is relinked, then a count of the number of times each optimization was applied will be displayed at the end of each compile run.  The display goes to the standard output file.  <P>
+
+<B>Public()<P></B>
+
+<B>Public()</B> is called whenever a global object is being defined.  It receives the identity code of the object so that it can distinguish functions from data.  First, it calls<B> toseg()</B> to switch segments if necessary.  Functions go into the code segment and global data goes into the data segment. <P>
+
+Next, it writes<P>
+
+<PRE>		PUBLIC <I>name</I><P>
+</PRE>
+
+(where <I>name</I> is the string in the global array <B>ssname[]</B> which contains the name being defined) to the output file.  This tells the assembler that the name is an entry point, allowing it to be referenced from other, separately compiled, source files. <P>
+
+Next, the name is written at the beginning of a new line.  If this call is for a data item, then the new line is left unfinished; later, a <B>DW</B> or <B>DB</B> directive will complete the line.  However, if it is a function, then the name is terminated with a colon and a new line is started.  This establishes the reference point for the start of the function.  <P>
+
+<B>External()<P></B>
+
+<B>External()</B> is called whenever a name is to be declared external.  It receives a pointer to the name, an integer giving the size of the object being declared, and an integer specifying the identity of the object.  As with<B> public()</B>, it first establishes the correct segment.  Then it writes <P>
+
+<PRE>		EXTRN <I>name</I><B> : </B><I>size</I><P>
+</PRE>
+
+where <I>name</I> is the designated name in uppercase (with a leading underscore) and <I>size</I> is one of <B>BYTE</B>, <B>WORD</B>, or 
+<B>NEAR</B>.  The first two of these apply to data declarations and the last to function declarations.  <P>
+
+<B>Outsize()<P></B>
+
+<B>Outsize()</B> is called by<B> external()</B> to generate the <B>size</B> portion of its output line.  It bases its decision on the object's size and identity, as indicated above.  <P>
+
+<B>Point()<P></B>
+
+<B>Point()</B> simply writes <B>DW $+2 </B>to the output file.  When this follows a label, it initializes a named pointer with the address of the following byte.  This function is used to define pointers that are initialized with character strings.  Since the string is stored immediately after the pointer, giving the pointer the value of the following byte effectively points it to the string.  <P>
+
+<B>Setstage()<P></B>
+
+This function performs three tasks.  First, it saves, in the pointer whose address is supplied by the caller, the current position in the staging buffer (<B>snext</B>).  This is the original position, before<B> setstage()</B> changes it, if it does.  Next, if <B>snext</B> is zero, meaning that the buffer is not being used,<B> setstage()</B> points it to the first word in the buffer, thus initializing the buffer for use and flagging the fact that the buffer is to be used 
+thereafter until <B>clearstage()</B> resets <B>snext</B> to zero again.  However, if <B>snext</B> is already non-zero, then the buffer is already being used, so <B>snext</B> is left unchanged.  Finally,<B> setstage()</B> saves the new (possibly changed) staging buffer position in another pointer whose address is also supplied by the caller. <P>
+
+To recap, this function initiates use of the staging buffer if it was not already being used.  It also saves the previous and current buffer positions in pointers that the caller owns.  These pointers will be the same unless the buffer was not previously in use (i.e., at the beginning of the analysis of an expression).  In that case, the first will be zero and the latter will point to the beginning of the staging buffer. <P>
+
+Recall from <a href="../chap20/chap20.htm">Chapter 20</a>, that the staging buffer is used only for holding code generated during expression evaluation.  At other times it is bypassed; generated code is sent directly to the output file.  <P>
+
+<B>Gen()<P></B>
+
+This is the primary code generation function.  From the other function descriptions, we can see that some functions write directly to the output file; these are the exception rather than the rule.  <B>Gen()</B> accepts two integer arguments--a p-code and a value.  The value could be a signed integer, or the address of a symbol table entry.  In many cases, depending on the p-code, the value serves no purpose at all.  Whether or not the value is used, every p-code has one, and this function treats them 
+all the same. <P>
+
+<B>Gen()</B> tests the p-code for one of several cases that receive special treatment.  If the p-code is <B>GETb1pu</B>, <B>GETb1p</B>, or <B>GETw1p</B>, the compiler wants to generate code that fetches an operand pointed to by the primary register.  But these codes expect to find the address in the secondary register.  So <B>gen()</B> first calls itself recursively to generate <B>MOVE21</B> which moves the address to the secondary register. <P>
+
+Likewise, p-codes <B>SUB12</B>, <B>MOD12</B>, <B>MOD12u</B>, <B>DIV12</B>, and <B>DIV12u</B> first generate <B>SWAP12</B> to swap the primary and secondary registers.  This is because these operations are not commutative and the operands are in the wrong registers for the 8086 subtract and divide instructions. <P>
+
+Since pushes and pops must adjust the compiler relative stack pointer <B>csp</B>, <B>PUSH1</B> and <B>POP2</B> are sensed and appropriate adjustments to <B>csp</B> are made. <P>
+
+Two additional p-codes (<B>ADDSP</B> and <B>RETURN</B>), receive special treatment.  These codes must adjust the machine stack pointer SP as well as the compiler relative stack pointer.  The values associated with these codes directly specify a new value for <B>csp</B>.  First, that value is saved.  Then it is converted to an adjustment by subtracting <B>csp</B> from it; this adjustment will be added to SP to adjust the machine stack.  And, finally, <B>csp</B> is set to its new (saved) value. <P>
+
+At this point,<B> gen()</B> does its primary task.  If <B>snext</B> is zero, the staging buffer is not being used, so<B> gen()</B> calls <B>outcode()</B> to translate the p-code and its value to an ASCII string in the output file.  Control, then returns to the caller. <P>
+
+However, if the staging buffer is in use, then an overflow test is performed.  If successful, the p-code and its value are placed in the next two words of the buffer, <B>snext</B> is advanced by two, and control returns to the caller.  <P>
+
+<B>Clearstage()<P></B>
+
+This function clears code from the staging buffer.  It either discards part of the code that was placed into the staging buffer most recently, or it dumps the buffer to the output file and resets it to its inactive state (<B>snext == 0</B>).  In the latter case, it may simply reset the buffer without writing to the output file. <P>
+
+Two pointer arguments are received--<B>before</B> points to the buffer position that preceded the start of the code being cleared, and <B>start</B> points to the start of the code being cleared.  These are normally the values that were earlier saved by<B> setstage()</B>.  However, <B>start</B> is sometimes forced to zero by the caller. <P>
+
+If <B>before</B> is not zero, the whole expression is not being cleared (only the most recently evaluated subexpression), so <B>snext</B> is set to that value, effectively ignoring code that was generated beyond that point.  Control then returns to the caller.  As we shall see in <a href="../chap26/chap26.htm">Chapter 26</a>, the code generated by the analyzer while evaluating constant subexpressions is discarded and replaced by a single p-code that loads the result. <P>
+
+However, if <B>before</B> is zero, the entire expression is being cleared from the buffer (this call corresponds to the first <B>setstage()</B> call for the expression), so the staging buffer is dumped via<B> dumpstage()</B> to the output file and then deactivated.  But there are times when all of the code for an expression should be discarded.  So,<B> dumpstage()</B> is called only if <B>start</B> is not zero.  In either case, <B>snext</B> is reset to zero before returning to the caller.  
+
+This deactivates buffering by causing<B> gen()</B> to write directly to the output file.  <P>
+
+<B>Dumpstage()<P></B>
+
+As we saw above, this function is called from<B> clearstage()</B> to dump the staging buffer to the output file.  It does this, one p-code at a time, by calling<B> outcode()</B>.  However, if optimizing has not been disabled for the run, it first calls <B>peep()</B> for each optimization that might possibly be applied.  If an optimization is applied, then the optimizing loop is restarted at the beginning so that the optimized p-code sequence can be further optimized.  Only the current and 
+subsequent p-codes come under the scrutiny of<B> peep()</B>. <P>
+
+When<B> peep()</B> indicates that all attempts have failed, <B>dumpstage()</B> calls<B> outcode()</B> to translate and write the current p-code to the output file as an ASCII string.  Having done that, it advances to the next p-code and repeats the process until the last p-code in the buffer has been processed. <P>
+
+On entry,<B> dumpstage()</B> sets the global pointer <B>stail</B> to the value of <B>snext</B> which indicates the next unused position in the staging buffer.  This marks the end of the data in the buffer.  Then, <B>snext</B> is set back to the beginning of the buffer, from which it advances p-code by p-code as <B>dumpstage()</B> does its work. <P>
+
+The main loop, which steps from one p-code to the next, continues as long as <B>snext</B> is less than <B>stail</B>.  The inner loop, in which<B> peep()</B> attempts to find an applicable optimization, continues until either an optimization is applied or all attempts fail.  If <B>DISOPT</B> was defined when part 4 of the compiler was compiled, each successful optimization is displayed on the screen (<B>stderr</B>) as it occurs.  <P>
+
+<B>Dumplits()<P></B>
+
+<B>Dumplits()</B> is called at the end of each function definition to dump the accumulated string constants from the literal pool to the output file.  It also serves to dump initial values for global objects. <P>
+
+It receives an integer argument that specifies whether the pool contains byte or word sized values.  To save space in the output file, as many as 10 values are listed with each <B>DB</B> or <B>DW</B> directive.  Therefore, this function comprises two loops.  The outer loop calls<B> gen()</B> to generate a <B>DB</B> or <B>DW</B> directive, depending on the value of the argument.  Then the inner loop repeats for a maximum of 10 times dumping successive values (bytes or words) from the literal pool as signed
+ decimal strings.  Commas separate the values.  When 10 values have been dumped, a newline is written and the outer loop continues.  If more values remain to be dumped, another <B>DB</B> or <B>DW</B> is generated and the inner loop is reinitiated.  When the literal pool has been exhausted, a newline terminates the current line and control returns to the caller.  <P>
+
+<B>Dumpzero()<P></B>
+
+This is a simple function that dumps a specified number of zeroes (bytes or words) into the output file.  It receives two arguments that specify the size of the items (byte or word) and the number to dump.  It simply calls<B> gen()</B> to produce <P>
+
+<PRE>		DB <I>n</I> DUP(0) <P>
+</PRE>
+
+or <P>
+
+<PRE>		DW <I>n</I> DUP(0) <P>
+</PRE>
+
+where <I>n</I> is the number of items being dumped.<P>
+
+<B>Output Functions<P></B>
+
+In this section, we look at each of the output functions except the one which translates p-codes to assembly language.  <P>
+
+<B>Colon()<P></B>
+
+<B>Colon()</B> calls the library function<B> fputc()</B> to write a colon to the output file designated by the global integer <B>output</B>.  <P>
+
+<B>Newline()<P></B>
+
+<B>Newline()</B> calls<B> fputc()</B> to write a newline character to the output file designated by the global integer <B>output</B>.  Recall from <a href="../chap12/chap12.htm">Chapter 12</a> that the put library functions convert this character to two characters--a carriage return followed by a line feed.  This is the standard end-of-line sequence in ASCII files.  When sent to the screen or to a printer, it has the effect of locating the next character at the beginning of the following line.  <P>
+
+<B>Outdec()<P></B>
+
+<B>Outdec()</B> accepts a signed integer which it writes to the output file as a signed decimal character string.  It calls <B>fputc()</B> repeatedly as it writes to the output file designated by <B>output</B>.  <P>
+
+<B>Outname()<P></B>
+
+<B>Outname()</B> accepts a pointer to a character string which it writes to the output file, as a Small C name.  It prefixes the string with an underscore character and translates the characters to uppercase as it repeatedly calls<B> fputc()</B> until the end of the string is reached.  The output file is designated by the global file descriptor <B>output</B>.  This function does not write a newline character.  <P>
+
+<B>Outstr()<P></B>
+
+<B>Outstr()</B> accepts a pointer to a character string which it writes to the output file, by repeated calls to<B> fputc()</B> until the end of the string is reached.  This function does not write a newline character. <P>
+
+A call to<B> poll()</B> at the beginning permits the compiler to be interrupted while writing to the output file.  It honors control-S pauses as well as a control-C termination of the compile run.  <P>
+
+<B>Outline()<P></B>
+
+<B>Outline()</B> also accepts a pointer to a string which it writes to the output file.  It differs from<B> outstr()</B> only in that it does append a newline to the end of the string.  Thus it writes an entire line, or perhaps the last part of a line.  This function first calls<B> outstr()</B> to write the string, then <B>newline()</B> to terminate the line.  <P>
+
+<B>Small C P-codes<P></B>
+
+For reasons of efficiency, before being output, code is first generated in the form of pseudo-codes or p-codes.  These are small integer values, each of which corresponds to some particular assembly language instruction, instruction sequence, or partial instruction.  Each p-code consists of two parts, the p-code itself and an integer value which influences the form of the ASCII string that it will become.  The function<B> outcode()</B> is a specialized output function that translates a p-code and its 
+value into ASCII assembly language. <P>
+
+Before looking into<B> outcode()</B>, however, we should first familiarize ourselves with the Small C p-codes.  To improve readability, the p-codes are defined in <B>CC.H</B> as manifest constants.  They have systematic names, so that even an unfamiliar p-code can usually be figured out simply by knowing the system. <P>
+
+Tables 21-2 and 21-3 list all of the Small C p-codes together with brief explanations of their effects.  The p-codes in Table 21-2 are generated directly by the compiler, and those in Table 21-3 are generated by the optimizer as it operates on the compiler's p-codes.<P>
+
+<PRE>
+            ____________________________________________
+            SYMBOL   MEANING
+	   ____________________________________________
+              0      the value zero
+              1      primary register (pr in comments)
+              2      secondary register (sr in comments)
+              b      byte
+              f      jump on false condition
+              l      current literal pool label number
+              m      memory reference by label
+              n      numeric constant
+              p      indirect reference thru pointer in sr
+              r      repeated r times
+              s      stack frame reference
+              u      unsigned
+              w      word
+              _      incomplete instruction (sequence)
+            ____________________________________________<p>
+</PRE>
+
+<CENTER><B>Table 21-1: Small C P-code Legend<P>
+</CENTER></B>
+
+Table 21-1 is a legend of the lowercase letters, digits, and special characters that are used in p-code names.  In the explanations in Tables 21-2 and 21-3, the abbreviation <B>pr</B> refers to the primary register, and <B>sr</B> refers to the secondary register.  Each p-code name is based on a verb that is written in uppercase letters.  This verb indicates the basic operation performed at run time or assembly time by the p-code.  Attached to this are numbers, lowercase letters, 
+and/or special characters which further define the specific activity of the p-code.  For example, <P>
+
+<PRE>		DIV12u<P>
+</PRE>
+
+designates a divide operation.  The registers involved are the primary register (1) and the secondary register (2).  Whenever registers (1 or 2) are specified, the left most (or only) register named receives the result of the operation.  Thus, <B>DIV12u</B> yields the quotient in the primary register.  Finally, the trailing letter <B>u</B> indicates that an unsigned operation is performed.  Of course, a naming system like this can not tell everything.  In this case, nothing designates 
+which register contains the divisor and which the dividend.<P>
+
+<PRE>
+        _____________________________________________
+        P-CODE    EFFECT
+        ____________________________________________________
+        ADD12     add sr to pr
+        ADDSP     add to stack pointer
+        AND12     AND sr to pr
+        ANEG1     arithmetically negate pr
+        ARGCNTn   pass argument count to a function
+        ASL12     arithmetically shift left sr by pr into pr
+        ASR12     arithmetically shift right sr by pr into pr
+        CALL1     call function thru pr
+        CALLm     call function directly
+        BYTE_     define bytes (part 1)
+        BYTEn     define byte of value n
+        BYTEr0    define r bytes of value 0
+        COM1      one's complement pr
+        DBL1      double pr
+        DBL2      double sr
+        DIV12     divide pr by sr
+        DIV12u    divide pr by sr (unsigned)
+        ENTER     set stack frame upon function entry
+        EQ10f     jump if (pr == 0) is false
+        EQ12      set pr TRUE if (sr == pr)
+        GE10f     jump if (pr &gt;= 0) is false
+        GE12      set pr TRUE if (sr &gt;= pr)
+        GE12u     set pr TRUE if (sr &gt;= pr) (unsigned)
+        POINT1l   point pr to function's literal pool
+        POINT1m   point pr to memory item thru label
+        GETb1m    get byte into pr from memory thru label
+        GETb1mu   get unsigned byte into pr from memory thru label
+        GETb1p    get byte into pr from memory thru sr ptr
+        GETb1pu   get unsigned byte into pr from memory thru sr ptr
+        GETw1m    get word into pr from memory thru label
+        GETw1n    get word of value n into pr
+        GETw1p    get word into pr from memory thru sr ptr
+        GETw2n    get word of value n into sr
+        GT10f     jump if (pr &gt; 0) is false
+        GT12      set pr TRUE if (sr &gt; pr)
+        GT12u     set pr TRUE if (sr &gt; pr) (unsigned)
+        WORD_     define word (part 1)
+        WORDn     define word of value n
+        WORDr0    define r words of value 0
+        JMPm      jump 
+        LABm      define label m
+        LE10f     jump if (pr &lt;= 0) is false
+        LE12      set pr TRUE if (sr &lt;= pr)
+        LE12u     set pr TRUE if (sr &lt;= pr) (unsigned)
+        LNEG1     logical negation of pr
+        LT10f     jump if (pr &lt; 0) is false
+        LT12      set pr TRUE if (sr &lt; pr)
+        LT12u     set pr TRUE if (sr &lt; pr) (unsigned)
+        MOD12     modulo pr by sr
+        MOD12u    modulo pr by sr (unsigned)
+        MOVE21    move pr to sr
+        MUL12     multiply pr by sr
+        MUL12u    multiply pr by sr (unsigned)
+        NE10f     jump if (pr != 0) is false
+        NE12      set pr TRUE if (sr != pr)
+        NEARm     define near pointer thru label
+        OR12      OR sr onto pr
+        POINT1s   point pr to stack item
+        POP2      pop stack into sr
+        PUSH1     push pr onto stack
+        PUTbm1    put pr byte in memory thru label
+        PUTbp1    put pr byte in memory thru sr ptr
+        PUTwm1    put pr word in memory thru label
+        PUTwp1    put pr word in memory thru sr ptr
+        rDEC1     decrement pr (may repeat)
+        REFm      finish instruction with label
+        RETURN    restore stack and return
+        rINC1     increment pr (may repeat)
+        SUB12     sub sr from pr
+        SWAP12    swap pr and sr
+        SWAP1s    swap pr and top of stack
+        SWITCH    call _SWITCH to find a switch's case
+        XOR12     XOR pr with sr
+        ____________________________________________<p>
+</PRE>
+
+<CENTER><B>Table 21-2: Compiler Generated P-codes<P>
+</CENTER></B><P>
+<PRE>
+    ____________________________________________________    
+     P-CODE    EFFECT
+    ____________________________________________________
+    ADD1n     add n to pr
+    ADD21     add pr to sr
+    ADD2n     add immediate value n to sr
+    ADDbpn    add n to memory byte thru sr pointer
+    ADDwpn    add n to memory word thru sr pointer
+    ADDm_     add n to memory byte/word thru label (part 1)
+    COMMAn    finish instruction with &quot;,n&quot;
+    DECbp     decrement memory byte thru sr pointer
+    DECwp     decrement memory word thru sr pointer
+    POINT2m   point sr to memory thru label
+    POINT2m_  point sr to memory thru label (part 1)
+    GETb1s    get byte into pr from stack
+    GETb1su   get unsigned byte into pr from stack
+    GETw1m_   get word into pr from memory thru label (part 1)
+    GETw1s    get word into pr from stack
+    GETw2m    get word into sr from memory (label)
+    GETw2p    get word into sr thru sr pointer
+    GETw2s    get word into sr from stack
+    INCbp     increment byte in memory thru sr pointer
+    INCwp     increment word in memory thru sr pointer
+    PLUSn     finish instruction with &quot;+n&quot;
+    POINT2s   point sr to stack
+    PUSH2     push sr
+    PUSHm     push word from memory thru label
+    PUSHp     push word from memory thru sr pointer
+    PUSHs     push word from stack
+    PUT_m_    put byte/word into memory thru label (part 1)
+    rDEC2     decrement sr (may repeat)
+    rINC2     increment sr (may repeat)
+    SUB_m_    subtract from memory byte/word thru label (part 1)
+    SUB1n     subtract n from pr
+    SUBbpn    subtract n from memory byte thru sr pointer
+    SUBwpn    subtract n from memory word thru sr pointer
+    ____________________________________________________<p>
+</PRE>
+<CENTER><B>Table 21-3: Optimizer Generated P-codes<P>
+</CENTER></B>
+
+Take some time now to study Tables 21-1, 21-2, and 21-3 to become familiar with the p-code naming system.  This will be time well spent.  Learning the system will make reading the compiler's source files much easier.<P>
+
+A bit more explanation may help.  The underscore symbol suffixes names that produce only the first part of an assembly language instruction or instruction sequence.  The underscore should be read as though it were an ellipsis (<B>...</B>) meaning etc.  It also prefixes names that complete an instruction (sequence). <P>
+
+The letter <B>r</B> indicates a repetition of whatever follows.  The number of occurrences is indicated by the p-code's value.  Thus, <P>
+
+<PRE>		rINC1<P>
+</PRE>
+
+produces as many occurrences of the instruction that increments the primary register as the p-code's corresponding value indicates. <P>
+
+Some p-codes produce an assembler instruction that contains a numeric (compiler generated) label.  The value associated with these codes designate the label number.  <P>
+
+<B>The P-Code Output Function<P>
+</B>
+
+Associated with each p-code is a character string that specifies the ASCII data that the p-code should produce.  These strings are related to the p-codes by means of an array of string addresses called <B>code[]</B>.  Each p-code is a subscript into this array.  The designated array element contains the address of the string that translates the p-code.  This arrangement makes for lightning fast testing of p-codes when they are translated.  <B>Outcode()</B> simply uses the p-code as 
+a subscript into <B>codes[]</B>, then proceeds to process the indicated string. <P>
+
+Since Small C does not support the initializing of an array of pointers, the function<B> setcodes()</B> is called once, before parsing begins, to load <B>code[]</B> with its addresses.  That function in <B>CC4.C</B> is the place to look for exactly what each p-code produces.  It is very handy to have this association of p-code names and ASCII strings clustered at one place in the compiler.  It saves a lot of searching around when we need to know the exact effect of a p-code. <P>
+
+As we saw in the description of<B> gen()</B>, several p-codes automatically trigger the generation of other codes.  In these cases, we must also look at<B> gen()</B> to see the total effect of the original p-code.  These p-codes are indicated with comments in<B> setcodes()</B>. <P>
+
+Translating p-codes to ASCII strings involves more than simply writing a string for a given p-code.  The value associated with the p-code may influence the final form of the output in several ways.  Thus, the p-code strings include a kind of language that directs<B> outcode()</B> in its application of the p-code's value.  Table 21-4 lists the p-code translation strings.<P>
+
+<PRE>
+_____________________________________________
+P-CODE     TRANSLATION
+_____________________________________________
+ADD12      \211ADD AX,BX\n
+ADD1n      \010?ADD AX,&lt;n&gt;\n??
+ADD21      \211ADD BX,AX\n
+ADD2n      \010?ADD BX,&lt;n&gt;\n??
+ADDbpn     \001ADD BYTE PTR [BX],&lt;n&gt;\n
+ADDwpn     \001ADD WORD PTR [BX],&lt;n&gt;\n
+ADDm_      \000ADD &lt;m&gt;
+ADDSP      \100?ADD SP,&lt;n&gt;\n??
+AND12      \211AND AX,BX\n
+ANEG1      \010NEG AX\n
+ARGCNTn    \000?MOV CL,&lt;n&gt;?XOR CL,CL?\n
+ASL12      \011MOV CX,AX\nMOV AX,BX\nSAL AX,CL\n
+ASR12      \011MOV CX,AX\nMOV AX,BX\nSAR AX,CL\n
+CALL1      \010CALL AX\n
+CALLm      \020CALL &lt;m&gt;\n
+BYTE_      \000 DB 
+BYTEn      \000 DB &lt;n&gt;\n
+BYTEr0     \000 DB &lt;n&gt; DUP(0)\n
+COM1       \010NOT AX\n
+COMMAn     \000,&lt;n&gt;\n
+DBL1       \010SHL AX,1\n
+DBL2       \001SHL BX,1\n
+DECbp      \001DEC BYTE PTR [BX]\n
+DECwp      \001DEC WORD PTR [BX]\n
+DIV12      \011CWD\nIDIV BX\n
+DIV12u     \011XOR DX,DX\nDIV BX\n
+ENTER      \100PUSH BP\nMOV BP,SP\n
+EQ10f      \010OR AX,AX\nJE $+5\nJMP _&lt;n&gt;\n
+EQ12       \211CALL __EQ\n
+GE10f      \010OR AX,AX\nJGE $+5\nJMP _&lt;n&gt;\n
+GE12       \011CALL __GE\n
+GE12u      \011CALL __UGE\n
+GETb1m     \020MOV AL,&lt;m&gt;\nCBW\n
+GETb1mu    \020MOV AL,&lt;m&gt;\nXOR AH,AH\n
+GETb1p     \021MOV AL,?&lt;n&gt;??[BX]\nCBW\n
+GETb1pu    \021MOV AL,?&lt;n&gt;??[BX]\nXOR AH,AH\n
+GETb1s     \020MOV AL,&lt;n&gt;[BP]\nCBW\n
+GETb1su    \020MOV AL,&lt;n&gt;[BP]\nXOR AH,AH\n
+GETw1m     \020MOV AX,&lt;m&gt;\n
+GETw1m_    \020MOV AX,&lt;m&gt;
+GETw1n     \020?MOV AX,&lt;n&gt;?XOR AX,AX?\n
+GETw1p     \021MOV AX,?&lt;n&gt;??[BX]\n
+GETw1s     \020MOV AX,&lt;n&gt;[BP]\n
+GETw2m     \002MOV BX,&lt;m&gt;\n
+GETw2n     \002?MOV BX,&lt;n&gt;?XOR BX,BX?\n
+GETw2p     \021MOV BX,?&lt;n&gt;??[BX]\n
+GETw2s     \002MOV BX,&lt;n&gt;[BP]\n
+GT10f      \010OR AX,AX\nJG $+5\nJMP _&lt;n&gt;\n
+GT12       \010CALL __GT\n
+GT12u      \011CALL __UGT\n
+INCbp      \001INC BYTE PTR [BX]\n
+INCwp      \001INC WORD PTR [BX]\n
+WORD_      \000 DW 
+WORDn      \000 DW &lt;n&gt;\n
+WORDr0     \000 DW &lt;n&gt; DUP(0)\n
+JMPm       \000JMP _&lt;n&gt;\n
+LABm       \000_&lt;n&gt;:\n
+LE10f      \010OR AX,AX\nJLE $+5\nJMP _&lt;n&gt;\n
+LE12       \011CALL __LE\n
+LE12u      \011CALL __ULE\n
+LNEG1      \010CALL __LNEG\n
+LT10f      \010OR AX,AX\nJL $+5\nJMP _&lt;n&gt;\n
+LT12       \011CALL __LT\n
+LT12u      \011CALL __ULT\n
+MOD12      \011CWD\nIDIV BX\nMOV AX,DX\n
+MOD12u     \011XOR DX,DX\nDIV BX\nMOV AX,DX\n
+MOVE21     \012MOV BX,AX\n
+MUL12      \211IMUL BX\n
+MUL12u     \211MUL BX\n
+NE10f      \010OR AX,AX\nJNE $+5\nJMP _&lt;n&gt;\n
+NE12       \211CALL __NE\n
+NEARm      \000 DW _&lt;n&gt;\n
+OR12       \211OR AX,BX\n
+PLUSn      \000?+&lt;n&gt;??\n
+POINT1l    \020MOV AX,OFFSET _&lt;l&gt;+&lt;n&gt;\n
+POINT1m    \020MOV AX,OFFSET &lt;m&gt;\n
+POINT1s    \020LEA AX,&lt;n&gt;[BP]\n
+POINT2m    \002MOV BX,OFFSET &lt;m&gt;\n
+POINT2m_   \002MOV BX,OFFSET &lt;m&gt;
+POINT2s    \002LEA BX,&lt;n&gt;[BP]\n
+POP2       \102POP BX\n
+PUSH1      \110PUSH AX\n
+PUSH2      \101PUSH BX\n
+PUSHm      \100PUSH &lt;m&gt;\n
+PUSHp      \100PUSH ?&lt;n&gt;??[BX]\n
+PUSHs      \100PUSH ?&lt;n&gt;??[BP]\n
+PUT_m_     \000MOV &lt;m&gt;
+PUTbm1     \010MOV &lt;m&gt;,AL\n
+PUTbp1     \011MOV [BX],AL\n
+PUTwm1     \010MOV &lt;m&gt;,AX\n
+PUTwp1     \011MOV [BX],AX\n
+rDEC1      \010#DEC AX\n#
+rDEC2      \010#DEC BX\n#
+REFm       \000_&lt;n&gt;
+RETURN     \100?MOV SP,BP\n??POP BP\nRET\n
+rINC1      \010#INC AX\n#
+rINC2      \010#INC BX\n#
+SUB_m_     \000SUB &lt;m&gt;
+SUB12      \011SUB AX,BX\n
+SUB1n      \010?SUB AX,&lt;n&gt;\n??
+SUBbpn     \001SUB BYTE PTR [BX],&lt;n&gt;\n
+SUBwpn     \001SUB WORD PTR [BX],&lt;n&gt;\n
+SWAP12     \011XCHG AX,BX\n
+SWAP1s     \012POP BX\nXCHG AX,BX\nPUSH BX\n
+SWITCH     \012CALL __SWITCH\n
+XOR12      \211XOR AX,BX\n
+_______________________________________________<p>
+</PRE>
+<CENTER><B>Table 21-4: P-code Translation Strings<P>
+</CENTER></B>
+
+Probably, the most obvious thing about these strings is that each one begins with a byte that is coded with an octal escape sequence.  That leading byte contains three codes that tell the optimizer about the effects of the instruction(s) in the string.  It is not a part of the string proper, and so is skipped over when<B> outcode()</B> writes a string to the output file.  More will be said about the meaning of these codes in <a href="../chap27/chap27.htm">Chapter 27</a>. <P>
+
+Now, notice that these strings include occurrences of the <B>\n</B> escape sequence which specifies the newline character.  <B>Outcode()</B> gives these no special treatment, so each one has its normal effect in the output file--it begins a new line.  Since some strings have embedded occurrences of newlines, it follows that some strings produce multi-line instruction sequences; that is, multiple instructions.  Notice too that some strings do not end with a newline character.  These are the strings for the
+ p-codes whose names end with an underscore, meaning that more text must follow to complete the instruction(s). <P>
+
+The language mentioned above, which tells<B> outcode()</B> how to apply the value associated with the p-code, consists of five devices (or directives).  They are: <P>
+
+<B>?...?...?<P></B>
+
+Question marks always appear in groups of three.  Arbitrary text may occur between them.  When <B>outcode()</B> sees the first question mark, it tests the value associated with the p-code for true or false.  If true, the text between the first two question marks is written to the output file; otherwise, the text between the second two is written.  As we can see from scanning Table 21-4, this directive is used in two ways.  First, it selects between alternate forms of code so as to produce the 
+most efficient instructions; for example, it is more efficient to zero a register by performing an exclusive OR of it with itself than by loading the constant zero.  The second use is in deciding whether or not to generate optional instructions (or parts of instructions).  This usually appears as <B>?...??</B>. <P>
+
+<B>#...#<P></B>
+
+Number signs always occur in pairs.  When<B> outcode()</B> sees the first number sign, it takes the p-code's value as a repetition count and writes the text between the number signs as many times as the count indicates.  Thus, for instance, <B>#INC AX\n#</B> produces as many increment instructions as the p-code's value specifies. <P>
+
+<B>&lt;l&gt;<P></B>
+
+A lowercase letter <B>l</B> (in angle brackets) tells <B>outcode()</B> to write the number of the current function's literal pool label as a decimal string.  This is for references to string constants which reside in the literal pool that occurs at the end of each function.  Each literal pool is preceded by a unique numeric label. <P>
+
+<B>&lt;m&gt;<P></B>
+
+A lowercase letter <B>m</B> (in angle brackets) tells <B>outcode()</B> that the p-code's value is a pointer to a symbol table entry containing the name of a label which is to be used in a direct memory reference.  On finding this,<B> outcode()</B> offsets the pointer by an amount that locates the symbol string in the table entry, and calls<B> outname()</B> to write the symbol to the output file as a name (in uppercase, preceded by an underscore). <P>
+
+<B>&lt;n&gt;<P></B>
+
+A lowercase letter <B>n</B> (in angle brackets) tells <B>outcode()</B> that the p-code's value is a number that is to be written to the output file as a signed decimal string.   <B>Outcode()</B> does not write the actual special characters and code letters to the output file.  They are replaced by the output which they designate. <P>
+
+At this point, the task of<B> outcode()</B> has been fully explained! It accepts a p-code and its value and it outputs the p-code's string while carrying out the operations indicated by these directives.  It uses three integer locals to help it carry out its special directives. <P>
+
+<OL>
+<LI><b>Part</b> indicates which part of a ?...?...? directive is being processed.  It contains a number indicating which question mark has been encountered. 
+<LI><b>Skip</b> contains true or false, indicating whether or not the current part of the string is to be written to the output file.  It is true during the part of a ?...?...? sequence that is to be skipped. 
+<LI><b>Count</b> counts down the number of repetitions of a  #...# sequence.<p>
+</OL>
+Also, two character pointers are used.<P>
+
+<OL>
+<LI><b>Cp</b> is used to scan the string as it is being written. 
+<LI><b>Back</b> saves the value of cp when it reaches the first text character in a #...# sequence.  It is used later, when the terminal number sign is reached, to reset cp for the next repetition.  When zero, it means that the next number sign will be the first one of a sequence rather than the last.<p>
+</OL>
+
+On entry,<B> outcode()</B> initializes <B>part</B> and <B>back</B> to zero, and <B>skip</B> to false.  It then sets <B>cp</B> to the second character of the p-code's string; this is where the translation from p-code to string is accomplished.  Next, <B>outcode()</B> falls into a loop which lasts as long as non-zero characters remain in the string.  In the loop, it first looks for a <B>&lt;</B>, indicating one of the lettered directives <B>&lt;l&gt;</B>, <B>&lt;m&gt;</B>, or <B>&lt;n&gt;</B>.  
+On finding one, and if the current code is not being skipped, it tests the letter with a <B>switch</B> statement.  Three cases cover the possibilities.  Then <B>cp</B> is advanced over the directive and the loop continues. <P>
+
+That failing,<B> outcode()</B> looks for a question mark.  If one is found and it is the first question mark in the sequence, it tests the p-code's value.  If zero, it sets <B>skip</B> true so that the first text segment will be bypassed.  On finding the second question mark, <B>skip</B> is logically negated.  If skipping was going on, the second text segment is written to the output file, and vice versa.  Finally, on finding the third question mark, <B>part</B> is reset, so the next question mark will be
+ taken as the first one of a sequence, and <B>skip</B> is set to false so that the following text will be written normally. <P>
+
+If these tests fail,<B> outcode()</B> tests the current character for a <B>#</B>.  Upon finding one, and seeing that it is the first one, it saves the p-code's value in <B>count</B> and <B>cp</B> in <B>back</B>.  The loop then continues normally.  Text is written until the second <B>#</B> is found.  At that point, <B>count</B> is decremented and tested for more repetitions.  If any remain, <B>cp</B> is reset to the address saved in <B>back</B> and the loop continues.  This repeats until 
+no more repetitions remain, at which time <B>back</B> is reset to zero and the loop continues. <P>
+
+If none of these special cases exists, <B>skip</B> indicates whether or not the current character is to be written.  In either case, <B>cp</B> is advanced over the current character and the loop continues. <P>
+
+When the end of the string is reached, the loop terminates and<B> outcode()</B> returns, having translated the p-code and its value to assembly language in the output file. <P>
+
+<CENTER>
+Go to <a href="../chap22/chap22.htm">Chapter 22</a>      Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

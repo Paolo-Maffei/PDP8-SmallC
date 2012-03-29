@@ -1,0 +1,334 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 1:<P>
+PROGRAM STRUCTURE<P></H1>
+</CENTER>
+</B>C is a free field language.  There is no significance 
+associated with any particular positions within a line, and both 
+multi-statement lines and multi-line statements are allowed.  The 
+only exceptions to this rule are the preprocessor directives 
+(<a href="../chap11/chap11.htm">Chapter 11</a>) which are written each 
+on a line by itself beginning with the character <B>#</B>.<P>
+
+Statements and declarations may be split between lines at any 
+point except within keywords, names, and multi-character 
+operators.  That is, <I>tokens</I> (the smallest units of the 
+syntax) must be wholly contained in a line.  Another way to think 
+of this is that C interprets line breaks, like blanks and tabs, 
+as white space.<P>
+
+<B>Overall Structure<P>
+
+</B>As Listing 1-1 shows, C programs have a simple structure.  A 
+program is essentially a sequence of comments (line 1), 
+preprocessor directives (lines 2-4), and global declarations 
+(beginning with lines 5, 6, 7, 14, and 18).  Notice that the 
+procedural parts of a program--the functions--are considered to 
+be declarations.<P>
+<CENTER>
+<img src="ls1-1.gif">
+</CENTER>
+<CENTER><B>Listing 1-1: Sample Small C Program<P>
+</CENTER></B>
+
+<B>Comments<P>
+
+</B>Comments are used to clarify the logic of programs and 
+document their operation.  They are of no use to the compiler, so 
+the preprocessor squeezes them out of a program before the 
+compiler sees it.  Comments are delimited on the left by the 
+<B>/*</B> sequence and on the right by the next <B>*/</B> 
+sequence.  There is no limit to the length of comments and 
+they may continue over any number of lines.  We can place them 
+anywhere in a program, except within tokens; that is, they are 
+legal anywhere white space is allowed.<P>
+
+The preprocessor is sensitive to the comment delimiters only when 
+they do not occur within quotes or apostrophes.  So, we may 
+freely use these character sequences in strings and character 
+constants without fear of confusing the compiler. (The idea of a 
+two-character constant may seem strange, but C accepts them 
+without complaint.)<P>
+
+While some C compilers support comment nesting as an option (it 
+is not a standard feature of C), Small C will definitely be 
+confused by comments within comments.  This makes it difficult to 
+comment out of programs sections of logic that are themselves 
+commented.  This lack of comment nesting is an unfortunate 
+characteristic of C.<P>
+
+<B>Preprocessor Directives<P>
+
+</B>Although not a part of the C language proper, I included 
+preprocessor directives in the overall structure of C programs 
+(above) because they do actually appear in the source file 
+together with the &quot;pure&quot; C code.  We have already seen 
+two examples of these directives in Listing 1-1 (lines 2-4); 
+those and others will be covered in detail in Chapter 11.<P>
+
+However, a few general remarks are in order.  First, all C 
+compilers include a preprocessor which prepares the source code 
+for assimilation by the compiler.  Small C is unusual in that the 
+preprocessor is integrated into the compiler itself as a low 
+level input routine.  This saves one pass of writing and reading 
+the source code.  It also means that when we probe the compiler 
+with keyboard input, we may enter preprocessor directives along 
+with regular C code.<P>
+
+The Small C preprocessor supports three capabilities--(1) the 
+inclusion of source code from other files, (2) the definition of 
+symbols that stand for arbitrary substitution text, and (3) the 
+conditional compiling of optional program code.<P>
+
+Each preprocessor directive is written on a line by itself 
+beginning with a <B>#</B> character.  The preprocessor lines are 
+eliminated from the program before it goes on the compiler.<P>
+
+<B>Global Declarations<P></B>
+
+Objects that may be declared in Small C programs include:<P>
+
+<OL>
+<LI>integer variables
+<LI>character variables
+<LI>arrays of integers or characters
+<LI>pointers to integers or characters
+<LI>functions
+</OL>
+
+Examples of these were seen in Listing 1-1.  Full C also 
+provides other kinds of declarations.  In full C, for instance, 
+we can declare arrays of pointers, structures (collections of 
+objects into records), and unions (redefinitions of storage).  
+While Small C does not support these, it manages pretty well 
+without them.  For example, since pointers are the same size as 
+integers, an array of integers has no problem holding pointers.  
+And, while this leads to some inefficiencies and programming 
+practices that are generally frowned upon, the language is not crippled 
+by its inability to declare arrays of pointers.  Likewise, the 
+lack of structures and unions does not impose any real limitation 
+because they provide no capabilities that cannot be done in other 
+ways.<P>
+
+Since there is much to be said about function declarations, they 
+are treated more thoroughly below.  But first we need to 
+distinguish between two similar terms.<P>
+
+<B>Declarations and Definitions<P>
+
+</B>The terms <I>declaration</I> and <I>definition</I> may seem 
+synonymous, but in the C language they imply different ideas.  
+Declarations only tell the compiler what it needs to know about 
+objects; whereas, definitions also reserve space in memory for 
+them.  We can declare something without defining it, but we 
+cannot define it without declaring it.<P>
+
+An object may be said to exist in the file in which it is 
+defined, since compiling the file yields a module containing the 
+object.  On the other hand, an object may be declared within a 
+file in which it does not exist.  Declarations of this type are 
+preceded by the keyword <B>extern</B>.  Thus,<P>
+<PRE>
+       int i;<P>
+</PRE>
+
+defines an integer which exists in the present module; 
+whereas,<P>
+
+<PRE>
+     extern int ei;<P>
+</PRE>
+
+only declares an integer to exist in another, separately 
+compiled, module.  The linker brings these modules together and 
+connects inter-module references by name.  The compiler knows 
+everything about <B>extern</B> objects except where they are.  
+The linker is responsible for resolving that discrepancy.  The 
+compiler simply tells the assembler that the objects are in fact 
+external.  And the assembler, in turn, makes this known to the 
+linker.<P>
+
+<B>Function Declarations<P>
+
+</B>A <I>function</I> is simply a subroutine--a common piece of 
+logic which is called from various points in a program, and 
+returns control to the caller when its work is done.  Other 
+languages distinguish between functions and procedures (or 
+subroutines).  The former being invoked as a term, returning a 
+value, in expressions and the latter being called directly by 
+means of call statements.  C eliminates the distinction by 
+accepting a bare expression as a statement.  Furthermore, since a 
+function call may comprise an entire expression, functions can be called without 
+the aid of a special statement.<P>
+
+While other block structured languages support the nesting of 
+procedural declarations, C does not.  In C all function 
+declarations must occur at the global level--outside of other 
+function declarations.  This greatly simplifies the structure of 
+C programs and makes them easier to understand.<P>
+
+A function declaration consists of two parts: a <I>declarator</I> 
+and a <I>body</I>.  The declarator states the name of the 
+function and (for use within the function) the names of arguments 
+passed to it.  In our sample program, no arguments were passed to 
+the functions that were called, so each of the three function 
+declarators specified a null argument list (empty parentheses).  
+The parentheses are required even when there are no arguments.<P>
+The body of a function consists of argument declarations followed 
+by a statement that performs the work.  The argument declarations 
+indicate to the function the types of the arguments listed in the 
+declarator.  Each argument must be declared and only arguments 
+may be declared at this point.  It is the responsibility of the 
+programmer to ensure that the correct types of arguments are 
+passed to the function when it is called.  Chapter 28 describes 
+how modern C compilers assuming this responsibility and sugg
+ests how Small C can be modified to do the same.<P>
+
+The reference above to a statement (singular) may be surprising.  
+After all, Listing 1-1 plainly shows several statements in each 
+function.  But the reference is correct since the collected 
+statements following the argument declarations of a function 
+comprise a single compound statement.<P>
+
+<B>Compound Statements<P>
+
+</B>A <I>compound statement</I> (or <I>block</I>) is a sequence 
+of statements, enclosed by braces, that stands in place of a 
+single statement.  Simple and compound statements are completely 
+interchangeable as far as the syntax of the C language is 
+concerned.  Therefore, the statements that comprise a compound 
+statement may themselves be compound; that is, blocks can be 
+nested.  Thus, it is legal to write<P>
+<PRE>
+     { i=5; { j=6; k=7; } }<P>
+</PRE>
+in which <B>j=6;</B> and <B>k=7;</B> comprise a block which, 
+together with <B>i=5;</B>, comprises a larger block.  Of course 
+this offers no advantage over simply writing the three statements 
+in sequence.  As we shall see, however, C does not provide for 
+sequences of statements except in blocks.  So if a sequence of 
+statements is to be controlled by some condition, we would need 
+to write something like<P>
+<PRE>
+      if (i &lt; 5) { i=5; j=6; k=7; }<P>
+</PRE>instead of<P>
+<PRE> 
+      if (i &lt; 5) i=5; j=6; k=7;<P>
+</PRE>
+In the latter case, only <B>i=5</B> is controlled by the 
+condition <B>I&lt;5</B>.  The other assignments happen regardless 
+of the value of <B>i</B>.<P>
+
+<B>Flow of Control<P>
+
+</B>When a function receives control, execution begins with its 
+first statement.  If control reaches the end of the body--the 
+closing brace--it then returns to the point from which the 
+function was called and continues onward from there.<P>
+
+C programs always begin execution with an ordinary call to a 
+function named <B>main()</B>.  Consequently, there must be a 
+<B>main()</B> function somewhere in the program.  A return from that 
+function (for that call) transfers control back to the operating 
+system.  Nothing prevents a program from calling <B>main()</B> 
+itself, however.  When that occurs, the return from <B>main()</B> 
+transfers control back to the point of the call.  Control returns 
+to the operating system from <B>main()</B> only when the in
+stance of <B>main()</B> called by the operating system returns 
+control.<P>
+
+<B>Global Variables<P>
+
+</B>Variables declared outside of a function, like <B>ch</B> and 
+<B>where</B> in Listing 1-1, are properly called <I>external</I> 
+variables because they are defined outside of any function.  
+While this is the standard term for these variables, it is 
+confusing because there is another class of external 
+variable--one that exists in a separately compiled source file.  
+So there is a need to distinguish between variables that are 
+merely external to functions and those that are also external to 
+the present source file.  To avoid this confusion, I have chosen to refer to 
+external variables in the present source file as <I>globals</I> 
+since they are known to all of the functions of the program.  By 
+contrast, <I>locals</I> are known only to the functions (more 
+properly, blocks) in which they are declared.  Hereafter, the 
+word <I>external</I> is reserved for variables that exist in 
+other, separately compiled, source files; that is, those declared 
+with the keyword <B>extern</B>.<P>
+
+<B>Local Variables<P>
+
+</B>As we shall see later, variables can be declared within a 
+compound statement.  We call these <I>local variables</I> since 
+they are known only to the block in which they appear, and to 
+subordinate blocks.  For example, we could write<P>
+<PRE>
+      if (i &lt; 5) { int x; x=j; j=k; k=x; }<P>
+</PRE>
+if we wanted to swap <B>j</B> and <B>k</B> when <B>i &lt; 5</B>.  
+Notice that the local variable <B>x</B> is declared within the 
+compound statement.  Unlike globals, which are said to be <I>
+static</I>, locals are created dynamically when their block is 
+entered, and they cease to exist when control leaves the block.  
+Furthermore, local names supersede the names of globals and other 
+locals declared at higher levels of nesting.  Therefore, locals 
+may be used freely without regard to the names of &quot;outlyi
+ng&quot; variables; clashes cannot occur.<P>
+
+<B>Source Files<P>
+
+</B>As we noted above, C programs may consist of source code in 
+more than one file.  One method of bringing the parts together is 
+to use the <B>#include</B> preprocessor directive which we saw in 
+Listing 1-1.  Another is to compile the source files separately, 
+then combine the separate object files as the program is being 
+linked with library modules.  This is very convenient since the 
+linker must be used anyway.  It permits us to break large 
+programs into parts so that the whole program need not be recomp
+iled with every change that is made.  As we shall see, the Small 
+C compiler consists of four parts which are brought together in 
+this way.<P>
+
+Although truly external variables must be declared as such with 
+the keyword <B>extern</B>, the Small C compiler assumes that 
+undeclared functions are external.  In either case, it generates 
+an <B>EXTRN</B> directive telling the assembler to inform the 
+linker to make the necessary connection.  Furthermore, each 
+global declaration generates a <B>PUBLIC</B> directive which 
+ensures that it can be seen from other modules.<P>
+
+<B>Summary<P>
+
+</B>In brief, a Small C program comprises one or more source 
+files.  Two mechanisms are provided for bringing together the 
+parts.  The text from one file may be included into another file 
+by means of the <B>#include</B> directive (<a href="../chap11/chap11.htm">Chapter 11</a>); or the 
+parts may be compiled and assembled separately then linked 
+together.<P>
+
+Each source file consists of comments, preprocessor directives, 
+and global declarations for variables, arrays, pointers, and 
+functions.  Each function in turn has a declarator and a body.  
+The declarator names the function and gives local names to its 
+arguments.  The body declares the types of the arguments and 
+specifies an algorithm in a block of local declarations, 
+executable statements, and other blocks.  And these blocks in 
+turn have their own local declarations, statements, and blocks; 
+and so on.<P>
+
+Programs begin execution in a function called <B>main()</B> and 
+other functions receive control only when they are specifically 
+called.  A function is called by writing its name followed by a 
+(possibly null) list of arguments enclosed in parentheses.<P>
+
+These concepts are just the foundation for the things that 
+follow.  So read on for the good stuff.<P>
+<P>
+<CENTER>Go to <a href="../chap2/chap2.htm">Chapter 2</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

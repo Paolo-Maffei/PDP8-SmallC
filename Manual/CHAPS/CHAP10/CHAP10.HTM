@@ -1,0 +1,564 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 10:<P>
+STATEMENTS<P></H1>
+</CENTER>
+</B>Every procedural language provides statements for determining 
+the flow of control within programs.  Although declarations are a 
+type of statement, in C the unqualified word statement usually 
+refers to procedural statements rather than declarations.  In 
+this chapter we are concerned only with procedural statements. <P>
+
+In the C language, statements can be written only within the body 
+of a function; more specifically, only within compound 
+statements.  The normal flow of control among statements is 
+sequential, proceeding from one statement to the next.  However, 
+as we shall see, most of the statements in C are designed to 
+alter this sequential flow so that algorithms of arbitrary 
+complexity can be implemented.  This is done with statements that 
+control whether or not other statements execute and, if so, how 
+many times.  Furthermore, the ability to write compound statements permits the 
+writing a sequence of statements wherever a single, possibly 
+controlled, statement is allowed.  These two features provide the 
+necessary generality to implement any algorithm, and to do it in 
+a structured way. <P>
+
+The C language uses semicolons as statement terminators.  A 
+semicolon follows every simple (non-compound) statement, even the 
+last one in a sequence. <P>
+
+When one statement controls other statements, a terminator is 
+applied only to the controlled statements.  Thus we would write <P>
+
+<PRE>		if(x &gt; 5) x = 0; else ++x; <P>
+</PRE>
+with two semicolons, not three.  Perhaps one good way to 
+remember this is to think of statements that control other 
+statements as &quot;super&quot; statements that 
+&quot;contain&quot; ordinary (simple and compound) statements.  
+Then remember that only simple statements are terminated.  This 
+implies, as stated above, that compound statements are not 
+terminated with semicolons.  Thus <P>
+
+<PRE>		while(x &lt; 5) {func(); ++x;}<P>
+</PRE>
+is perfectly correct.  Notice that each of the simple 
+statements within the compound statement is terminated.  <P>
+
+<B> Null Statements<P>
+
+</B>The simplest C statement is the <I>null statement</I>.  It 
+has no text, just a semicolon terminator.  As its name implies, 
+it does exactly nothing.  Why have a statement that serves no 
+purpose?  Well, as it turns out, statements that do nothing can 
+serve a purpose.  As we saw in <a href="../chap9/chap9.htm">Chapter 9</a>, expressions in C can do 
+work beyond that of simply yielding a value.  In fact, in C 
+programs, all of the work is accomplished by expressions; this 
+includes assignments and calls to functions that invoke operating 
+system services such as input/output operations.  It follows that 
+anything can be done at any point in the syntax that calls for an 
+expression.  Take, for example, the statement <P>
+
+<PRE>		while(...) ;<P>
+</PRE>
+in which the ellipsis stands for some expression that 
+controls the execution of the null statement following.  We are 
+free to write <B>...</B> so that it produces side effects of any 
+kind in addition to controlling the loop.  In other words, the 
+effects of the loop can be accomplished in the controlling 
+expression rather than the controlled statement.  The result of 
+this practice is more efficient object code.  For a specific 
+example see the discussion of the <B>while</B> statement below.  
+The null statement is just one way in which the C language follows a 
+philosophy of attaching intuitive meanings to seemingly 
+incomplete constructs.  The idea is to make the language as 
+general as possible by having the least number of disallowed 
+constructs.  <P>
+
+<B> Compound Statements<P>
+
+</B>The terms <I>compound statement</I> and <I>block</I> both 
+refer to a collection of statements that are enclosed in braces 
+to form a single unit.  Compound statements have the form <P>
+
+<PRE>		{<I>ObjectDeclaration?... Statement?...</I> }
+</PRE><P>
+
+<I>ObjectDeclaration?...</I> is an optional set of local 
+declarations.  If present, Small C requires that they precede the 
+statements; in other words, they must be written at the head of 
+the block.  <I>Statement?... </I>is a series of zero or more 
+simple or compound statements.  Notice that there is not a 
+semicolon at the end of a block; the closing brace suffices to 
+delimit the end. <P>
+
+The power of compound statements derives from the fact that one 
+may be placed anywhere the syntax calls for a statement.  Thus 
+any statement that controls other statements is able to control 
+units of logic of any complexity. <P>
+
+When control passes into a compound statement, two things happen. 
+ First, space is reserved on the stack for the storage of local 
+variables that are declared at the head of the block.  Then the 
+executable statements are processed. <P>
+
+When control leaves a compound statement, the stack is restored 
+to its original condition.  For more on local declarations, see 
+Chapters 4-6. <P>
+
+One important limitation in Small C is that a block containing 
+local declarations must be entered through its leading brace.  
+This is because bypassing the head of a block effectively skips 
+the logic that reserves space for local objects.  Since the 
+<B>goto</B> and <B>switch</B> statements (below) could violate this 
+rule, Small C mutually excludes from any function <B>goto</B> 
+statements and declarations at levels below the function body, 
+and it disallows declarations within <B>switch</B> statements.  
+Full C has no such restrictions, however.  As it turns out, these 
+restrictions are seldom encountered, since most people declare 
+all of their locals at the head of function bodies, and it is 
+fairly unusual to see locals declared in blocks within switch 
+statements.  <P>
+
+<B> Expression Statements<P>
+
+</B>The C language is unusual in its provision for <I>expression 
+statements</I>--expressions which the compiler accepts as 
+complete statements.  We saw in <a href="../chap8/chap8.htm">Chapter 8</a> that this 
+generalization leads to the elimination of procedures as a 
+distinct class of subroutine and the elimination of special call 
+statements for invoking them.  This feature and the provision of 
+assignment operators also leads to the elimination of a special 
+assignment statement. <P>
+
+The value produced by an expression statement is not used under 
+normal conditions.  In fact, some compilers optimize such values 
+into oblivion.  But Small C goes ahead and produces them in its 
+primary register and then ignores them.  It is possible, however, 
+to utilize these values by inserting assembly language code after 
+the expression statement.  See <a href="../chap11/chap11.htm">Chapter 11</a> for details. <P>
+As we noted above, the work in C programs is really done by 
+expressions.  Function calls, assignments, increments, and 
+decrements are all performed during expression evaluation.  That 
+being the case, it follows that C must provide for the normal 
+sequential evaluation of expressions; it must support expression 
+statements. <P>
+
+Some examples of valid expression statements are: <P>
+
+<PRE>		func();
+		++i;
+		i = 15, j = 16, k = 17;
+		x += func(x, y = 12) * 100;  <P>
+</PRE>
+
+<B> The Goto Statement<P>
+
+</B><B>Goto</B> statements break the sequential flow of execution 
+by causing control to jump abruptly to designated points.  They 
+have the general form <P>
+
+<PRE>		goto <I>Name</I> ;<P>
+</PRE>
+where <I>Name</I> is the name of a label which must appear in the 
+same function.  It must also be unique within the function.  
+Labels have the form <P>
+
+<PRE>		<I>Name</I> :<P>
+</PRE>
+where <I>Name</I> obeys the C naming conventions (
+<a href="../chap2/chap2.htm">Chapter 2</a>).  Notice that labels are terminated with a colon.  This 
+highlights the fact that they are not statements but statement 
+prefixes which serve to label points in the logic as targets for 
+<B>goto</B> statements.  When control reaches a <B>goto</B>, it 
+proceeds directly from there to the designated label.  Both 
+forward and backward references are allowed, but the range of the 
+jump is limited to the body of the function containing the <B>goto</B> statement. <P>
+
+As we observed above, <B>goto</B> statements, cannot be used in 
+functions which declare locals in blocks which are subordinate to 
+the outermost block of the function. <P>
+
+<B>Goto</B> statements should be used sparingly, if at all.  Over 
+reliance on them is a sure sign of sloppy thinking.  Strictly 
+speaking, they are never absolutely necessary.  In fact the 
+original Small C compiler did not even support <B>goto</B> 
+statements.  But situations do occasionally arise in which a 
+<B>goto</B> can save the writing of redundant statements.  To keep 
+the meaning of your logic clear, you should try to limit the 
+distance between <B>goto</B> statements and their target labels.  
+It also helps to write labels so they stand out from their surrounding 
+code; for instance, placing a blank line above a label helps.  <P>
+
+<B> The If Statement<P>
+
+</B><B>If</B> statements provide a non-iterative choice between 
+alternate paths based on specified conditions.  They have either 
+of two forms <P>
+
+<PRE>		if ( <I>ExpressionList</I> ) <I>Statement</I><P>
+</PRE>
+
+or
+
+<PRE>		if ( <I>ExpressionList</I> ) <I>Statement</I> <P>
+</PRE>
+
+<B>else</B> <I>Statement</I><P>
+<I>ExpressionList</I> is a list of one or more expressions and <I>Statement</I>
+ is any simple or compound statement.  First, <I>ExpressionList</I>
+ is evaluated and tested.  If more than one 
+expression is given, they are evaluated from left to right and 
+the right-most expression is tested.  If the result is true 
+(non-zero), then the first (or only) statement is executed and 
+the one following the keyword <B>else</B> (if present) is 
+skipped.  If it is false (zero), the first statement is skipped 
+and the second (if present) is executed.  For example, the statement <P>
+
+<PRE>		if (ch) {
+			putchar(ch);
+			++i;
+			}
+		else return (i);<P>
+</PRE>
+tests <B>ch</B>.  If it is not zero,<B> putchar()</B> 
+(<a href="../chap12/chap12.htm">Chapter 12</a>) writes it to the standard output file and <B>i</B> 
+is incremented; otherwise, the value of <B>i</B> is returned to 
+the calling function.  <P>
+
+<B> The Switch Statement<P></B>
+
+<B>Switch</B> statements provide a non-iterative choice 
+between any number of paths based on specified conditions.  They 
+compare an expression to a set of constant values.  Selected 
+statements are then executed depending on which value, if any, 
+matches the expression.  <B>Switch</B> statements have the form <P>
+
+<PRE>		switch ( <I>ExpressionList</I> ) { <I>Statement?...</I>}<P>
+</PRE>
+
+where <I>ExpressionList</I> is a list of one or more 
+expressions.  <I>Statement?...</I> represents the statements to 
+be selected for execution.  They are selected by means of <B>case
+</B> and <B>default</B> prefixes--special labels that are used 
+only within  <B>switch</B> statements.  These prefixes locate 
+points to which control jumps depending on the value of <I>
+ExpressionList</I>.  They are to the <B>switch</B> statement what 
+ordinary labels are to the <B>goto</B> statement.  They may occur 
+only within the braces that delimit the body of a <B>switch</B> 
+statement. <P>
+
+The <B>case</B> prefix has the form <P>
+
+<PRE>		case <I>ConstantExpression</I> : <P>
+</PRE>
+
+and the <B>default</B> prefix has the form <P>
+
+<PRE>		default: <P>
+</PRE>
+
+The terminating colons are required; they heighten the analogy to 
+ordinary statement labels.  Any expression involving only numeric 
+and character constants and operators is valid in the <B>case</B> 
+prefix. <P>
+
+After evaluating <I>ExpressionList</I>, a search is made for the 
+first matching <B>case</B> prefix.  Control then goes directly to 
+that point and proceeds normally from there.  Other <B>case</B> 
+prefixes and the <B>default</B> prefix have no effect once a 
+<B>case</B> has been selected; control flows through them just as 
+though they were not even there.  If no matching <B>case</B> is 
+found, control goes to the <B>default</B> prefix, if there is 
+one.  In the absence of a <B>default</B> prefix, the entire 
+compound statement is ignored and control resumes with whatever 
+follows the <B>switch</B> statement.  Only one <B>default</B> 
+prefix may be used with each <B>switch</B>.  Full C compilers 
+reject multiple <B>case</B> prefixes with the same value; 
+however, Small C accepts them but effectively sees only the first 
+one.<P>
+
+If it is not desirable to have control proceed from the selected 
+prefix all the way to the end of the <B>switch</B> block, <B>break</B> 
+statements may be used to exit the block.  <B>Break</B> 
+statements have the form <P>
+
+<PRE>		break; <P>
+</PRE>
+
+Some examples may help clarify these ideas.  The statement <P>
+
+<PRE>		switch (ch) {
+			case 'Y':
+			case 'y': cptr = &quot;yes&quot;;
+				 break;
+			case 'N':
+			case 'n': cptr = &quot;no&quot;;
+				 break;
+			default: cptr = &quot;error&quot;;
+			}<P>
+</PRE>
+
+tests <B>ch</B>.  If it equals<B> 'Y'</B> or <B>'y'</B> the 
+character pointer <B>cptr</B> is set to the address of a string 
+containing <B>&quot;yes&quot;</B> and control exits the <B>switch
+</B> block.  If it equals<B> </B><B>'N'</B> or <B>'n'</B> then <B>
+cptr</B> is set to the address of a string containing 
+<B>&quot;no&quot;</B> and control exits from the block.  Those cases 
+failing, <B>cptr</B> is set to the address of a string containing 
+<B>&quot;error&quot;</B> and control exits through the end of 
+the block. <P>
+
+The statement<P>
+
+<PRE>		switch (i) {
+			default: putchar ('a');
+			case 2: putchar ('b');
+			case 3: putchar ('c');
+			}<P>
+</PRE>
+tests <B>i</B> for values <B>2</B> and <B>3</B>.  Those failing, 
+the characters <B>abc</B> are written to the standard output 
+file.  If <B>i</B> is <B>2</B> then just <B>bc</B> is written; 
+and if it is <B>3</B> then only <B>c</B> is written. <P>
+
+The body of the <B>switch</B> is not a normal compound statement 
+since local declarations are not allowed in it or in subordinate 
+blocks.  This restriction enforces the Small C rule that a block 
+containing declarations must be entered through its leading 
+brace.  <P>
+
+<B> The While Statement<P></B>
+
+The <B>while</B> statement is one of three statements that 
+determine the repeated execution of a controlled statement.  This 
+statement alone is sufficient for all loop control needs.  In 
+fact it was the only such statement supported by the original 
+Small C compiler.  The other two merely provide an improved 
+syntax and an execute-first feature.  <B>While</B> statements 
+have the form <P>
+
+<PRE>		while ( <I>ExpressionList</I> ) <I>Statement</I><P>
+</PRE>
+
+where <I>ExpressionList</I> is a list of one or more expressions 
+and <I>Statement</I> is an simple or compound statement.  If more 
+than one expression is given, the right-most expression yields 
+the value to be tested.  First, <I>ExpressionList</I> is 
+evaluated.  If it yields true (non-zero), then <I>Statement</I> 
+is executed and <I>ExpressionList</I> is evaluated again.  As 
+long as it yields true, <I>Statement</I> executes repeatedly.  
+When it yields false, <I>Statement</I> is skipped, and control 
+continues with whatever follows. <P>
+
+In the example <P>
+
+<PRE>		i = 5;
+		while (i) array[--i] = 0;<P>
+</PRE>
+
+elements 0 through 4 of <B>array[ ]</B> are set to zero.  First 
+<B>i</B> is set to <B>5</B>.  Then as long as it is not zero, the 
+assignment statement is executed.  With each execution <B>i</B> 
+is decremented before being used as a subscript. <P>
+
+It is common to see <B>while</B> statements where the statement 
+being controlled is null and all of the work is done in the 
+expression being tested.  In the statement <P>
+
+<PRE>		while (*dest++ = *sour++) ;<P>
+</PRE>
+
+<B>dest</B> and <B>sour</B> are pointers.  With every iteration, 
+the object at <B>sour</B> is obtained (before incrementing <B>
+sour</B>) and is then assigned to the object at <B>dest</B> 
+(before incrementing <B>dest</B>).  Since the assignment operator 
+yields the value assigned, that becomes the value of the 
+expression in parentheses.  If it is not zero, the null statement 
+executes (doing nothing) and another evaluation is performed.  
+The process repeats until a value of zero has been assigned.  
+This illustrates how strings in C are usually copied. <P>
+
+Two other statements are handy for use with the <B>while</B> (or 
+any loop controlling) statement when it controls a compound 
+statement.  The <B>continue</B> statement has the form <P>
+
+<PRE>		continue; <P>
+</PRE>
+
+It causes control to jump directly back to the top of the 
+loop for the next evaluation of the controlling expression.  If 
+loop controlling statements are nested, then <B>continue</B> 
+affects only the innermost surrounding statement.  That is, the 
+innermost loop statement containing the <B>continue</B> is the 
+one that starts its next iteration. <P>
+
+The <B>break</B> statement (described earlier) may also be used 
+to break out of loops.  It causes control to pass on to whatever 
+follows the loop controlling statement.  If <B>while</B> (or any 
+<B>loop</B> or <B>switch</B>) statements are nested, then  <B>break</B> 
+affects only the innermost statement containing the <B>break</B>.
+That is, it exits only one level of nesting. <P>
+
+It is not uncommon to see <B>while</B> statements such as <P>
+
+<PRE>		while (1) {
+			...
+			if(...) break;
+			...
+			}<P>
+</PRE>
+Notice that the expression is always true.  When a specific 
+condition arises, control breaks out of the loop.  This is the 
+usual way out of such a loop.  Of course, the program could use a 
+<B>goto</B> or a <B>return</B> statement (below), or it could 
+terminate execution by calling the <B>exit()</B> or<B> </B>
+<B>abort()</B> (<a href="../chap12/chap12.htm">Chapter 12</a>).  <P>
+
+<B> The For Statement<P>
+</B>
+The <B>for</B> statement also controls loops.  It is really 
+just an embellished <B>while</B> in which the three 
+operations normally performed on loop-control variables 
+(initialize, test, and modify) are brought together 
+syntactically.  It has the form <P>
+
+<PRE>		for ( <I>ExpressionList?</I> ;
+			<I>ExpressionList?</I> ;
+			<I>ExpressionList?</I> ) <I>Statement</I>
+</PRE>
+<P>
+
+<B>For</B> statements are performed in the following steps: <P>
+<OL>
+<LI>The first ExpressionList is evaluated.  This is 
+done only once to initialize the control variable(s).  
+<LI>The second ExpressionList is 
+evaluated to determine whether or not to perform Statement.  If 
+more than one expression is given, the right-most expression 
+yields the value to be tested.  If it yields false (zero), 
+control passes on to whatever follows the for statement.  But, if 
+it yields true (non-zero), Statement executes.
+<LI>The third ExpressionList is then evaluated to adjust 
+the control variable(s) for the next pass, and the process goes 
+back to step 2. 
+</OL>
+
+The example given previously, in which a five-element array 
+is set to zero, could be written as <P>
+
+<PRE>		for (i = 4; i &gt;= 0; --i) array[i] = 0; <P>
+</PRE>
+
+or a little more efficiently as <P>
+
+<PRE>		for (i = 5; i; array[--i] = 0) ; <P>
+</PRE>
+
+Any of the three expression lists may be omitted, but the 
+semicolon separators must be kept.  If the test expression is 
+absent, the result is always true.  Thus <P>
+
+<PRE>		for (;;) {...break;...} <P>
+</PRE>
+
+will execute until the <B>break</B> is encountered.  This syntax 
+is not as desirable as <B>while(1)...</B>, however, since Small C 
+implements <B>for</B> statements with more hidden jumps than <B>
+while</B> statements (<a href="../chap19/chap19.htm">Chapter 19</a>). <P>
+
+As with the <B>while</B> statement, <B>break</B> and <B>continue</B> 
+statements may be used with equivalent effects.  A <B>break</B>
+ statement makes control jump directly to whatever follows 
+the <B>for</B> statement.  And a <B>continue</B> skips whatever 
+remains in the controlled block so that the third <I>ExpressionList</I> 
+is evaluated, after which the second one is 
+evaluated and tested.  In other words, a <B>continue</B> has the 
+same effect as transferring control directly to the end of the 
+block controlled by the <B>for</B>.  <P>
+
+<B> The Do Statement<P></B>
+
+The<B> do</B> statement is the third loop controlling 
+statement in C.  It is really just an execute-first <B>while</B> 
+statement.  It has the form <P>
+
+<PRE>		do <I>Statement</I> while ( <I>ExpressionList</I> ) ;<P>
+</PRE>
+
+<I>Statement</I> is any simple or compound statement.  The <B>
+do</B> statement executes in the following steps: <P>
+
+<OL>
+<LI>Statement is executed.     
+<LI>Then, ExpressionList is evaluated and tested.  If more 
+than one expression is given, the right most expression yields 
+the value to be tested.  If it yields true (non-zero), control 
+goes back to step 1; otherwise, it goes on to whatever follows. <p>
+</OL>
+
+As with the <B>while</B> and <B>for</B> statements, <B>break</B>
+ and <B>continue</B> statements may be used.  In this case, a 
+<B>continue</B> causes control to proceed directly down to the 
+<B>while</B> part of the statement for another test of 
+ExpressionList.  A <B>break </B>makes control exit to whatever 
+follows the do statement. <P>
+
+The example of the five-element array could be written as <P>
+
+<PRE>		i = 4;
+		do {array[i] = 0; --i;} while (i &gt;= 0); <P>
+</PRE>
+or as 
+<PRE>		i = 4;
+		do array[i--] = 0; while (i &gt;= 0); <P>
+</PRE>
+
+or as 
+<PRE>		i = 5;
+		do array[--i] = 0; while (i); <P>
+</PRE>
+
+<B> The Return Statement<P></B>
+
+The <B>return</B> statement is used within a function to 
+return control to the caller.  <B>Return</B> statements are not 
+always required since reaching the end of a function always 
+implies a return.  But they are required when it becomes 
+necessary to return from interior points within a function or 
+when a useful value is to be returned to the caller.
+<B>Return</B> statements have the form <P>
+
+<PRE>		return <I>ExpressionList?</I> ; <P>
+</PRE>
+
+<I>ExpressionList?</I> is an optional list of expressions.  If 
+present, the last expression determines the value to be returned 
+by the function.  I f absent, the returned value is 
+unpredictable.  <P>
+
+<B> Missing Statements<P></B>
+It may be surprising that nothing was said about 
+input/output, program control, or memory management statements.  
+The reason is that such statements do not exist in the C language 
+proper. <P>
+
+In the interest of portability these services have been relegated 
+to a set of standard functions in the run-time library.  Since 
+they depend so heavily on the run-time environment, removing them 
+from the language eliminates a major source of compatibility 
+problems.  Each implementation of C has its own library of 
+standard functions which perform these operations.  Since 
+different compilers have libraries that are pretty much 
+functionally equivalent, programs have very few problems when 
+they are compiled by different compilers.  
+<a href="../chap12/chap12.htm">Chapter 12</a> describes the standard functions of the Small C compiler. <P>
+<P>
+<CENTER>Go to <a href="../chap11/chap11.htm">Chapter 11</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

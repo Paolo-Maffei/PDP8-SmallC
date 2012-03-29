@@ -1,0 +1,347 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 27:<P>
+OPTIMIZING<P></H1></B>
+</CENTER>
+
+We now come to the most refined part of the compiler, its peephole optimizer.  The original compiler (by Ron Cain in 1980) did not incorporate optimizing.  When I upgraded it to version 2.0 (under NorthStar DOS then CP/M) I added the staging buffer and a rudimentary peephole optimizer.  At that time, the buffer held ASCII assembly code (p-codes were not used) and<B> streq()</B> was used repeatedly in a long string of <B>if...else if...  </B>statements to search for cases to optimize.<P>
+
+Later, when Russ Nelson at Clarkson College ported that compiler to MS-DOS, he introduced p-codes and made appropriate changes throughout the compiler, including the optimizer.  The result was more efficient optimizer testing, but the original if...else if... structure remained.  Furthermore, since every case was unique and the optimizations directly altered the staging buffer, the code was very obscure.<P>
+
+In my own MS-DOS implementation, based on Nelson's work, I replaced that structure with a large switch statement to reduce the compiler's size and make the testing faster still.<P>
+
+Finally, with the release of version 2.2, I completely rewrote the optimizer.  The result is easy to understand, is generalized so that changes can be made without revising procedural code, and is smaller than ever.  The incremental cost per optimization now is simply (1) a small integer array and (2) a single assignment statement.  As a consequence, much more optimizing is now being done.<P>
+
+Small C performs optimizing activities both in the expression analyzer and in the back end.  We saw in Chapter 26 that the analyzer lead-in function<B> test()</B> optimized tests against the value zero.  Also, we saw that constant (sub)expressions were evaluated at compile time, rather than run time, and loaded with a single instruction.  Also, subscripting by zero resulted in the total elimination of the subscripting code.<P>
+
+In this chapter, we deal with the peephole optimizer in the compiler's back end.  It's purpose is to scrutinize the staging buffer as it is being dumped to the output file.  On finding cases of inefficient code, it makes revisions before passing the code on for translation and output.<P>
+
+Mature optimizing compilers do much more optimizing than Small C.  The main difference is that they optimize the whole program, whereas Small C only optimizes expressions.  At first this may seem very limiting; but when we consider what a large part of any C program expressions account for, then it becomes apparent that optimizing just expressions can pay off handsomely.  Essentially, all that is not covered is the &quot;flow of control&quot; code--the &quot;glue&quot; that holds the expressions together.<P>
+
+Now, before going into the optimizer proper, we look first at its data structures.  Having done that, without even looking at its functions, we will fully understand what the optimizer does and how to make it do other things as well. <P>
+
+<B>Optimizer Data Structures<P>
+</B>
+
+<CENTER><B> The Staging Buffer<P>
+</CENTER></B>
+
+Since the peephole optimizer reads and modifies the staging buffer, it is essential for us to have a clear picture of what that buffer contains.  Essentially, the staging buffer is just an array of integers.  Several global pointers address it.  <B>Stage</B> points to the first word of the buffer.  <B>Snext</B> is used in two ways.  When code is being generated in the buffer, it points to the next available entry; that is, the one beyond the last one made.  When the buffer is being optimized,
+ translated, and dumped to the output file, <B>snext</B> is reset to the start of the buffer, and thereafter steps forward as each p-code is processed.  <B>Stail</B> is used to mark the end of data in the buffer while optimizing, translating, and output are being performed.  Finally, <B>slast</B> marks the physical end of the buffer for overflow detection.<P>
+
+Each entry in the buffer consists of two words--a p-code and a value associated with it.  Not every p-code uses its value, but every p-code has one.  Each p-code is a small integer value which uniquely identifies an assembly language string by acting as a subscript into an array of string pointers (<B>code[]</B>).<P>
+
+<CENTER><B> The Code[] Array<P>
+</CENTER></B>
+
+We have already seen the <B>code[]</B> array in <a href="../chap21/chap21.htm">Chapter 21</a>.  Table 21-4 lists the p-code subscripts into <B>code[] </B>and the translation strings to which the designated elements point.  We covered the translation process in that chapter; but, since it pertained to optimizing, we postponed the discussion of the first byte of each string until now.<P>
+
+The first byte of each translation string, which we shall call the p-code's property byte, is written as an octal escape sequence.  The reason is to make its division into bit fields more obvious.  The purpose of this byte is to supply the optimizer with information about the p-codes that enters into its decision making process.  Six questions are answered by each property byte; they are:<P>
+
+<OL>
+<LI> does the p-code generate a commutative operation?
+<LI> does the p-code push something onto the stack?
+<LI> does the p-code use the primary register?
+<LI> does the p-code destroy the primary register?
+<LI> does the p-code use the secondary register?
+<LI> does the p-code destroy the secondary register?<p>
+</OL>
+
+The encoding of this information is illustrated in Figure 27-1.  The named condition is true when the corresponding bit is set to one.<P>
+
+<CENTER>
+<img src="fg27-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 27-1: P-code Property Byte<P>
+</CENTER></B><P>
+
+To provide access to these bits, six masks, as revealed in Table 27-1, are defined in file <B>CC4.C</B>.<P>
+
+<CENTER>
+<img src="tb27-1.gif">
+</CENTER>
+<CENTER><B>Table 27-1: Masks for Decoding P-code Property Bytes<P>
+</CENTER></B>
+
+One of the first two masks is used in combination with (bitwise AND) one of the second two (and the property byte) to determine the effects of a p-code on one or the other of the registers.  This arrangement permits<B> isfree()</B> to be written independently of the register whose availability it tests.  The last two are directly ANDed with the property byte to determine a p-code's stack and commutation properties. <P>
+
+<CENTER><B> The Seq##[] Arrays<P>
+</CENTER></B>
+
+<B>CC4.C</B> contains declarations for about 50 initialized integer arrays bearing the name <B>seq##</B>, where <B>##</B> is a sequence number that distinguishes between the arrays.  Each array specifies a single optimization case by supplying two kinds of information--(1) a sequence of p-codes to be optimized and (2) a sequence of instructions to the optimizer telling it exactly what to do.  In addition, the first word of each array serves as a counter for the number of 
+times the optimization was applied during the compile run.<P>
+
+Recall from Chapter 21 that if <B>CC4.C</B> is compiled with the symbol <B>DISOPT</B> defined, then, at the end of the run, the compiler displays optimization frequency figures for use in determining whether or not a given optimization is being used enough to make it worth having in the compiler.  Naturally, this would only be done in interim versions of the compiler, while performing optimizer development.  Whether or not the counts are displayed, the optimizer accumulates them in the first word of these
+ arrays.<P>
+
+After the frequency counter, each <B>seq##[]</B> array is partitioned into two parts--a recognition pattern followed by a set of optimizing instructions.  Each partition is terminated with a word containing zero.<P>
+
+Each word in a recognition pattern corresponds to an entry (two words) in the staging buffer, beginning at the present value of <B>snext</B>.  For the most part, these patterns contain specific p-codes.  For example, one array begins with<P>
+
+<PRE>		0,POINT1m,GETw2n,ADD12,MOVE21,0,<P>
+</PRE>
+
+The leading zero is the frequency counter.  Following that is a pattern of four p-codes terminated by zero.  When the optimizer sees this pattern of p-codes, at <B>snext</B> in the buffer, it looks beyond the terminating zero for instructions.<P>
+
+As we have noted, in matching a pattern to the staging buffer, the optimizer begins at the entry indicated by <B>snext</B>.  Thereafter, it advances one word in the pattern for two words in the staging buffer.  In each case, the current word in the recognition pattern is compared to the first (p-code) word in the current buffer entry.  The p-code's value does not enter into the matching process.<P>
+
+Besides actual p-codes, the recognition pattern may also contain what, for lack of a better word, we shall call metacodes.  These are special codes (that never occur in the buffer) which direct the optimizer to inspect the buffer for specific conditions.  These metacodes are defined symbolically in <B>CC4.C</B> where they are given large values which cannot conflict with genuine p-codes.  These recognition metacodes are described below: <P>
+
+<B>any<P>
+</B>
+
+This metacode matches any p-code in the staging buffer.  Think of it as a &quot;wild card.&quot;<P>
+
+<B>_pop<P>
+</B>
+
+This metacode instructs the optimizer to look ahead in the staging buffer for a <B>POP2</B> that matches the current stack level.  To ensure that the correct pop is found, the optimizer must overlook as many pops as pushes it finds along the way.  Failure to find the pop is considered a mismatch. <P>
+
+<B>pfree<P>
+</B>
+
+This metacode has the optimizer verify that, at the current point in the buffer, the primary register is free.  It is considered to be free if its value is not used by any p-code before it gets zapped by a p-code.  It is also considered to be free if it is not used before the end of the buffer is reached and the value of the expression is immaterial to the program--as when the expression stands alone as a statement in its own right.  This metacode matches only if the primary register is free. <P>
+
+<B>sfree<P>
+</B>
+
+This metacode has the optimizer verify that, at the current point in the buffer, the secondary register is free.  It is considered to be free if its value is not used by any p-code before it gets zapped by a p-code.  It is also considered to be free if it is not used before the end of the buffer is reached.  The context of the expression is not important because the value of the expression is returned in the primary register, not the secondary register.  This metacode matches only if the 
+secondary register is free. <P>
+
+<B>comm<P>
+</B>
+
+This metacode matches only if the current p-code in the staging buffer has the commutative property.  In other words, the p-code performs a binary operation and it does not matter which register (primary or secondary) the operands are in.<P>
+
+The second part of each <B>seq##[]</B> array, the optimizing instructions, tells the optimizer what actions to take in revising the staging buffer.  As with the recognition part, this part is terminated by a word containing zero.  Also like the preceding part, the elements of this part of the array consist of either actual p-codes or metacodes.  The difference is that, in this case, the optimizer is writing to the staging buffer rather than reading it.<P>
+
+It is important here to understand how <B>snext</B> is used during this phase of the optimizing process.  We said earlier that, after evaluating an expression, <B>snext</B> is reset to the beginning of the staging buffer, from which it advances to each p-code, designating it for translation and output.  Before processing each p-code, however,<B> dumpstage()</B> enters a loop in which it calls<B> peep()</B> once for each <B>seq##[]</B> array.  <B>Peep()</B> attempts to apply the 
+specified <B>seq##[]</B> array to the staging buffer at the point designated by <B>snext</B>.  The important thing here is that when<B> peep()</B> receives control, <B>snext</B> points to the current entry in the buffer.  All preceding entries have been processed (translated and output), and all following entries have yet to be processed.  It follows that the manner in which<B> peep()</B> manipulates <B>snext</B> is crucial.<P>
+
+This brings us to a very important difference between the recognition and optimization phases of<B> peep()</B>.  In the first phase <B>snext</B> is not changed.  However, in the second phase, if the new code sequence is shorter than the original, <B>snext</B> is advanced to account for the difference.  More specifically, the forward most part of the original code sequence is revised and <B>snext</B> is repositioned to the beginning of the revised sequence, bypassing the unused p-codes at the rear of 
+the original sequence.  To summarize this concept,<B> peep()</B> adjusts <B>snext</B> during its optimization phase, and further processing resumes from that point.<P>
+
+Finally, it should be understood that, after applying an optimization, the optimization loop in<B> dumpstage()</B> is restarted from the beginning at the current setting of <B>snext</B>.  That is, after each successful optimization, all of the optimizations are attempted once again on the chance that the revised sequence can be further optimized.<P>
+
+Another difference between the recognition and optimization parts of the <B>seq##[]</B> arrays is that, in the latter part, each metacode is divided into two bytes--a high order code byte and a low order value byte.  We shall define these metacodes and their values momentarily.<P>
+
+P-codes are distinguished from metacodes by the fact that the high order byte is always zero for a p-code, but never for a metacode.  As an instruction, a p-code tells the optimizer to write the p-code itself into the current buffer entry (as designated by <B>snext</B>).<P>
+
+On the other hand, a metacode may tell the optimizer to take any of several different actions.  The optimization metacodes are defined in <B>CC4.C</B> as indicated in Table 27-2.<P>
+
+<CENTER>
+<img src="tb27-2.gif">
+</CENTER>
+<CENTER><B>Table 27-2: Optimization Metacodes<P>
+</CENTER></B>
+
+Notice that in each case the non-zero part of the code is in the high order byte of a constant word.  This reserves the low order byte for a value that can be combined with the code by writing something like <B>go|2</B> which yields <B>0x0102</B>.  As it turns out, we must be able to combine metacodes with negative values also.  But writing <B>go|-2</B> would overwrite the high order byte with ones (the extended sign bit).  So, to facilitate the writing of negative values, the symbols <B>m1</B>, <B>m2</B>, <B>m3</B>, and <B>m4</B> are defined in <B>CC4.C</B> as <B>0x00FF</B>, <B>0x00FE</B>, <B>0x00FD</B>, and <B>0x00FC</B> respectively.  Now, writing <B>go|m2</B> will yield <B>0x01FE</B> which preserves the code byte.  It follows, that when<B> peep()</B> accesses the value byte, it must do it with sign extension; otherwise, it would see a positive number in all cases.  Only four negative values are defined, only four are needed.<P>
+
+Finally, since it seemed offensive to write positive values directly and negative values symbolically, an additional set of four positive symbols (<B>p1</B>, <B>p2</B>, <B>p3</B>, and <B>p4</B>) was defined to provide symmetry.<P>
+
+As we look through the <B>seq##[]</B> arrays, we shall see numerous examples of optimization metacodes, all written with the | operator, and many with these minus and positive symbolic constants.  In the descriptions which follow, the symbol <B>n</B> refers to these minus or positive values.<P>
+
+The optimization metacodes are:<P>
+
+<B>go<P>
+</B>
+
+This code tells<B> peep()</B> to adjust <B>snext</B> (the current position in the staging buffer) relative to its current value.  Thus, <B>go|p3</B> moves it ahead (the positive direction) by three entries.  Since each entry consists of two words, <B>snext</B> is actually incremented by six.  Furthermore, since it is a word pointer, the compiler ensures that it gets incremented by twice that amount.  Conversely, <B>go|m2</B> adjusts <B>snext</B> backward by two entries.  The 
+value of <B>snext</B> is important for two reasons.  First, all of the other metacodes use it as a reference point.  And, as we saw, the final value of <B>snext</B> when<B> peep()</B> is finished, determines where further optimizing and output processing resumes. <P>
+
+<B>gc<P>
+</B>
+
+This code gets the code from the buffer entry <B>n</B> entries away and copies it into the current entry.  In other words, it fetches the p-code from the designated buffer entry into the current entry.  Thus,<B> gc|m3</B> copies the p-code from three entries back over the current p-code. <P>
+
+<B>gv<P>
+</B>
+
+This code gets the value from the buffer entry <B>n</B> entries away and copies it into the current entry.  In other words, it fetches the value from the designated buffer entry into the current entry.  Thus, <B>gv|p2</B> copies the value from two entries ahead over the current value. <P>
+
+<B>sum<P>
+</B>
+
+This code calculates the sum of the current entry's value and the one <B>n</B> entries away.  The result replaces the original value of the current entry.  Thus, <B>sum|m1</B> tells<B> peep()</B> to add the value from one entry back to the value of the current entry. <P>
+
+<B>neg<P>
+</B>
+
+This code tells<B> peep()</B> to arithmetically negate the value in the current entry of the staging buffer.  Thus, the value in the current entry is replaced by its two's complement. <P>
+
+<B>ife<P>
+</B>
+
+This code and the next one give<B> peep()</B> some decision making ability, based on the value of the current entry.  In this case, if the value equals <B>n</B> then the following metacodes are performed until a zero code is found.  At that point, optimizing ceases, and the remainder of the array is ignored.  However, if the value does not equal <B>n</B>, then the following metacodes are bypassed until a zero code is found, and optimizing resumes with the following metacode.  Thus the sequence, <P>
+
+<PRE>		ife|0, go|p1, 0, go|p2, ...<P>
+</PRE>
+
+would test the value of the current staging buffer entry for zero.  If it is zero, then <B>go|p1</B> is performed, moving the current position one entry forward, and optimizing ceases.  Otherwise, metacodes are skipped until the next zero, after which <B>go|p2</B> and whatever follows is performed.  If ife is used at the end of the <B>seq##[]</B> array, then two zero words must terminate the array.  For example, <P>
+
+<PRE>		ife|p2, go|m1, 0, 0<P>
+</PRE>
+
+illustrates the proper termination of such an array. <P>
+
+<B>ifl<P>
+</B>
+
+This code tells<B> peep()</B> to test the value of the current entry for less than, <B>n</B>.  If it is, then the following metacodes are performed until a zero code is found.  At that point, optimizing ceases, and the remainder of the array is ignored.  However, if the value is greater than or equal to <B>n</B> then the following metacodes are bypassed until a zero code is found.  <B>Peep()</B> then resumes with the following metacode.  Thus, the sequence,<P>
+
+<PRE>		ifl|m1, go|p1, 0, go|p2, ...<P>
+</PRE>
+
+would test the value of the current staging buffer entry for -2, -3, and so on.  If true, <B>go|p1</B> is performed and optimizing ceases.  Otherwise, <B>go|p2</B> and whatever follows is performed.  If ifl is used at the end of the <B>seq##[]</B> array, then two zero words must terminate the array.<P>
+
+<B>swv<P>
+</B>
+
+This code tells<B> peep()</B> to swap values between the current entry and the one <B>n</B> entries away. <P>
+
+<B>topop<P>
+</B>
+
+This code should be read to pop (not top op).  It must be used in conjunction with a <B>_pop</B> metacode in the recognition phase.  In that case, when<B> peep()</B> sees this code, it has already located a <B>POP2</B> somewhere ahead in the buffer.  The purpose of this instruction is to convert that <B>POP2</B> into a different p-code.  The idea is to replace something like <P>
+
+<PRE>		GETw1m,PUSH1,...,POP2<P>
+</PRE>
+
+with<P>
+
+<PRE>		...,GETw2m<P>
+</PRE>
+
+To accomplish this, it is necessary not only to change the p-code of the <B>POP2</B> to <B>GETw2m</B>; but, since the value with the <B>GETw1m</B> designates a label number, then that same label number must be associated with the new <B>GETw2m</B>.  Therefore, topop assigns an arbitrary p-code (specified by <B>n</B>) to the <B>POP2</B> that <B>_pop</B> found, and also moves the value of the current entry to that same entry.  Thus, <P>
+
+<PRE>		POINT1s, PUSH1, pfree, _pop, 0,
+		topop|POINT2s, go|p2, 0<P>
+</PRE>
+
+has the following effect.  First, if the staging buffer (beginning at <B>snext</B>) contains <B>POINT1s</B> followed by <B>PUSH1</B>, if the value in the primary register (as established by <B>POINT1s</B>) is not used, and if there is a <B>POP2</B> (corresponding to this <B>PUSH1</B>) somewhere ahead in the buffer, then the optimizing is performed.  In that case, <B>POINT2s</B> replaces the original <B>POP2</B> (wherever it is) and the value of the current entry (<B>POINT1s</B> since <B>snext</B> has 
+not yet been adjusted) is also copied to that same entry.  Finally, <B>snext</B> is moved two entries forward to bypass <B>POINT1s</B> and <B>PUSH1</B>.<P>
+
+It should be clear that the <B>seq##[]</B> arrays actually contain an optimizing language which<B> peep()</B> interprets.  It is this feature that gives<B> peep()</B> its generality and allows us to understand its behavior without knowing its logic.  Adding other optimizing cases is essentially just a matter of creating additional <B>seq##[]</B> arrays.<P>
+
+There is nothing sacred about the particular metacodes in this language.  They simply represent facilities that are sufficient to do the kind of things that are currently being done.  Should we need other facilities in the future, then the language can be extended by defining other metacodes and revising<B> peep()</B> to recognize them.  As we shall see, that is quite easy to do.  But, even with its present capabilities, this language is sufficient for most of the additional optimizing we may wish to do.<P>
+
+At this point, we should be able to interpret the <B>seq##[]</B> arrays without even looking at<B> peep()</B>.  Consider the following case:<P>
+
+<PRE>		ADD1n, 0,
+		ifl|m2, 0, ifl|0, rDEC1, neg, 0, ifl|p3, rINC1, 0, 0<P>
+</PRE>
+
+<B>ADD1n</B> adds the constant value associated with the p-code to the primary register.  The idea here is to replace this three-byte instruction with one or two single-byte instructions.  First, if the constant is less than -2, nothing is done.  That failing, if it is less than 0, then it must be -1 or -2.  In that case, <B>rDEC1</B> replaces <B>ADD1n</B> and the constant is converted to a positive value.  The result is one or two <B>DEC AX</B> instructions.  That failing, if the constant is 
+less than +3, then it must be 0, 1, or 2.  Zero is not possible because the analyzer never generates that case.  Therefore, <B>ADD1n</B> is replaced by <B>rINC1</B> which produces one or two <B>INC AX</B> instructions. <P>
+
+<CENTER><B> The Seq[] Array<P>
+</CENTER></B>
+
+Now we begin to see how the optimizer actually works.  First, however, we must be introduced to the array <B>seq[]</B>.  The purpose of this array is to help<B> dumpstage()</B> direct<B> peep()</B> to the individual <B>seq##[]</B> arrays.  <B>Seq[]</B> is an integer array with an element for each <B>seq##[]</B> array.  Each element contains a pointer to an <B>seq##[]</B> array.  <B>Seq[1]</B> points to <B>seq01[]</B>, <B>seq[2]</B> points to <B>seq02[]</B>, and so on.  <B>Seq[]</B> is defined
+ in <B>CC4.C</B> immediately before<B> setseq()</B> which initializes it at the beginning of the run.  Just before the definition of <B>seq[]</B> the symbolic constant <B>HIGH_SEQ</B> is defined.  Its purpose is to determine the number of elements in <B>seq[]</B> (<B>HIGH_SEQ + 1</B>), and to give<B> dumpstage()</B> the last subscript to be used in <B>seq[]</B> (<B>HIGH_SEQ</B>).<P>
+
+<B>Revising the Optimizer<P>
+</B>
+
+The purpose in grouping these definitions in front of <B>setseq()</B> and behind the <B>seq##[]</B> arrays is to localize in the source files everything that needs to be changed when optimizations are added or deleted.<P>
+Adding an optimization involves three steps:   <P>
+
+<OL>
+<LI> Add a new seq##[] array, giving it the next available number in the sequence.
+<LI> Increase HIGH_SEQ by one to account for the new array.
+<LI> Add an assignment to setseq() for the new array.<p>
+</OL>
+
+Removing an optimization involves four steps.  They are:<P>
+
+<OL>
+<LI> Delete the seq##[] array for the optimization in question.
+<LI> Renumber the following seq##[] arrays to close gap.
+<LI> Decrease HIGH_SEQ by one to account for the deleted array.
+<LI> Delete the last assignment from setseq().<p>
+</OL>
+
+<B>The Optimizer Functions<P>
+</B>
+
+<B>Dumpstage()<P>
+</B>
+
+When an expression has been entirely parsed,<B> clearstage()</B> is called to empty the staging buffer to the output file.  <B>Clearstage()</B> in turn calls<B> dumpstage()</B> to do the work.  <B>Dumpstage()</B> first copies <B>snext</B> to <B>stail</B> to mark the end of the data in the staging buffer.  It then copies <B>stage</B> to <B>snext</B> to initially direct processing to the beginning of the buffer.  Then it enters a loop that exits only when <B>snext</B> is no longer less than <B>stail</B>.  With each iteration, (1) an attempt is made to optimize the code sequence starting at <B>snext</B>, (2)<B> outcode()</B> is called to translate and output the p-code at <B>snext</B> (which may have been advanced because of optimizing), and (3) <B>snext</B> is advanced by two words (one entry). <P>
+ Step (1) is what we are interested in.  This involves first testing the global integer <B>optimize</B> to see whether or not optimizing is to be done in this run.  If it is, then another loop is entered which steps through <B>seq[]</B>, passing its elements to<B> peep()</B> one at a time.  With each iteration,<B> peep()</B> attempts the optimization to which it is pointed, returning true or false depending on whether or not the attempt succeeded.  If the attempt fails, then the loop 
+continues with another attempt.  But if it succeeds, then the loop is restarted from the beginning so that all of the optimizations will have a shot at the revised code.  Also, if <B>DISOPT</B> was defined when <B>CC4.C</B> was compiled, the fact that the optimization succeeded is reported on the screen.  This is especially handy when entering source code from the keyboard to test the compiler.<P>
+
+It may seem wasteful to restart the optimizer from the beginning with each successful optimization.  It would appear that the pointers in <B>seq[] </B>could be carefully arranged so that each optimization of an optimized sequence follows its predecessor.  In that way only one pass through <B>seq[]</B> would ever be needed.  But, in practice it is very difficult arrange the cases in the proper order, and it is especially time consuming to keep them in order when changes are made.  For that 
+reason, I decided to accept the inefficiency of the present arrangement (which testing has verified to be minor).  When we consider what a small part of the overall compiling process is spent in<B> dumpstage()</B> and that only a relatively small fraction of the p-codes lead to optimizations, then the cost of restarting the optimization loop appears less menacing.<P>
+
+<B>Peep()<P>
+</B>
+
+<B>Peep()</B> is the main optimizing function.  It accepts a pointer to a <B>seq##[]</B> array and attempts the indicated optimization at the point in the staging buffer designated by <B>snext</B>.  The body of this function comprises two separate loops.  The first determines whether or not the current p-code sequence matches the optimization case (the recognition phase).  The second performs the optimization if a match occurs (the optimization phase).<P>
+
+A local pointer <B>next</B> is used in place of <B>snext</B> during the recognition phase so <B>snext</B> will not be disturbed.  The<P>
+<B> seq##[]</B> pointer <B>seq</B>, being an argument, is used to step through the <B>seq##[]</B> array.  With each iteration of this loop, <B>next</B> increments by two to the next staging buffer entry and seq increments by one to the next <B>seq##[]</B> element.  The heart of the loop consists of a <B>switch</B> statement in which the current <B>seq##[]</B> element is compared to the recognition metacodes.  Failure is taken to mean that the element contains a p-code which must match 
+the current p-code in the staging buffer.  If it does not match, then false is returned to<B> dumpstage()</B> which again calls<B> peep()</B>, but for a different optimization.  If the p-codes do match, however, the pointers are advanced and the loop repeats.<P>
+
+<UL>
+<LI>If the metacode is any, then the loop simply continues, providing the end of the buffer has not been reached.
+<LI>If the metacode is pfree, then isfree() is called to make the determination.  If the primary register is found to be free, then the loop continues.
+<LI>If the metacode is sfree, then isfree() is called to make the determination.  If the secondary register is found to be free, then the loop continues. 
+<LI>If the metacode is comm, then the p-code property byte in the p-code's translation string is tested for the commutation bit.  If it commutes, the loop continues.
+<LI>Finally, if the metacode is _pop, then getpop() is called to look ahead for a POP2 at the present stack level.  On finding one, its buffer position is saved for possible use with a topop metacode, and the loop continues.<p>
+</UL>
+
+Should any of these conditions fail, however, the function immediately returns false to<B> dumpstage()</B>.  However, if the end of the recognition part of <B>seq##[]</B> is reached, then an optimizable pattern has been found, and control drops into the optimizing phase.<P>
+
+At this point, the frequency counter in <B>seq##[]</B> is incremented and the optimizing loop is initialized.  The first iteration begins with the first optimizing metacode.  Before attempting to perform the current code, a local variable <B>skip</B> is checked to see if codes are being skipped because of an unsuccessful <B>ife</B> or <B>ifl</B>.  If so, then the current code is compared to zero to determine if the end of the skipped sequence has been reached.  If it has, <B>skip</B> is 
+reset.  And, regardless, the loop is immediately continued.  Control proceeds beyond this point only if skipping is not in effect.<P>
+
+Next, the current code is tested to see if it is a p-code or a metacode.  If it is a p-code, then it is simply copied over the p-code in the current buffer entry and the loop repeats.<P>
+
+If it is a metacode then its low order byte is extracted with sign extension into a local integer <B>n</B>.  After that, a <B>switch</B> statement, identifies the metacode by looking at its upper byte.      <P>
+
+<UL>
+<LI>If the metacode is ife, then the current p-code's value in the staging buffer is compared to n.  If they differ, then skip is set true.
+<LI>If the metacode is ifl, then the current p-code's value is compared to n.  If it is not less than n, then skip is set true.
+<LI>If the metacode is go, then snext (the staging buffer's currency pointer) is adjusted by adding two times n (a signed quantity) to it.
+<LI>If the metacode is gc, then the current buffer entry's p-code is replaced by the one n entries away.
+<LI>If the metacode is gv, then the current buffer entry's value is replaced by the one n entries away.
+<LI>If the metacode is sum, then the current buffer entry's value is replaced by the sum of itself and the one n entries away.
+<LI>If the metacode is neg, then the current buffer entry's value is replaced by its two's complement.
+<LI>If the metacode is topop, then the buffer entry located previously by getpop() receives n for its p-code and the current entry's value for its value.
+<LI>Finally, if the metacode is swv, then the values of the current entry and the one n entries away are swapped. <p>        
+</UL>
+
+In each of these cases, a local variable <B>reply</B> is set true  to indicate that optimizing took place, and the loop is continued.  When the <B>seq##[]</B> array has been exhausted, <B>reply</B> is returned to<B> dumpstage()</B>.<P>
+
+<B>Isfree()<P>
+</B>
+
+<B>Isfree()</B> is a small function that decides whether or not one of the registers is free.  It receives the mask bits for the register to be tested (<B>PRI</B> or <B>SEC</B> in Table 27-1) and a p-code pointer (<B>pp</B>).  In a loop, it steps through the buffer until a determination is made or the end of the buffer is reached.  With each iteration the next p-code's property byte is tested.  If it indicates that the p-code uses the register false is returned--the register is not free for other uses.  However, if the property byte indicates that the p-code zaps the register, then original value in the register was not used and so the register is free for other uses.  In that case true is returned.  If the end of the buffer is reached, then a test is made to determine if the expression being optimized is a stand-alone statement.  If not, <B>usexpr</B> (a global variable) is true (as set by<B> doexpr()</B> ); the expression's value is needed so, if the primary register is being tested, 
+false is returned.  If the secondary register is being tested, however, true is returned.  On the other hand, if <B>usexpr</B> is false, then the value of the expression is definitely not needed, so true is returned regardless of which register is being tested.<P>
+
+<B>Getpop()<P>
+</B>
+
+<B>Getpop()</B> looks ahead in the staging buffer for a <B>POP2</B> at the current stack level.  It receives a p-code pointer <B>next</B> which it increments by two with each iteration of a loop.  A local integer <B>level</B> is initialized to zero, indicating the current stack level.  Thereafter, each push increases it by one and each pop (at any level but zero) decreases it by one.<P>
+
+With each iteration of the loop, three checks are made.  <P>
+
+<UL>
+<LI>If the end of the buffer has been reached, false is returned--no POP2 was found.
+<LI>If a POP2 is found, and if level is zero, the desired pop has been found so true is returned.  But if level is not zero, it is decremented and the loop continues.
+<LI>If an ADDSP is found, the stack is being adjusted to deallocate function arguments that were pushed earlier.  In that case, level in decreased by half the ADDSP's value--once for each word being deallocated.  Since we are in an expression, this is the only condition under which an ADDSP can be generated.<p>
+</UL>
+
+Finally, if the &quot;push&quot; property bit for the p-code is set, then the p-code involves a push instruction, and so <B>level</B> is increased. <P>
+
+<CENTER>
+Go to <a href="../chap28/chap28.htm">Chapter 28</a>   Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

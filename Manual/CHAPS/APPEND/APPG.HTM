@@ -1,0 +1,43 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>Appendix G:</B></H1><P>
+</CENTER>
+<CENTER><B><H1>Changes from Small C 2.1</B></H1><P>
+</CENTER><P>
+The most popular MS-DOS version of the Small C compiler to date is version 2.1 as distributed by M&amp;T Publishing.  With the publication of this book, however, a new version (2.2) was released.  The following material is provided to help you assess the differences and thereby determine how applicable this book may be to the compiler you may already have and whether or not to obtain a copy of the new version.<P>
+<OL>
+<LI> Several bugs have been fixed.<P>
+<UL>
+<LI>The mapping of special keystrokes obtained through the various get and read functions was not consistent with <b>poll()</b>.
+<LI><b>Scanf()</b> and <b>fscanf()</b> dropped the first character of an input field because <b>fgetc(</b>) didn't look for ungotten characters.
+<LI><b>Ispunct()</b> failed to exclude white space from the true condition.
+<LI><b>Unlink()</b> returned ERR on failure instead of EOF.
+<LI>The expression analyzer lost pointer offsets when subscripting was applied; e.g., (ptr+5)[x] would lose the offset 5.
+<LI><b>Hier2()</b> (now called <b>level2()</b> ), which processes the ?: operator, didn't group properly or yield meaningful attributes for further expression analysis.<p>
+</UL>
+
+<LI> The optimizer has been entirely rewritten for greater efficiency, maintainability, and understandability.  It now does much more optimizing.  <B>EXE</B> sizes are down by 10% typically and execution times are down by as much as 25%.<P>
+<LI> <B>Iscons()</B> was revised to call DOS only the first time for a file and remember the answer thereafter.  The effect was a DOUBLING OF I/O SPEED through the get functions.<P>
+<LI> <B>Strlen()</B> was revised to use the 8086 <B>REPNE SCASB</B> prefix/instruction for the fastest possible operation.  This sped up finding a string's length by over 5 times.<P>
+<LI> The <B>is...()</B> character classification functions have been consolidated into a single module with an array of 128 bytes which are encoded with the various attributes of the ASCII characters.  These functions now simply subscript the array and select the appropriate bit.  This approach is 3 times faster than before.<P>
+<LI> Previously-optional compiler features have been made standard.  Primarily this includes dynamic allocation of data structures and support for flow-of-control statements that were not in the original Small C compiler.<P>
+<LI> A general clean up of the source code was performed.  This involved consolidating the compiler code into just four files, reorganizing the placement of functions, renaming the p-codes in a systematic way, renaming many functions, purging unused variables, reducing the number of functions, and numerous minor code improvements.<P>
+<LI> The amount of stack space used by the expression analyzer was reduced by allocating instances of <B>lval2[]</B> (now called <B>is2[]</B>) only when actually needed.<P>
+<LI> Support for the <B>unsigned</B> <B>integer</B> and <B>character</B> data types was added.<P>
+<LI> The handling of numeric constants was revised to recognize values from 32768 to 65535 as unsigned, and treat them as such during expression analysis.<P>
+<LI> Rather than defaulting declarations with multiple modifiers (e.g., <B>*array[]</B>) to something the programmer doesn't intend, they are now rejected.<P>
+<LI> The compiler now accepts <B>void</B> before function headers as a comment.<P>
+<LI> The implementation of the <B>sizeof</B> operator was revised to work correctly.  Although undocumented, this operator was in the original MS-DOS compiler, but it was incorrectly implemented.<P>
+<LI> An argument count is now always passed to called functions--even if <B>NOCCARGC</B> is defined.  This is not very costly on 8086 family CPUs and it eliminates a lot of headaches when you call<B> printf()</B> but forget that <B>NOCCARGC</B> is defined.<P>
+<LI> Small C programs now abort with a return code of 1 for memory overflows and 2 for operator interruptions (control-C).<P>
+</OL>
+<P>
+<CENTER><P>
+Go to <a href="apph.htm">Appendix H</a>  Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

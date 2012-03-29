@@ -1,0 +1,109 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER><B><H1>Appendix F:<P></H1>
+</CENTER></B><CENTER><B><H1>Small C Error Messages<P></H1>
+</CENTER></B>
+When the compiler encounters an error condition it displays the erroneous line, an arrow pointing up to the approximate location of the error, and an explanatory error message.  If instructed by the<B> -P</B> switch, the compiler pauses, waiting for the operator to press the <B>ENTER</B> key. <P>
+Some programs may cause the compiler to overflow one of its internal buffers.  If that happens two alternatives are available: (1) recompile the compiler with more space for the offending buffer, or (2) revise the program to avoid the overflow condition. <P>
+The error messages which the compiler generates are listed below in alphabetic order with explanations.  The explanations describe the intended use of the messages.  Sometimes, however, an error message will surface because of conditions other than those anticipated by the compiler.  So the text of a message may not always be entirely appropriate to the circumstances. <P>
+The error messages are explained below:<P>
+<B>already defined<P>
+</B>A name is being declared more than once at the global level or among the formal arguments of a function. <P>
+<B>bad label<P>
+</B>A <B>goto</B> statement has an improperly formed label.  Either it does not conform to the C naming conventions or it is missing altogether. <P>
+<B>can't subscript<P>
+</B>A subscript is associated with something which is neither a pointer nor an array. <P>
+<B>cannot assign to pointer<P>
+</B>An initializer consisting of a constant or a constant expression is associated with a pointer.  Integer pointers do not take initializers and character pointers take only expression-list or string initializers. <P>
+<B>control statement nesting limit<P>
+</B>The level of nesting of any combination of <B>do</B> , for , <B>while</B>, and <B>switch</B> statements exceeds the capacity of the while queue.  This may be corrected by increasing the size of <B>WQTABSZ</B> in <B>CC.H</B>.  <B>WQTABSZ</B> is the size (in bytes) of the while queue.  It must be a multiple of <B>WQSIZ</B>. <P>
+<B>global symbol table overflow<P>
+</B>The global symbol table has overflowed.  This may be corrected by recompiling the compiler with larger values assigned to the symbols <B>NUMGLBS</B> and <B>SYMTBSZ</B> in <B>CC.H</B>.  <B>NUMGLBS</B> is the number of global entries the table will hold, and <B>SYMTBSZ</B> is the overall size (in bytes) of the combined local and global tables.  A comment in the source text explains how to calculate <B>SYMTBSZ</B>. <P>
+<B>illegal address<P>
+</B>The address operator is applied to something which is neither a variable, a pointer, nor a subscripted pointer or array name. <P>
+<B>illegal argument name<P>
+</B>A name in a function's formal argument list does not conform to the C naming conventions. <P>
+<B>illegal function or declaration<P>
+</B>The compiler found something at the global level which is not a function or object declaration. <P>
+<B>illegal symbol<P>
+</B>The compiler found a symbol which does not conform to the C naming convention. <P>
+<B>invalid expression<P>
+</B>An expression contains a primary which is neither a constant, a string, nor a valid C name.  Note that previously undeclared names (if they are correctly formed) are assumed to be function names and do not produce this error. <P>
+<B>line too long<P>
+</B>A source line, after preprocessing, is more than <B>LINEMAX</B> characters long.  This can be corrected by breaking the line into parts.  However, the compiler can be recompiled with larger values for <B>LINEMAX</B> and <B>LINESIZE</B> in <B>CC.H</B>.  Note that <B>LINESIZE</B> must be one greater than <B>LINEMAX</B>. <P>
+<B>literal queue overflow<P>
+</B>A string constant would overflow the compiler's literal pool.  The literal pool may be increased by recompiling the compiler with a larger value for <B>LITABSZ</B> in <B>CC.H</B>.  <B>LITABSZ</B> is the size of the literal buffer in bytes. <P>
+<B>local symbol table overflow<P>
+</B>A local declaration would overflow the local symbol table.  This may be corrected by recompiling the compiler with larger values for <B>NUMLOCS</B> and <B>SYMTBSZ</B> in <B>CC.H</B>.  <B>NUMLOCS</B> is the number of entries in the table, and <B>SYMTBSZ</B> is the overall size (in bytes) of the combined local and global symbol tables.  A comment in the source text shows how to calculate <B>SYMTBSZ</B>. <P>
+<B>macro name table full<P>
+</B>A <B>#define</B> command would overflow the macro name table.  The table may be expanded by recompiling the compiler with larger values for <B>MACNBR</B> in <B>CC.H</B>.  <B>MACNBR</B> is the number of names that will fit into the table. <P>
+<B>macro string queue full<P>
+</B>A <B>#define</B> command would overflow the macro string queue.  This may be resolved by recompiling the compiler with a larger value for <B>MACQSIZE</B> in <B>CC.H</B>.  <B>MACQSIZE</B> is the size of the macro-string buffer in bytes and is calculated as <B>MACNBR*7</B>.  You could increase <B>MACNBR</B> or assume more than 7 bytes per substitution string on the average.  The macro-string buffer must hold all of the replacement strings defined for the entire program being compiled. <P>
+<B>mismatched expressions<P>
+</B>The second and third expressions of a conditional operator (<I> expr1 </I><B>?</B><I> expr2 </I><B>:</B><I> expr3</I> ) are not compatible.  The compiler does not know to determine the attributes of the result. <P>
+<B>missing token<P>
+</B>The syntax requires a particular token which is missing. <P>
+<B>multiple defaults<P>
+</B>A <B>switch</B> contains more than one <B>default</B> prefix. <P>
+<B>must assign to char pointer or char array<P>
+</B>A string initializer is applied to something other than a character pointer or a character array. <P>
+<B>must be constant expression<P>
+</B>Something other than a constant expression was found where the syntax requires a constant expression. <P>
+<B>must be lvalue<P>
+</B>Something other than an lvalue is used as a receiving field in an expression.  An lvalue is an expression (possibly just a name) for a storage location in memory which may be altered.  Assigning something to a constant or an unsubscripted array name will produce this message. <P>
+<B>must be object or type<P>
+</B>The <B>sizeof</B> operator refers to something besides an object name or a type specification. <P>
+<B>must declare first in block<P>
+</B>A local declaration occurs after the first executable statement in a block. <P>
+<B>need array size<P>
+</B>A local array declaration does not specify the number of elements in the array. <P>
+<B>negative size illegal<P>
+</B>An array is dimensioned to a negative value.  Recall that constant expressions may be used as array dimensions.  Such an expression may very well evaluate to a negative value. <P>
+<B>no apostrophe<P>
+</B>A character constant lacks its terminating apostrophe. <P>
+<B>no comma<P>
+</B>An argument or declaration list lacks a separating comma. <P>
+<B>no final }<P>
+</B>The end of the input occurred while inside of a compound statement. <P>
+<B>no matching #if...<P>
+</B>An <B>#else</B> or <B>#endif</B> is not preceded by a corresponding <B>#ifdef</B> or <B>#ifndef </B>directive. <P>
+<B>no open paren<P>
+</B>An apparent function declarator lacks the left parenthesis which introduces the formal argument list. <P>
+<B>no quote<P>
+</B>A string constant lacks its terminating double quote.  This quotation mark must be on the same line as the initial quotation mark. <P>
+<B>no semicolon<P>
+</B>A semicolon does not appear where the syntax requires one. <P>
+<B>not a label<P>
+</B>The name following the keyword <B>goto</B> is defined, but not as a label. <P>
+<B>not allowed in switch<P>
+</B>A local declaration occurs within the body of a <B>switch</B> statement.  Small C disallows that possibility. <P>
+<B>not allowed with block-locals<P>
+</B>A <B>goto</B> statement occurs in a function which has local declarations in blocks below the highest level.  Small C disallows that situation. <P>
+<B>not allowed with goto<P>
+</B>A local declaration occurs in a block below the highest level in a function which contains <B>goto</B> statements.  Small C disallows that possibility. <P>
+<B>not an argument<P>
+</B>The names in a function's formal argument list do not match the corresponding type declarations. <P>
+<B>not in switch<P>
+</B>A <B>case</B> or <B>default</B> prefix occurs outside of a <B>switch</B> statement. <P>
+<B>open failure on include file<P>
+</B>An <B>#include</B> file cannot be opened. <P>
+<B>out of context<P>
+</B>A <B>break</B> statement is not located within a <B>do</B>, <B>for</B>, <B>while</B>, or <B>switch</B> statement, or a <B>continue</B> is not within a <B>do</B>, <B>for</B>, or <B>while</B> statement. <P>
+<B>staging buffer overflow<P>
+</B>The code generated by an expression exceeds the size of the staging buffer.  This can be corrected by breaking the expression into several intermediate expressions, or by recompiling the compiler with a larger <B>STAGESIZE</B> in <B>CC.H</B>.  <B>STAGESIZE</B> is the number of 4-byte entries in the staging buffer. <P>
+<B>too many cases<P>
+</B>The number of <B>case</B> prefixes in a <B>switch</B> exceeds the capacity of the switch table.  The switch table may be enlarged by assigning a larger value to <B>SWTABSZ</B> in <B>CC.H</B> and recompiling the compiler.  <B>SWTABSZ</B> is the size (in bytes) of the switch table.  It must be a multiple of <B>SWSIZ</B>. <P>
+<B>try (*...)()<P>
+</B>An argument or local declaration specifies a function, instead of a function pointer. <P>
+<B>wrong number of arguments<P>
+</B>One or more of the formal arguments in a function header was not typed before entering the function body.<P>
+<P>
+<CENTER>
+Go to <a href="appg.htm">Appendix G</a>   Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</BODY>
+</HTML>

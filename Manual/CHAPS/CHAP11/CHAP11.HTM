@@ -1,0 +1,170 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 11:<P>
+PREPROCESSOR DIRECTIVES</H1><P>
+</CENTER>
+</B>
+C compilers incorporate a preprocessing phase that alters the source code in various ways before passing it on for compiling.  Four capabilities are provided by this facility in Small C.  They are: <P>
+
+<OL>
+<LI>macro processing
+<LI>inclusion of text from other files
+<LI>conditional compiling
+<LI>in-line assembly language
+</OL>
+
+The preprocessor is controlled by directives which are not part of the C language proper.  Each directive begins with a <B>#</B> character and is written on a line by itself.  Only the preprocessor sees these directive lines since it deletes them from the code stream after processing them. <P>
+
+Depending on the compiler, the preprocessor may be a separate program or it may be integrated into the compiler itself.  Small C has an integrated preprocessor that operates at the front end of its single pass algorithm.  <P>
+
+<B>Macro Processing<P>
+
+</B>Directives of the form <P>
+
+<PRE>		#define <I>Name CharacterString?... </I><P>
+</PRE>
+
+define names which stand for arbitrary strings of text.  After such a definition, the preprocessor replaces each occurrence of <I>Name</I> (except in string constants and character constants) in the source text with <I>CharacterString?...</I>.   As Small C implements this facility, the term macro is misleading, since parameterized substitutions are not supported.  That is, <I>CharacterString?...</I> does not change from one substitution to another according to parameters provided 
+with <I>Name</I> in the source text. <P>
+
+Small C accepts macro definitions only at the global level.  It should be obvious that the term <I>definition</I>, as it relates to macros, does not carry the special meaning it has with declarations (Chapters 4-6). <P>
+
+The <I>Name</I> part of a macro definition must conform to the standard C naming conventions as described in <a href="../chap2/chap2.htm">Chapter 2</a>.  <I>CharacterString?...</I> begins with the first printable character following <I>Name</I> and continues through the last printable character of the line or until a comment is reached. <P>
+
+If <I>CharacterString?...</I> is missing, occurrences of <I>Name</I> are simply squeezed out of the text.  Name matching is based on the whole name (up to 8 characters); part of a name will not match.  Thus the directive <P>
+
+<PRE>		#define ABC 10<P>
+</PRE>
+
+will change<P>
+
+<PRE>		i = ABC;<P>
+</PRE>
+
+into<P>
+
+<PRE>		i = 10;<P>
+</PRE>
+
+but it will have no effect on<P>
+
+<PRE>		i = ABCD;<P>
+</PRE>
+
+It is customary to use uppercase letters for macro names to distinguish them from variable names. <P>
+
+Replacement is also performed on subsequent <B>#define</B> directives, so that new symbols may be defined in terms of preceding ones. <P>
+
+The most common use of <B>#define</B> directives is to give meaningful names to constants; i.e., to define so called <I>manifest constants</I>.  However, we may replace a name with anything at all, a commonly occurring expression or sequence of statements for instance.  Some people are fond of writing <P>
+
+<PRE>		#define FOREVER while(1) <P>
+</PRE>
+
+and then writing their infinite loops as <P>
+
+<PRE>		FOREVER {...}  <P>
+</PRE>
+
+<B>Conditional Compiling<P>
+
+</B>This preprocessing feature lets us designate parts of a program which may or may not be compiled depending on whether or not certain symbols have been defined.  In this way it is possible to write into a program optional features which are chosen for inclusion or exclusion by simply adding or removing <B>#define </B>directives at the beginning of the program. <P>
+
+When the preprocessor encounters <P>
+
+<PRE>		#ifdef <I>Name</I> <P>
+</PRE>
+
+it looks to see if the designated name has been defined.  If not, it throws away the following source lines until it finds a matching <P>
+
+<PRE>		#else <P>
+</PRE>
+
+or <P>
+
+<PRE>		#endif <P>
+</PRE>
+
+directive.  The <B>#endif </B>directive delimits the section of text controlled by <B>#ifdef</B>, and the <B>#else</B> directive permits us to split conditional text into true and false parts.  The first part (<B>#ifdef...#else</B>) is compiled only if the designated name is defined, and the second (<B>#else...#endif</B>) only if it is not defined. <P>
+
+The converse of <B>#ifdef</B> is the <P>
+
+<PRE>		#ifndef <I>Name</I> <P>
+</PRE>
+
+directive.  This directive also takes matching <B>#else</B> and <B>#endif</B> directives.  In this case, however, if the designated name is not defined, then the first (<B>#ifndef...#else</B>) or only (<B>#ifndef...#endif</B>) section of text is compiled; otherwise, the second (<B>#else...#endif</B>), if present, is compiled. <P>
+
+Nesting of these directives is allowed; and there is no limit on the depth of nesting.  It is possible, for instance, to write something like <P>
+
+<PRE>		#ifdef ABC
+		...               /* ABC */
+		#ifndef DEF
+		...               /* ABC and not DEF */
+		#else
+		...               /* ABC and DEF */
+		#endif
+		...               /* ABC */
+		#else
+		...               /* not ABC */
+		#ifdef HIJ
+		...               /* not ABC but HIJ */
+		#endif
+		...               /* not ABC */
+		#endif<P>
+</PRE>   
+
+where the ellipses represent conditionally compiled code, and the comments indicate the conditions under which the various sections of code are compiled.<P>
+
+<B>Including Other Source Files<P>
+
+</B>The preprocessor also recognizes directives to include source code from other files.  The three directives<P>
+
+<PRE>		#include &quot;<I>Filename</I>&quot;
+		#include &lt;<I>Filename</I>&gt;
+		#include <I>Filename</I><P>
+</PRE>
+
+cause a designated file to be read as input to the compiler.  The preprocessor replaces these directives with the contents of the designated files.  When the files are exhausted, normal processing resumes. <P>
+Filename follows the normal MS-DOS file specification format, including drive, path, filename, and extension.  Full C requires either quotation marks or angle brackets around the name, but Small C is not so particular.  Nevertheless, for better portability, we should write <P>
+
+<PRE>		#include &lt;stdio.h&gt; <P>
+</PRE>
+
+to include the standard I/O header file (which contains standard definitions and is normally included in every C program) and <P>
+
+<PRE>		#include &quot;<I>Filename</I>&quot; <P>
+</PRE>
+
+for other files. <P>
+
+Use of this directive allows us to draw upon a collection of common functions which can be included into many different programs.  This reduces the amount of effort needed to develop programs and promotes uniformity among programs.  However, since this method requires the recompiling of the code in each program that uses it, its use is usually limited to including header files of common macro definitions and global declarations.  On the other hand, procedural modules are usually compiled 
+separately, stored in libraries, and combined with programs at link time (<a href="../chap16/chap16.htm">Chapter 16</a>).  <P>
+
+<B>Assembly Language Code<P>
+
+</B>One of the main reasons for using the C language is to achieve portability.  But there are occasional situations in which it is necessary to sacrifice portability in order to gain full access to the operating system or to the hardware in order to perform some interface requirement.  If these instances are kept to a minimum and are not replicated in many different programs, the negative effect on portability may be acceptable. <P>
+
+To support this capability, Small C provides for assembly language instructions to be written into C programs anywhere a statement is valid.  Since the compiler generates assembly language as output, when it encounters assembly language instructions in the input, it simply copies them directly to the output. <P>
+
+Two special directives delimit assembly language code.  They are <P>
+
+<PRE>		#asm <P>
+</PRE>
+
+and <P>
+
+<PRE>		#endasm <P>
+</PRE>
+
+Everything from <B>#asm</B> to<B> #endasm</B> is assumed to be assembly language code and so is sent straight to the output of the compiler exactly as it appears in the input.  Macro substitution is not performed. <P>
+
+Of course, to make use of this feature, we must know how the compiler uses the CPU registers, how functions are called, and how the operating system and hardware works.  Small C code generation is covered in <a href="../chap19/chap19.htm">Chapter 19</a>. <P>
+
+<CENTER>
+Go to <a href="../part2/part2.htm">Part 2</a>         Return to <a href="/../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

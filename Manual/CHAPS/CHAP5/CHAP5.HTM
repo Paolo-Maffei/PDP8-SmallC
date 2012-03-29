@@ -1,0 +1,277 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 5:<P>
+POINTERS<P></H1>
+</CENTER>
+</B>The ability to work with memory addresses is an important 
+feature of the C language.  In many situations, array elements 
+can be reached more efficiently through pointers than by 
+subscripting.  It also allows pointers and pointer chains to be 
+used in data structures.  This added degree of flexibility is 
+always nice, but in systems programming it is absolutely 
+essential.<P>
+
+<B>Addresses and Pointers<P>
+
+</B>Addresses that can be stored and changed are called 
+<I>pointers</I>.  A pointer is really just a variable that contains 
+an address.  Although, they can be used to reach objects in 
+memory, their greatest advantage lies in their ability to enter 
+into arithmetic (and other) operations, and to be changed.<P>
+
+Not every address is a pointer.  For instance, we can write
+<B>&amp;var</B> when we want the address of the variable <B>var</B>. 
+ The result will be an address which is not a pointer since it 
+does not have a name or a place in memory; it cannot, therefore, 
+have its value altered.<P>
+
+Another example is an array name.  As we shall see in 
+<a href="../chap6/chap6.htm">Chapter 6</a>, 
+an unsubscripted array name yields the address of the array.  
+But, since the array cannot be moved around in memory, its 
+address is not variable.  So, although, such an address has a 
+name, it does not exist as an object in memory (the array does, 
+but its address does not) and cannot, therefore, be changed.<P>
+
+A third example is a character string.  
+<a href="../chap3/chap3.htm">Chapter 3</a> indicated that 
+a character string yields the address of the character array 
+specified by the string.  In this case the address has neither a 
+name or a place in memory, so it too is not a pointer.<P>
+
+<B>Pointer Declarations<P>
+
+</B>The syntax for declaring pointers is like that for variables 
+(<a href="../chap4/chap4.htm">Chapter 4</a>) except that pointers are distinguished by an asterisk 
+that prefixes their names.  Table 5-1 illustrates several 
+legitimate pointer declarations.  Notice, in the third example, 
+that we may mix pointers and variables in a single declaration.  
+Also notice that the data type of a pointer declaration specifies 
+the type of object to which the pointer refers, not the type of 
+the pointer itself.  As we shall see, all Small C pointers (in
+teger or character) contain 16-bit segment offsets.<P>
+
+The best way to think of the asterisk is to imagine that it 
+stands for the phrase &quot;object at&quot; or &quot;object 
+pointed to by.&quot; The first declaration in Table 5-1 then 
+reads &quot;the object at (pointed to by) <B>ip</B> is an integer.&quot;<P>
+
+<CENTER>
+<img src="tb5--1.gif">
+</CENTER>
+<CENTER><B>Table 5-1: Pointer Declarations<P>
+</CENTER></B>
+
+<B>Memory Addressing<P>
+
+</B>The size of a pointer depends on the architecture of the CPU 
+and the implementation of the C compiler.  The 8086 CPU 
+incorporates a segmented memory addressing scheme in which an 
+effective address is composed of two parts.  There is a 16-bit 
+segment address and the 16-bit offset within the segment.  The 
+CPU adds these parts together, with the segment address shifted 
+left four bits, to derive the effective address for a memory 
+reference.  (See <a href="../append/appb.htm">Appendix B</a>
+ for details, especially Figures B-2 through B-4.)<P>
+
+To be perfectly general, an 8086 address must occupy two 16-bit 
+words--one for the segment address and one for the offset.  But, 
+since a given segment is usually referenced frequently while 
+transitions between segments are relatively rare, the CPU 
+contains segment registers (<a href="../append/b-1.gif">Figure B-1</a>)
+ that &quot;remember&quot; the segment addresses.  Therefore, it is not always necessary for 
+an address to specify more than the 16-bit offset.<P>
+
+The flexibility of this addressing scheme allows programs to 
+utilize various schemes for segmenting memory so as to obtain a 
+suitable compromise between program size and efficiency.  Notice 
+that a 16-bit offset effectively restricts segments to 64K bytes 
+or less.  So large programs must be divided into multiple 
+segments.  In 8086 terminology, addresses that specify both 
+segment and offset are called <I>far addresses</I>, and those 
+that provide only the offset are called <I>near addresses</I>.<P>
+
+Although some C compilers permit us to designate any of several 
+memory addressing schemes (<I>memory models</I>), Small C always 
+uses just one.  Figure 5-1 illustrates the way Small C programs 
+use memory and the segment and stack pointer registers.<P>
+
+<CENTER>
+<img src="fg5--1.gif">
+</CENTER>
+<CENTER><B>Figure 5-1. Small C Memory Model<P>
+</CENTER></B>
+
+Each Small C program is divided into two segments, a 
+<I>code segment</I> which is addressed by the CPU's code segment 
+register (CS) and a <I>data segment</I> which is addressed by the 
+data segment register (DS).  The stack segment and data segment 
+are one and the same, so the stack segment register (SS) contains 
+the same address as DS.  These segment register addresses remain 
+fixed throughout the execution of a program; therefore, only 
+<I>near</I> pointers are needed.  Therefore, pointers are
+ always just 16-bit offsets in Small C programs.<P>
+
+The code segment is only as large as it has to be to contain the 
+program's instructions.  The data/stack segment is exactly 64K 
+bytes in size, if that much memory is available when the program 
+begins execution.  If less is available, then whatever is 
+available is used.  Notice how the data/stack segment is 
+organized.  Globally declared data occupies a fixed space at the 
+low (address) end.  Following that is the <I>heap</I>--space that 
+has been allocated by calling the library functions <B>malloc()</B> and
+ <B>calloc()</B>.  The heap expands and contracts as program 
+execution progresses.  At the high end is the stack which grows 
+toward the low end of the segment and shrinks back into the high 
+end as the program executes.  This leaves the area in the middle 
+free for either heap or stack use.  These last two areas should 
+never overlap; if they do the program will certainly misbehave 
+and may well go berserk.  The library function <B>avail()</B> 
+returns the amount of free memory available and optionally aborts 
+the program if the stack overlaps allocated memory.<P>
+
+<B>Pointers and Integers<P>
+
+</B>As the preceding discussion indicates, Small C pointers 
+occupy one word, just as integers do.  This is fortunate, since 
+Small C does not support arrays of pointers.  In Small C, we are 
+free to store pointer values in integer arrays; the compiler will 
+not complain.  This sort of abuse of data types used to be common 
+in C circles, but these days it is frowned upon and the newer 
+compilers gripe about it.  Personally, I find it only slightly 
+irksome since it obviates a major Small C shortcoming.  A conseq
+uence of this practice is that when it becomes necessary to use a 
+pointer in an integer array, we must first assign it to a pointer 
+variable so the compiler will know that it is working with an 
+address rather than an integer.<P>
+
+<B>Pointer Arithmetic<P>
+
+</B>Another major difference between addresses and ordinary 
+variables or constants has to do with the interpretation of 
+addresses.<P>
+
+Since an address points to an object of some particular type, 
+adding one (for instance) to an address should direct it to the 
+next object, not necessarily the next byte.  If the address 
+points to integers, then it should end up pointing to the next 
+integer.   But, since integers occupy two bytes, adding one to an 
+integer address must actually increase the address by two.  A 
+similar consideration applies to subtraction.  In other words, 
+values added to or subtracted from an address must be scaled 
+according to the size of the objects being addressed.  This automatic 
+correction saves the programmer a lot of thought and makes 
+programs less complex since the scaling need not be coded 
+explicitly.  Notice that while the scaling factor for integers is 
+two, for characters it is one; therefore, character addresses do 
+not receive special handling.  It should be obvious that if 
+objects of other sizes were supported than different factors 
+would have to be used.<P>
+
+A related consideration arises when we imagine the meaning of the 
+difference of two addresses.  Such a result is interpreted as the 
+number of objects between the two addresses.  If the objects are 
+integers, the result must be divided by two in order to yield a 
+value which is consistent with this meaning.  See
+<a href="../chap6/chap6.htm"> Chapter 6</a> for 
+more on address arithmetic.<P>
+
+When an address is operated on, the result is always another 
+address.  Thus, if <B>ptr</B> is a pointer, then <B>ptr+1 </B>is 
+also an address.<P>
+
+<B>The Indirection Operator<P>
+
+</B>The asterisk, which we saw in pointer declarations, can also 
+be used as an operator in expressions.  We call it the <I>
+indirection operator</I> because when it precedes a pointer (or 
+any address) it produces an indirect reference to the indicated object.<P>
+
+Thus, if <B>ip</B> is a properly initialized integer pointer, 
+then<B> </B><B>*ip </B>yields the integer pointed to by <B>ip</B>. 
+On the other hand, <B>ip </B>yields the address contained in the pointer.<P>
+At the assembly-language level, an indirect reference is 
+accomplished by first loading the value of the pointer into a 
+register, and then using it to fetch the object.  If <B>ip</B> is 
+a global pointer to integers, then <B>*ip</B> generates<P>
+
+<PRE>
+		MOV BX,_IP
+		MOV AX,[BX]
+</PRE><P>
+
+The first instruction loads the contents of <B>ip</B> into <B>
+BX</B> and the second loads the word addressed by <B>BX</B> into 
+<B>AX</B>.  It should be clear why this is called an <I>indirect reference</I>.<P>
+
+<B>Pointer Comparisons<P>
+
+</B>One major difference between pointers and other variables is 
+that pointers are always considered to be unsigned.  This should 
+be obvious since memory addresses are not signed.  This property 
+of pointers (actually all addresses) ensures that only unsigned 
+operations will be performed on them.  It further means that the 
+other operand in a binary operation will also be regarded as 
+unsigned (whether or not it actually is).  For instance, if (as 
+we saw above) an integer array<B> </B><B>ia[]</B> actually co
+ntains addresses, then it would make sense to write<P>
+
+<PRE>	(ia[5] &gt; ptr)<P>
+</PRE>
+
+which performs an unsigned comparison since <B>ptr</B> is a 
+pointer.  Thus, if <B>ia[5]</B> contains -1 and <B>ptr</B> 
+contains 0x1234, the expression will yield true, since -1 is 
+really 0xFFFF--a higher unsigned value than 0x1234.  So, although 
+the array is thought by the compiler to contain signed integers, 
+the proper type of comparison is performed anyway. <P>
+
+<I>Note: With the current version of Small C, we could designate 
+the array </I><B><I>unsigned</B></I><I> for better documentation.</I><P>
+It makes no sense to compare a pointer to anything but another 
+address or zero.  C guarantees that valid addresses can never be 
+zero, so that particular value is useful in representing the 
+absence of an address in a pointer.<P>
+
+Furthermore, to avoid portability problems, only addresses within 
+a single array should be compared for relative value (as above).  
+To do otherwise would necessarily involve assumptions about how 
+the compiler organizes memory.  Comparisons for equality, 
+however, need not observe this restriction, since they make no 
+assumption about the relative positions of objects.<P>
+
+<B>An Example<P>
+
+</B>A final example may help pull the ideas in this chapter 
+together.  Consider the program fragment in Listing 5-1.<P>
+
+<P>
+<CENTER>
+<img src="ls5--1.gif">
+</CENTER>
+<CENTER><B>Listing 5-1: Example of the Use of Pointers<P>
+</CENTER></B>
+
+This code adds the values of 5 characters to 
+corresponding integers.  First, the pointer <B>cend</B> is set 5 
+characters beyond the address in <B>cp</B> (which we presume has 
+already been initialized properly).  The <B>while</B> statement 
+then repeatedly tests whether <B>cp</B> is less than <B>cend</B>. 
+ If so, the compound statement is performed.  If not, control 
+passes to whatever follows.  With each execution of the compound 
+statement, the object at <B>cp</B> (a character) is added to the 
+object at <B>ip</B> (an integer) with the object at <B>ip</B> 
+receiving the result.  Then both <B>cp</B> and <B>ip</B> are 
+incremented to the next objects.  Since <B>ip</B><B> </B>is an 
+integer pointer, each increment advances it two bytes to the next 
+integer.  The loop executes 5 times.  After that the task is 
+finished, <B>cp</B> is no longer less than <B>cend</B>, and 
+control go on to whatever follows.<P>
+<P>
+<CENTER>Go to <a href="../chap6/chap6.htm">Chapter 6</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+</HTML>

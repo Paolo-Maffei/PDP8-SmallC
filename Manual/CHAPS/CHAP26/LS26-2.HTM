@@ -1,0 +1,101 @@
+
+
+<HTML>
+        <B>PSEUDOCODE                                      COMMENTS</B><P> 
+
+     1 if op == pre-increment                              ++ 
+     2     parse operand recursively                       level13() 
+     3     if operand is not an lvalue 
+     4          issue &quot;must be an lvalue&quot; 
+     5          return &lt;request no fetch&gt; 
+     6     generate rINC1 on operand in memory             step() 
+     7     return &lt;request no fetch&gt; 
+     8 if op == pre-decrement                              -- 
+     9     parse operand recursively                       level13() 
+    10     if operand is not an lvalue 
+    11          issue &quot;must be an lvalue&quot; 
+    12          return &lt;request no fetch&gt; 
+    13     generate rDEC1 on operand in memory             step() 
+    14     return &lt;request no fetch&gt; 
+    15 if op == one's complement                           ~ 
+    16     parse operand recursively                       level13() 
+    17     if operand is an lvalue 
+    18          FETCH OPERAND INTO PRIMARY 
+    19     generate COM1 
+    20     pass ~is[CV] 
+    21     pass zero stage address                         is[SA] 
+    22     return &lt;request no fetch&gt; 
+    23 if op == logical not                                ! 
+    24     parse operand recursively                       level13() 
+    25     if operand is an lvalue 
+    26          FETCH OPERAND INTO PRIMARY 
+    27     generate LNEG1 
+    28     pass !is[CV] 
+    29     pass zero stage address                         is[SA] 
+    30     return &lt;request no fetch&gt; 
+    31 if op == unary minus                                - 
+    32     parse operand recursively                       level13() 
+    33     if operand is an lvalue 
+    34          FETCH OPERAND INTO PRIMARY 
+    35     generate ANEG1 
+    36     pass -is[CV] 
+    37     pass zero stage address                         is[SA] 
+    38     return &lt;request no fetch&gt; 
+    39 if op == indirection                                * 
+    40     parse operand recursively                       level13() 
+    41     if operand is an lvalue 
+    42          FETCH OPERAND INTO PRIMARY 
+    43     if operand is symbolic 
+    44          pass indirect data type from symbol table  is[TI] 
+    45     else pass indirect data type integer            is[TI] 
+    46     pass zero stage address                         is[SA] 
+    47     pass &lt;not address&gt;                              is[TA] 
+    48     pass &lt;not constant&gt;                             is[TC] 
+    49     pass &lt;do not fetch if function call&gt;            is[CV] 
+    50     return &lt;request fetch&gt; 
+    51 if op == sizeof                                     sizeof() 
+    52     bypass and remember ( 
+    53     default size to 0 
+    54     if &quot;unsigned&quot; set size to 2 
+    55     if &quot;int&quot; set size to 2 
+    56     else if &quot;char&quot; set size to 1 
+    57     if size != 0 and &quot;char *&quot; set size to 2 
+    58     if size == 0 and symbol and in symbol table 
+    59          fetch size from symbol table 
+    60     else if size = 0 issue &quot;must be object or type&quot;           
+    61     bypass ) if there was a ( 
+    62     pass &lt;integer constant&gt;                         is[TC] 
+    63     pass size as &lt;constant value&gt;                   is[CV] 
+    64     pass &lt;not address&gt;                              is[TA] 
+    65     pass &lt;not indirect fetch&gt;                       is[TI] 
+    66     pass &lt;not in symbol table&gt;                      is[ST] 
+    67     return &lt;request no fetch&gt; 
+    68 if op == address                                    &amp; 
+    69     parse operand recursively                       level13() 
+    70     if operand is not an lvalue 
+    71          issue &quot;illegal address&quot; 
+    72          return &lt;request no fetch&gt; 
+    73     pass address data type from symbol table        is[TA] 
+    74     if indirect object reference 
+    75          return &lt;request no fetch&gt; 
+    76     generate POINT1m 
+    77     pass indirect data type from symbol table       is[TI] 
+    78     return &lt;request no fetch&gt; 
+    79 parse operand at higher precedence level            level14() 
+    80 if op == post increment                             ++ 
+    81     if operand is not an lvalue 
+    82          issue &quot;must be an lvalue&quot; 
+    83          return &lt;request no fetch&gt; 
+    84     generate rINC1                                  step() 
+    85     generate rDEC1     
+    86     return &lt;request no fetch&gt; 
+    87 if op == post decrement                             -- 
+    88     if operand is not an lvalue 
+    89          issue &quot;must be an lvalue&quot; 
+    90          return &lt;request no fetch&gt; 
+    91     generate rDEC1                                  step() 
+    92     generate rINC1 
+    93     return &lt;request no fetch&gt; 
+    94 return &lt;fetch request status from below&gt; 
+</PRE> 
+</HTML>

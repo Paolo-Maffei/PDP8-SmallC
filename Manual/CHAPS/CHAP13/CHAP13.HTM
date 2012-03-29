@@ -1,0 +1,182 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<h1><B>CHAPTER 13:<P>
+EFFICIENCY CONSIDERATIONS<P></H1>
+</CENTER>
+</B>
+
+Ideally, our programs should be both efficient and well designed.  To a point, both objectives can be realized by careful planning before committing our designs to code.  However, once a significant effort has gone into a program it becomes easier to live with what we have than to start over again when we discover a major flaw or a better algorithm.  As a result, we make do with something that is less than it could have been.  So the first rule for writing well designed, efficient programs is to think
+ first. <P>
+
+At various points in the planning phase, we must decide between good programming style and efficiency.  We often have to make tradeoff decisions.  And even when the emphasis is on efficiency we often have to choose between program size and speed. <P>
+
+As a rule, good programming style is more important than efficiency, because programming time is expensive and the more clearly a program is written the more quickly it can be documented and revised.  However, there are times when it is more important for programs to work with limited memory and/or to satisfy fixed performance criteria. <P>
+
+This chapter does not deal with programming style, it merely provides information about the efficiency of certain C constructs, as they are implemented by the Small C compiler, so that tradeoff decisions can be made intelligently.  The advice given below is not necessarily appropriate in all circumstances.  Since, by default, Small C optimizes its output, the following comments relate to the optimized output, not the preliminary code produced by the <B> -NO</B> command-line switch (<a href="../chap16/chap16.htm">Chapter 16</a>). <P>
+
+Because of complexities (like instruction pipelining) in the design of the 8086 family of processors and the different instruction timings of the different processors in the family, it is impossible to give exact information on the relative speeds of alternative constructs.  So the following information, as it pertains to speed, should be taken as approximate. <P>
+
+Appendix B describes the 8086 CPU.  It may help to review that material before proceeding with the following discussions, since they refer to the 8086 registers.  <P>
+
+<B>Integer Alignment<P>
+</B>
+
+Systems with an 8-bit data bus always require two memory accesses to fetch or store an integer or pointer.  However, systems with wider buses can reference a word with just one memory access.  With a 16-bit bus, if the word has an even address (is on a word boundary) one access fetches or stores both bytes; but, if the word has an odd address (is on a byte boundary) two memory accesses will be performed by the hardware since the word spans two aligned words in memory. <P>
+
+With a 32-bit bus, the situation is a bit more complicated.  If the word is on a byte boundary, then it may either span two aligned double words in memory or it may fall exactly in the middle of one.  In the first case, two accesses are required; but, in the latter case one will suffice.  So we can expect roughly half of our integers and pointers to be referenced efficiently, and half inefficiently.  However, if an integer or pointer is word aligned, then it must fall in the first or second half of 
+an aligned double word.  So only one memory access is required. <P>
+
+We can take advantage of the way Small C allocates global storage to ensure that integers and pointers are word aligned.  Small C starts segments on word boundaries, and allocates storage in the order in which global definitions appear in the program.  By writing all of our integer and pointer definitions before any character definitions we can ensure that all integers fall on word boundaries. <P>
+
+Unfortunately, Small C does not control the alignment of function arguments or local variables.  So, although it may run counter to good programming practice, if speed is important, we can declare integers and pointers globally rather than locally. <P>
+<a href="../chap28/chap28.htm">Chapter 28</a> contains a discussion on making the compiler align word sized items in every case.  <P>
+
+<B>Integers and Characters<P>
+</B>
+
+Compared to integers, fetching characters takes somewhat more time and decidedly more instruction space in memory.  For instance, only one instruction <P>
+
+<PRE>		MOV AX,_GI<P>
+</PRE>
+
+(three bytes) is needed for a global integer, but two instructions<P>
+
+<PRE>		MOV AL,_GC
+		CBW<P>
+</PRE>
+
+(three bytes and one byte respectively) are required for a global character.  The second instruction converts the byte in AL to a word in AX by extending its sign bit through AH.  If the character is declared to be unsigned, <B>CBW</B> is replaced with <P>
+
+<PRE>		XOR AH,AH <P>
+</PRE>
+
+(two bytes) which zeros AH. <P>
+
+Choosing character variables wherever they are sufficient does not necessarily reduce program size, and may in fact enlarge it somewhat.  For instance, suppose we have the choice of defining a variable as an signed integer or a signed character, and suppose it is to be fetched five times in the program.  Then we would save one byte of data space by declaring a character, but we would lose five bytes of code space.  On the other hand, suppose instead of a variable we were considering an array of 
+1000 elements.  In that case, declaring an integer array would cost 1000 bytes of data space (compared to a character array), while saving only five bytes of code space--not a wise choice.  So, in situations where either integers or characters will do, it is usually better to declare integer variables and character arrays. <P>
+
+In terms of speed, the difference is not so clear.  Suffice it to say that integers are generally accessed a little faster that characters because of the additional instruction that characters require.  However, this tends to be compensated by the need to transfer two bytes instead of one.  On the other hand, the second byte may be free, as we saw above, depending on the data bus width and the alignment of the integers. <P>
+
+Since the storing of a character involves transferring just the low order byte of AX to memory, there is no penalty associated with characters.  On machines with 8-bit buses or when the destination is aligned on a byte (not word) boundary, storing integers is slower than storing characters.  However, they both require the same amount of instruction space--three bytes for global stores.  <P>
+
+<B>Globals and Locals<P>
+</B>
+
+There is no appreciable difference in fetching or storing global and local objects.  Fetching a global integer is done with <P>
+
+<PRE>		MOV AX,_GI<P>
+</PRE>
+
+and a local integer with <P>
+
+<PRE>		MOV AX,-n[BP] <P>
+</PRE>
+
+where <B>n</B> is an offset into the stack frame (<a href="../chap8/chap8.htm">Chapter 8</a>).  In the first case, the instruction, together with the address of the global integer <B>_GI</B>, takes three bytes of space.  Two bytes of this is the address which the processor uses to locate the operand.  In the second case, the instruction together with the immediate value <B>n</B> also takes three bytes.  In this case, the processor forms an effective address by adding <B>n</B> to BP; this takes very little time. <P>
+
+Global objects occupy the same amount of space as locals, but since they are static they always exist--even in the <B>EXE</B> file.  On the other hand, locals are dynamically allocated at run time, so they require no space in the <B>EXE</B> file.  Therefore, a program containing a large global array may waste disk space and take unnecessarily long to load.  These disadvantages can be overcome two ways. <P>
+
+First the array can be declared locally in<B> main()</B>.  If it requires initial values, then logic must be executed to initialize it; however, this is often a simple process and the space it adds to the code segment may be a small compared to what is saved in the data segment.  The time to initialize such an array is negligible since the array is initialized only once.  This method has the disadvantage that the array's address must be passed to every function that needs to refer to it.  Another 
+disadvantage is that each reference to the array, from functions other than<B> main()</B>, requires an additional memory access since the array is being referenced indirectly through a pointer--the address passed to the function.<P>
+
+A second approach is to declare a global pointer.  Then, in <B>main()</B>, allocate memory for the array and assign its address to the pointer.  From then on, the pointer can be used just as though it were an array.  This method permits functions to refer to the array as a global object.  Since the desired initial value for an array's elements is usually zero, the function <B>calloc()</B> can be used to allocate zeroed memory.  The disadvantage of this method is that (as above) each reference to 
+an element requires an additional memory access since the array is being referenced indirectly through the pointer--in this case a global pointer.  <P>
+
+<B>Constant Expressions<P>
+</B>
+
+Since the compiler evaluates constant expressions at compile time, there is no penalty associated with writing constants as expressions.  For instance, we may be working with a character array in which every four bytes constitutes a single entry of four one-byte fields.  To make the program logic clearer, we could define symbols for the size of an entry  (<B>#define SZ 4</B>) and for offsets to the individual fields in each entry (e.g., <B>#define FLD3 2</B>).  If we have a pointer to some entry 
+in the array (e.g., <B>*ap</B>), we could refer to the third field of the previous entry as <P>
+
+<PRE>		*(ap + (FLD3 - SZ)) <P>
+</PRE>
+
+In this case the expression generates just <P>
+
+<PRE>
+		MOV BX,_AP		fetch address from pointer
+		MOV AL,-2[BX]		indirectly fetch character
+		CBW			sign extend to 16 bits <P>
+</PRE>
+
+where the first instruction loads the contents of <B>ap</B> (an address) into BX, the second one moves into AL the byte located two bytes previous to that address, and the third one converts it to a word.  Notice that the subexpression (<B>FLD3 - SZ</B>) appears as the offset <B>-2</B> in the second instruction.  This is just as though we had written <P>
+
+<PRE>		*(ap - 2) <P>
+</PRE>
+
+Without the inner parentheses in this example, the compiler would have evaluated the expression as though it were written <P>
+
+<PRE>		*((ap + FLD3) - SZ) <P>
+</PRE>
+
+which is effectively the same but not nearly as efficient.  This generates<P>
+
+<PRE>
+		MOV AX,_AP	fetch the address from pointer
+		ADD AX,2	add FLD3 to address
+		SUB AX,4	subtract SZ from address
+		MOV BX,AX	move address to BX
+		MOV AL,[BX]	indirectly fetch character
+		CBW		sign extend to 16 bits<P>
+</PRE>
+
+Notice here that the constants appear in two places.  Also, the optimizer is not smart enough to eliminate the fourth instruction by making the first three work directly with BX. <P>
+
+The point is that, because Small C evaluates constant (sub)expressions at compile time, there is no penalty associated with writing them in terms of their constituent parts.  And whenever more than one constant appears in an expression, it is worth trying to group them together. <P>
+
+Remember, from <a href="../chap9/chap9.htm">Chapter 9</a>, that the sizeof operator yields a constant value.  So it can be used in constant expressions.  <P>
+
+<B>Zero Tests<P>
+</B>
+
+Whenever possible, you should write test expressions in <B>if</B>, <B>for</B>, <B>do</B>, and <B>while</B> statements so that they involve a comparison to the constant zero.  In such cases, the compiler economizes on the code it generates.  This is illustrated by the examples in <a href="../chap19/ls19-23.gif">Listing 19-23</a>.  The exact savings depends on which relational operator is involved and whether a signed or unsigned comparison is performed.  <P>
+
+<B>Constant Zero Subscripts<P>
+</B>
+
+The compiler adds a subscript to the address of an array or to the contents of a pointer in order to obtain the address of the specified element.  However, if the compiler sees that the subscript has the constant value zero, it eliminates the addition altogether.  It follows that, in terms of the code generated, writing <B>array[0]</B> is the same as writing  <B>*array</B>--there is no penalty for using the subscript notation.  This is true even if a constant expression is used for the subscript.  If 
+it evaluates to zero, the addition operation is skipped.  <P>
+
+<B>Switch Statements<P>
+</B>
+
+Whenever possible, write a <B>switch</B> statement instead of a string of <B>if...else...</B> statements.  The code generated by the compiler is much smaller since, for each condition, it generates only a pair of words (an address and a constant).  At run time, a library routine accepts the value of the expression and rapidly runs down the list of constants looking for a match.  When it finds one it branches to the corresponding address.  With the <B>if...else...</B> approach, however, the expression 
+must be evaluated and the result tested in each case.  See <a href="../chap19/ls19-22.gif">Listing 19-22</a> for an example of the code generated by an <B>if...else...</B> sequence, and <a href="../chap19/ls19-24.gif">Listing 19-24</a> for a <B>switch</B> statement.  <P>
+
+<B>Pointer References<P>
+</B>
+
+Generally, it is more efficient to use pointer rather than subscripted references.  The advantage is that pointer references do not have to involve the addition of a subscript, since the pointer itself can be adjusted like a subscript.  For example, the reference<P>
+
+<PRE>		*gip<P>
+</PRE>
+
+where <B>gip</B> is a global integer pointer, generates <P>
+
+<PRE>		MOV BX,_GIP	fetch pointer value
+		MOV AX,[BX]	indirectly fetch integer<P>
+</PRE>
+
+On the other hand, the subscripted reference<P>
+
+<PRE>		gia[gi],<P>
+</PRE>
+
+where <B>gia</B> is a global integer array and <B>gi</B> is a global integer, generates<P>
+
+<PRE>		MOV AX,_GI		fetch subscript
+		MOV BX,OFFSET_GIA	fetch array address
+		SHL AX,1		multiply subscript by 2
+		ADD BX,AX		add subscript to address
+		MOV AX,[BX]		indirectly fetch integer<P>
+</PRE>
+
+<CENTER>
+ Go to <a href="../chap14/chap14.htm">Chapter 14 </a>            Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

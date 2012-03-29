@@ -1,0 +1,93 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 7:<P>
+INITIAL VALUES<P></H1>
+</CENTER>
+
+</B>Most programming languages provide ways of specifying <I>initial values</I>; that is, the values that variables have when program execution begins.  By designating initial values, we avoid having to write assignment statements to initialize variables, and eliminate from the executable program the code which they would generate.  The main advantage of eliminating this code is a reduction in program size.  There is also a speed advantage; however, since initializing assignments are executed only once,
+the time saved is usually insignificant.<P>
+
+<B>Initial Values and Serial Reusability<P>
+
+</B>Some operating systems provide an environment in which a program may be invoked any number of times after being loaded into memory once.  The memory resident utilities that run on MS-DOS machines are an example.  In such cases, the programmer must ensure that subsequent invocations of the program will see the same initial values as the first invocation.  When that is done, the program is said to be <I>serially reusable</I>.  In other words, to be serially reusable, a program's behavior must not be
+influenced by previous executions.<P>
+
+If not obvious, it should at least seem reasonable that relying on initializers, instead of assignment statements, will not provide serial reusability.  The reason is that when the compiler processes a declaration with an initial value, it tells the assembler to preset the memory for the variable with the specified value.  After the first execution of the program, the variable will be left with its final value.  Then, when the program is invoked again, it finds the final value instead of the required 
+initial value.  And that leads to faulty performance.<P>
+
+Therefore, if serial reusability is important, we should use assignment statements to set preliminary values for any variables which might be changed by program execution.  Then, with each subsequent execution, the variables will be reassigned their preliminary values.<P>
+
+<B>Globals versus Locals<P>
+
+</B>Small C implements some, but not all, of the initializing capabilities of the full C language.  Small C initializes only globals, whereas full C initializes both globals and locals.  The ability to initialize locals produces only an illusion of efficiency.  This is because automatic objects are created at the time control reaches their declarations.  If they are given initial values, then there must be hidden assignment statements to give them their designated values.  So, while it may look efficient 
+at the source level, there is no real advantage at the object level.  Neither is there much advantage at the source level, since writing assignment statements takes very little more effort than writing initializers, as we shall see.  Arrays are the exception, since either an iterative statement or a list of statements must be written.<P>
+
+Uninitialized Small C globals (static storage) start life at zero and all Small C locals (automatic storage) initially have unpredictable values.<P>
+
+<B>Initializer Syntax<P>
+
+</B>Specifying initial values is simple.  In its declaration, we follow a variable's name with an equal sign and a constant expression for the desired value.  Character constants with backslash-escape sequences are permitted.  Thus<P>
+
+<PRE>		int i = 80;<P>
+</PRE>
+
+declares <B>i</B> to be an integer, and gives it an initial value of <B>80</B>.  And<P>
+
+<PRE>		char ch = '\n';<P>
+</PRE>
+
+declares <B>ch</B> to be a character, and gives it the value of the newline character.<P>
+If array elements are being initialized, a list of constant expressions, separated by commas and enclosed in braces, is written.  For example,<P>
+
+<PRE>		int ia[3] = {1, 2, 3};<P>
+</PRE>
+
+declares <B>ia</B> to be an integer array, and gives its elements the values <B>1</B>, <B>2</B>, and <B>3</B> respectively.  If the size of the array is not specified, it is determined by the number of initializers.  Thus<P>
+
+<PRE>		char ca[] = {'a', 0};<P>
+</PRE>
+
+declares <B>ca</B> to be a character array of two elements which are initialized to the lowercase letter <B>a</B> and zero respectively.  On the other hand, if the size of the array is given and if it exceeds the number of initializers, the leading elements are initialized and the trailing elements default to zero.  Therefore,<P>
+
+<PRE>		int ia[3] = 1;<P>
+</PRE>
+
+declares <B>ia</B> to be an integer array of three elements with the first element initialized to 1 and the others to zero.  Finally, if the size of an array is given and there are too many initializers, the compiler generates an error message.  In that case, the programmer must be confused.<P>
+Character arrays and character pointers may be initialized with a character string.  In these cases, a terminating zero is automatically generated.  For example,<P>
+
+<PRE>		char ca[4] = &quot;abc&quot;;<P>
+</PRE>
+
+declares <B>ca</B> to be a character array of four elements with the first three initialized to <B>a</B>, <B>b</B><B>,</B> and <B>c</B> respectively.  The fourth element contains zero.  If the size of the array is not given, it will be set to the size of the string plus one.  Thus <B>ca</B> in<P>
+
+<PRE>		char ca[] = &quot;abc&quot;;<P>
+</PRE>
+
+also contains the same four elements.  If the size is given and the string is shorter, trailing elements default to zero.  For example, the array declared by<P>
+
+<PRE>		char ca[6] = &quot;abc&quot;;<P>
+</PRE>
+
+contains zeroes in its last three elements.  If the string is longer than the specified size of the array, the array size is<P>
+increased to match. <P>
+
+If we write<P>
+
+<PRE>		char *cp = &quot;abc&quot;;<P>
+</PRE>
+
+the effect is quite different from initializing an array.  First a word (16 bits) is set aside for the pointer itself.  This pointer is then given the address of the following byte.  Then, beginning with that byte, the string and its zero terminator are assembled.  The result is that <B>cp</B> contains the address of the string <B>&quot;abc&quot;</B>.<P>
+Small C accepts initializers for character variables, pointers, and arrays, and for integer variables and arrays.  The initializers themselves may be either constant expressions, lists of constant expressions, or strings.  But not all combinations of object type and initializer type are legal.  Table 7-1 shows which combinations are supported.  Small C supports an upward compatible subset of the full C initializers.<P>
+
+<CENTER>
+<img src="tb7-1.gif">
+</CENTER>
+<CENTER><B>Table 7-1: Permitted Object/Initializer Combinations<P>
+</CENTER></B><P>
+<CENTER>Go to <a href="../chap8/chap8.htm">Chapter 8</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+</HTML>

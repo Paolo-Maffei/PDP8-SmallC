@@ -1,0 +1,119 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 15:<P>
+EXECUTING SMALL C PROGRAMS<P></H1>
+</CENTER>
+</B>
+
+After a Small C program has been compiled, assembled, and linked it ends up as an ordinary MS-DOS executable file with an <B>EXE</B> extension.  Invoking (executing) such a program is just a matter of answering the MS-DOS prompt with the name of the program to be executed.  However, four other matters of concern to the user are: <P>
+
+<OL>
+<LI>how to specify command-line arguments
+<LI>how to redirect standard files
+<LI>how to interrupt program execution
+<LI>how programs indicate success or failure
+</OL>
+
+Obviously, the way the program is written has the greatest influence on these questions, and so they cannot possibly be answered in general for all programs.  They must be spelled out in detail in the program's documentation.  But, there are certain traits which all programs produced by the same compiler have in common. <P>
+
+In this chapter, we look at the execution traits of Small C programs.  Keep in mind that the Small C compiler is itself just another Small C program.  So, whatever can be said of Small C programs in general applies equally to the compiler.  We will have more to say about the compiler specifically in <a href="../chap16/chap16.htm">Chapter 16</a>.  <P>
+
+<B>Command-line Arguments<P>
+</B>
+
+In <a href="../chap14/chap14.htm">Chapter 14</a> we studied the mechanism by which parameters can be passed to a program from the command line.  Suffice it to say here that whatever information we add to the command line, after the program's name, can be viewed by the program and so can influence the way it behaves. <P>
+
+Each string of visible characters (no spaces or tabs) is passed to the program as a separate argument.  Arguments are passed in the order of their appearance.  They can be separated by any amount of white space.  A maximum of 19 arguments following the program name can be passed to the program.  Additional arguments are ignored. <P>
+
+Redirection specifications (below) are invisible to the program.  Arguments and redirection specifications can be mixed freely, no particular order is required (except that the program itself may impose an order on the arguments).  The redirection specifications are extracted by MS-DOS, and what remains is passed on to the program. <P>
+
+With Small C it is not possible to include white space in an argument string.  Other compilers (and the UNIX shell) let us enclose such an argument in quotation marks.  However, Small C programs will split it in to separate arguments and see the quotation marks as part of the first and last of these arguments. <P>
+
+Of course, it is up to the program to process arguments however it wishes.  It may assign positional significance to arguments, or base their significance entirely to their values.  It may even do both, assigning positional significance to some arguments (say the first one or two) and process others based their value alone.  There are no rigid rules here, it is strictly a matter of choice.  <P>
+
+Arguments that enable or disable program features (usually non-positional) are customarily called <I>switches</I>.  Normal practice is to give switches a specific lead in character--a hyphen (<B>-</B>) or slash (<B>/</B>) for example.  UNIX programs use hyphens consistently.  MS-DOS programs, on the other hand, use either or both.  Microsoft has a preference for slashes, but many other developers follow the UNIX tradition.  Still others straddle the fence by accepting both hyphens and slashes.  Of course,
+ switches are not required to have any lead in character at all; but when non-switch arguments (like filenames) and switches must coexist, the lead in is normally used to distinguish between them.  Although this could be done on the basis of position, it is generally considered better style to let switches float in the command line--it is harder to remember where a switch must go than to remember to put a hyphen in front of it.<P>
+
+Typically, switches consist of one or more alphabetic, numeric, or special characters.  They usually have mnemonic value--what they do is suggested by their values, making them easy to remember.  For example, the switch <B>-ep105 </B>might tell a text formatter to &quot;end on page 105.&quot;  The command<P>
+
+<PRE>		prog -x zz &lt;abc /1234<P>
+</PRE>
+
+would invoke <B>PROG.EXE</B> passing <B>-x</B>, <B>zz</B>, and <B>/1234</B> as arguments.  The string <B>&lt;abc</B> is not passed since MS-DOS takes it as a redirection specification (below) and drops it from the command line before passing it to the program.  When <B>PROG</B> receives control in<B> main()</B>, its stack will be set up as indicated in Figure 15-1.<P>
+
+<CENTER>
+<img src="fg15-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 15-1: Arguments Passed to Small C Programs<P>
+</CENTER></B>
+
+As we saw in <a href="../chap14/chap14.htm">Chapter 14</a>, <B>argc</B> and <B>argv</B> are declared as formal arguments in<B> main()</B> and so can be accessed by name.  The function<B> getarg()</B> in the Small C library (<a href="../chap12/chap12.htm">Chapter 12</a>) is designed to help fetch the command line arguments.  <P>
+
+<B>Input/Output Redirection<P>
+</B>
+
+The general concept of standard files and redirection was covered in <a href="../chap12/chap12.htm">Chapter 12</a> where we discussed them from the view point of the programmer.  Now we consider them from the user's perspective.  Current versions of MS- DOS completely handle standard file assignments, so the following discussion pertains universally to programs that work with standard files under MS-DOS, not just Small C programs. <P>
+
+Of the five standard files that are open and ready for use when a program begins execution, two are redirectable--the standard input (<B>stdin</B>) and standard output (<B>stdout</B>) files.  Unless specified otherwise in the command line, <B>stdin</B> is assigned to the keyboard and <B>stdout</B> is assigned to the screen. <P>
+
+Failure to realize this can create confusion because when a program inputs from the keyboard it waits for user response.  Many programs written in the UNIX tradition do not prompt for input when <B>stdin</B> has its default assignment.  So novice users may find themselves waiting for the program while the program is waiting for them.  If they do not realize that the program wants keyboard input, they will think the program is hung up.<P>
+
+The important thing to remember about entering a file from the keyboard is how to signal that the end of the file has been reached.  This is done by entering a control-Z, the standard end of file sentinel for MS-DOS.  As we saw in <a href="../chap12/chap12.htm">Chapter 12</a>, the end of a &quot;cooked&quot; disk file is signaled either by a control-Z or the physical end of the file.  With the keyboard, however, there is no physical end of the file, so a control-Z must be used.  Depending on whether the program is reading the file on 
+a line-by-line or a character-by-character basis the user may or may not have to hit the ENTER key after the control-Z. <P>
+
+By placing redirection specifications in the command line, the user causes the default assignments for <B>stdin</B> and/or <B>stdout</B> to be changed for the present execution of the program.  Redirection specifications can be placed anywhere in the command line after the program name.  To redirect <B>stdin</B> we enter a <B>&lt;</B> followed by a file specification.  When that is done, input to <B>stdin</B> comes from the designated file or device instead of the keyboard.  A <B>&gt;</B> followed by 
+a file specification redirects <B>stdout</B> to the indicated file or device.  This causes output through <B>stdout</B> to go to the designated file or device instead of the screen.<P>
+
+File specifications may or may not include drive, path, and extension.  The filename itself is required (except for devices like COM1:), and if the indicated file has an extension, that too must be given.  Omitting the drive designator directs MS-DOS to the default drive, and omitting the path assigns the reference to the current subdirectory.  MS-DOS's special device file names (AUX, PRN, etc.) and actual device names (e.g., LPT1:) are acceptable as file specifications.<P>
+
+When <B>stdout</B> is redirected to a disk file, and the named file does not exist, a new file with the specified name is created.  If the file does exist, then it is overwritten from the beginning.  Standard output can be concatenated to an existing file by writing the redirection specification with  <B>&gt;&gt;</B> instead of  <B>&gt;</B>.  If the named file does not exist, however, this has the same effect as an ordinary output redirection--a new file is created.<P>
+
+Programs that simply read data from <B>stdin</B>, process it, and write the result to <B>stdout</B> are often called <I>filters</I>.  Table 15-1 illustrates several examples of redirecting the input and output of such a filter program.    <P>
+
+<CENTER>
+<img src="tb15-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 15-1: Redirecting Standard Input and Output Files<P>
+</CENTER></B>
+
+<B>Interrupting Program Execution<P>
+</B>
+
+As data spews onto the screen from <B>stdout</B> or <B>stderr</B> the user may wish to freeze the output long enough to study something before it scrolls off the screen.  This can usually be done by entering a control-S from the keyboard.  This keystroke is not taken as data for <B>stdin</B> but simply pauses the program instead.  A second keystroke resumes program execution.  This character, too, is dropped from the input file.<P>
+
+Many programs are also sensitive to the control-C or control-BREAK keystrokes.  If MS-DOS has not been told otherwise, when it sees one of these keystrokes it cancels the program.  Even if MS-DOS is ignoring them, the Small C  <B>get</B> functions, when inputting from the keyboard, take control-C as a signal to abort the program.  Of course, we can use the <B>read</B> functions, which do not cook the data, to override this action.  Also,<B> poll()</B> can be used to poll the keyboard with or 
+without sensitivity to control-C and control-S keystrokes.  <P>
+
+<B>Exit Codes<P>
+</B>
+
+A Small C program may terminate execution in four ways.  It may allow control to reach the end of<B> main()</B>, at which point control returns to MS-DOS.  It may call either<B> exit()</B> or <B>abort()</B>, or it may be canceled by the user. <P>
+
+The functions<B> exit()</B> and<B> abort()</B> are really the same function with two names.  They take a single integer argument--an error code.  If the error code is zero, a normal exit is indicated and control returns quietly to MS-DOS with an exit code of zero.  However, if the error code is not zero, the program displays <P>
+
+<PRE>		Exit Code: n<P>
+</PRE>
+
+(where <B>n</B> is the error code) and returns to MS-DOS passing it the error code.  The value passed to MS-DOS can be tested by means of the <P>
+
+<PRE>		IF ERRORLEVEL ...<P>
+</PRE>
+
+batch command.<P>
+
+When a Small C program aborts because of insufficient memory, it issues an exit code of 1.  This condition is caught by <B>avail()</B> which is called whenever memory is allocated by <B>malloc()</B> or<B> calloc()</B> or whenever the program calls it directly. <P>
+
+When<B> poll()</B> or any of the get functions detects a control-C, they abort the program with an exit code of 2. <P>
+
+When control is allowed to reach the end of<B> main()</B> an implicit <B>exit(0);</B> is issued to close open files and return to MS-DOS.<P>
+<p>
+<CENTER>
+Go to <a href="../chap16/chap16.htm">Chapter 16 </a>            Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER><P>
+</HTML>

@@ -1,0 +1,197 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 20:<P>
+DATA STRUCTURES<P></H1>
+</CENTER>
+</B>
+
+This chapter describes the seven main data structures used by the Small C compiler.  They are: the input line, the literal pool, the macro pool, the staging buffer, the switch table, the symbol table, and the while queue.  Gaining a conceptual understanding of these now will make the remainder of the compiler much easier to learn. <P>
+
+The term structure is being used here in a generic sense, not with reference to the C language construct of the same name.  Although that feature of full C is a real convenience, it is hardly essential for working with data structures of any kind and, since it is not supported by Small C, the compiler is written without them. <P>
+
+Space for these structures is allocated dynamically in<B> main()</B> when the compiler begins execution.  In each case, a pointer receives the address of the memory block that is allocated for the structure.  Table 20-1 lists these pointer names together with their data types and the amount of memory allocated.  The memory sizes are expressed as macro names which are defined in the file <B>CC.H</B>.<P>
+
+<CENTER>
+<img src="tb20-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 20-1: Data Structure Pointers<P>
+</CENTER></B>
+
+<B>The Input Line<P>
+</B>
+
+There are two input line buffers in the compiler--<B>pline</B> from which parsing is done, and <B>mline</B> from which macro processing is done. <P>
+
+The preprocessor reads from <B>mline</B> while writing into <B>pline</B>, from which the parser operates.  The function which reads source lines into the compiler<B> inline()</B> places its data wherever the pointer <B>line</B> points.  Before a line is read into the compiler, <B>line</B> is set to <B>mline</B>, causing the raw source code to be placed there.  The preprocessor then scans <B>mline</B> looking for matches with defined symbols.  Tokens that do not match are copied directly into <B>pline</B>.
+  Tokens that match have their replacement text copied into <B>pline</B> instead.  When the end of the line is reached, <B>line</B> is reset to point to <B>pline</B>, from which parsing takes place. <P>
+
+Associated with <B>line</B> is another global pointer <B>lptr</B> which points to the current character in <B>line</B>.  <B>Lptr</B> marches along the line as tokens are being recognized.  Since the same scanning functions are shared by the preprocessor and the parser, they are directed by <B>lptr</B> so that they work from either line buffer.  They reference <B>mline</B> during preprocessing and <B>pline</B> while parsing.  <P>
+
+<B>The Literal Pool<P>
+</B>
+
+The literal pool is really just a character/integer buffer.  It serves two purposes; it temporarily holds strings until they can be dumped at the end of the current function, and it temporarily holds initializers that are applied to global objects.  The latter case does not require buffering, but it is more convenient to use the literal pool and its functions than to write special functions just for global initializers.  Since function definitions are global, there is no conflict in these two uses of 
+the literal pool; they occur at different times. <P>
+
+In the first case,<B> dofunction()</B>, at the beginning of a function, clears the literal pool and allocates a label number for it.  At the end of the function, it dumps the literal pool; that is, it generates the label followed by enough DB instructions to define the function's strings.  Each string within the function is referenced by an offset from the label.  Since the literal pool is reset with each function, it only has to be large enough to hold the strings in a single function. <P>
+
+In the second case, the literal pool is used by<B> initials()</B> to initialize global objects.  For each object, it is first cleared.  Any initializers following the object's name cause constants to be stored in the pool.  Finally, at the end of the definition, the contents of the pool are output as <B>DB</B> or <B>DW</B> instructions which cause the assembler to place the constants in memory. <P>
+
+The literal pool is controlled by two global variables--<B>litq</B> which points to the beginning of the pool and <B>litptr</B> which is not really a pointer, but a subscript to the next available position in the pool (the byte following the last one used). <P>
+
+The function<B> stowlit()</B> puts things into the pool and <B>dumplits()</B> dumps it by generating a sufficient number of <B>DB</B> or <B>DW</B> instructions to define the contents of the pool to the assembler.  These are described in <a href="../chap21/chap21.htm">Chapter 21</a>.  <P>
+
+<B>The Macro Pool<P>
+</B>
+
+The macro pool is made up of two separate structures--the macro name table and the macro text queue which holds substitution text.  The name table has the format shown in Figure 20-1.<P>
+
+<CENTER>
+<img src="fg20-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 20-1.  Format of the Macro Name Table<P>
+</CENTER></B>
+
+It consists of a fixed number of fixed length entries.  Each entry consists of a string containing a macro name and an offset into <B>macq</B>.  The names are placed in the name field left justified with the customary trailing null byte; the offset is an ordinary integer which locates the beginning of the substitution text for the named macro. <P>
+
+Searches are performed on the name table by the same function that searches the global symbol table,<B> search()</B>.  <B>Search()</B> employs a hashing algorithm to quickly locate a name in the table or the vacant entry where a name should be placed.  On finding the name it returns true; otherwise, false.  In either case, the global pointer <B>cptr</B> is set to the entry matching the name, or the vacant entry in which the name should be placed. <P>
+
+<B>Macq</B> is simply a character buffer into which the replacement text for macro definitions is stored.  For each symbol, the entry in <B>macn</B> contains the offset to a null terminated string in <B>macq</B>. <P>
+
+The function<B> addmac()</B> processes <B>#define</B> statements by adding entries to <B>macn</B> and replacement text to <B>macq</B>.  <B>Preprocess()</B> performs the substitutions.  <P>
+
+<B>The Staging Buffer<P>
+</B>
+
+The staging buffer is a large integer buffer for holding generated code until<B> outcode()</B> can write it to the output file.  It receives only code generated by expressions--the major part of C programs.  Code that falls between expressions is not buffered in this way, but goes straight to the output file.  The reason for buffering the code generated by expressions is so that it can be optimized.  Some optimizing is done by the expression analyzer itself, but most is done by the 
+peephole optimizer<B> peep()</B> as the buffered code is being written to the output file. <P>
+
+Each entry in the staging buffer consists of two integers, a small numeric code called a p-code or pseudo-code, and an integer value that further qualifies the p-code.  Each p-code represents one or more assembler instructions.  A few represent partial instructions. <P>
+
+Two global pointers control the staging buffer.  <B>Snext</B> either contains zero or points to the next available entry in the buffer and <B>slast</B> points to the end of the buffer.  When  <B>snext</B> is zero, an expression is not being analyzed and so code generated by<B> gen()</B> goes directly to the output file.  However, when <B>snext</B> is not zero,<B> gen()</B> places p-codes into the staging buffer at the position indicated. <P>
+
+Two functions<B> setstage()</B> and<B> clearstage()</B> manipulate <B>snext</B> and the contents of the buffer.  <B>Setstage()</B> is called before expression analysis begins and before each subexpression is analyzed.  In the first case, it changes <B>snext</B> from zero to the starting address of the staging buffer (<B>stage</B>), thereby directing future output to the beginning of the buffer.  In the second case, <B>snext</B> is left alone but saved so that code generated from that point can be ignored 
+later by resetting <B>snext</B> to its original value.  The expression analyzer does this when it sees that an expression or subexpression resulted in a constant value.  In that case, it throws away the code that it generated and replaces it with a single instruction that loads the constant into the primary register. <P>
+
+<B>Clearstage()</B> either writes the contents of the buffer to the output file and resets <B>snext</B> to zero or merely backs up <B>snext</B> to an earlier point in the buffer, thereby discarding the most recently generated code.  <B>Clearstage()</B> calls <B>outcode()</B> to translate the p-codes to ASCII strings and write them to the output file.  <B>Outcode()</B> in turn calls<B> peep()</B> to optimize the p-codes before it translates and writes them.  <P>
+
+<B>The Switch Table<P>
+</B>
+
+For each <B>case</B> in a <B>switch</B> statement the switch table holds the value of the case and the number of the label to which control should go in that case.  Figure 20-2 shows the format of the switch table.<P>
+
+<CENTER>
+<img src="fg20-2.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 20-2.  Format of the Switch Table<P>
+</CENTER></B>
+
+Each entry consists of two words, one for the label number and one for the value of the corresponding <B>case</B>.  After compiling the body of the <B>switch</B> statement, which generates ordinary code interspersed with a numeric labels for the cases, Small C generates a call to<B> __switch()</B> followed immediately by a table of label/value pairs to be scanned by<B> __switch()</B> in deciding which label to target.  The purpose of the switch table is to accumulate these 
+label/value pairs until they can be dumped after the call to <B>__switch()</B>. <P>
+
+Two global pointers control access to the table; they are <B>swnext</B> and <B>swend</B>.  <B>Swnext</B> points to the next available entry in the table and <B>swend</B> always points to the last entry.  Whenever a <B>case</B> is found in the body of a <B>switch</B>, a label is generated, its number is stored in the table, the value of the case is stored with it, and <B>swnext</B> is advanced to the next entry.  An attempt to advance <B>swnext</B> beyond <B>swend</B> results in an error. <P>
+
+Notice that <B>switch</B> statements can be nested.  Therefore, it is necessary to track label/value pairs for higher level statements as well as for the current one.  This is done by partitioning the table at the start of every nested <B>switch</B>.  The function<B> doswitch()</B> saves <B>swnext</B> in a local variable and then calls<B> statement()</B> recursively to compile the compound statement which is the body of the current <B>switch</B>.  If another <B>switch</B> is encountered 
+before <B>statement()</B> returns,<B> doswitch()</B> is again called (this time recursively), again saving <B>swnext</B> locally, and again calling<B> statement()</B>.  When<B> statement()</B> does finally return, <B>doswitch()</B> generates its call to<B> __switch()</B> and dumps the switch table from the entry indicated by <B>swnext</B> (when the current instance of<B> doswitch()</B> was called) to the last entry made.  Finally, <B>swnext</B> is restored to its previous value and<B> doswitch()</B> exits.  <P>
+
+<B>The Symbol Table<P>
+</B>
+
+The symbol table is the principle data structure of the compiler.  It stores the names of every object declared in the program and everything the compiler must know about them.  As Figure 20-3 shows, the symbol table is partitioned into two parts.  There is a local table and a global table.  Although they carry the same data, they are really distinct tables with different search algorithms.<P>
+
+<CENTER>
+<img src="fg20-3.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 20-3.  Format of the Symbol Table<P>
+</CENTER></B>
+
+A limited space at the front of the symbol table is reserved for local declarations.  Its address is defined by the symbol <B>STARTLOC</B>.  Since local declarations pertain to only one function at a time, not much space is needed.  The symbol <B>NUMLOCS</B> determines how many local declarations will fit in the reserved space.  The global pointer <B>locptr</B> controls placement of entries in the local table by pointing to the next available entry--the one immediately following the last one 
+made. <P>
+
+The remainder of the table, beginning at the symbol <B>STARTGLB</B>, stores global declarations which, unlike local declarations, accumulate throughout the compilation run.  The symbol <B>NUMGLBS</B> determines how many global declarations will fit in the space allocated.  The global pointer <B>glbptr</B> is initially set to <B>STARTGLB</B> and thereafter always points to the start of the global table. <P>
+
+Each table entry consists of six fields--identity, type, class, size, offset, and name.  The symbols <B>IDENT</B>, <B>TYPE</B>, <B>CLASS</B>, <B>SIZE</B>, <B>OFFSET</B>, and <B>NAME</B> specify the offsets, within an entry, to each of these fields. <P>
+
+The identity field tells what the declared entity is.  The possible values are defined by the symbols shown in Table 20-2.  Symbol table entries can represent labels, variables, arrays of variables, pointers, and functions.  These labels are the ones written in the source code, not the numeric labels created by the compiler.  Labels exist only in the local symbol table.<P>
+
+<CENTER>
+<img src="tb20-2.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 20-2: Defined Values for the Identity Field<P>
+</CENTER></B>
+
+The type field specifies the data type.  The possible values are defined by the symbols shown in Table 20-3.  Since data type is meaningless with respect to labels, this field does not apply to label entries, so zero is used.  For variables, this field specifies the type of variable.  For arrays, it tells the type of the array's elements.  For pointers, it indicates the type of object referenced by the pointer.  And for functions, it specifies the type of object returned--always integer.  The
+ values assigned to these symbols are especially chosen so that when they are shifted right by two bits, they yield the length of objects of the designated type.<P>
+
+<CENTER>
+<img src="tb20-3.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 20-3: Defined Values for the Type Field<P>
+</CENTER></B>
+
+The class field gives the storage class of an object.  The possible values are defined by the symbols shown in Table 20-4.  Since storage class is meaningless with respect to labels, this field is set to zero for label entries.  The idea of a storage class is the same for variables, arrays, and pointers.  <B>STATIC</B> storage is always present.  <B>STATIC</B> objects are declared to the assembler with labels and <B>DB</B> or <B>DW</B> directives.  <B>AUTOMATIC</B> storage is 
+dynamically allocated on the stack upon entry of a compound statement and is deallocated on exit (recall that the body of a function is a compound statement).  Automatic (local) objects are referenced by their offset from the stack frame pointer BP rather than by means of labels.  <B>EXTERNAL</B> objects exist at the global level in some other, separately compiled, module.  They are merely declared to the assembler to be external.  <B>AUTOEXT</B> applies to functions which are referenced but not declared in the program. 
+ These are assumed to be external and are declared so to the assembler at the end of the compile run. <P>
+
+<CENTER>
+<img src="tb20-4.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 20-4: Defined Values for the Class Field<P>
+</CENTER></B>
+
+The size field gives the number of bytes occupied by the object.  If it is a scalar item, then the size is one for a character and two for an integer.  However, the size of an array is the total amount of space taken up by the array.  For character arrays, this is the same as the number of elements, but for integer arrays it is twice that value. <P>
+
+The offset field specified a numeric value (if applicable).  Primarily this is the stack frame offset for local objects.  If the entry describes a label, this field contains the compiler assigned label number to be used in place of the actual label name.  Label names are not used directly because their scope is restricted to the functions in which they appear.  The same label may occur many times in a program, so using the name directly could result in an error at assembly time.  Therefore, 
+Small C associates with each declared label a unique compiler generated label number which is used instead. <P>
+
+The name field contains the name of an entry as a character string.  This is a variable length field in the local table and a fixed length field in the global table.  In the local table, the name is terminated with a byte containing the length of the name (1-8).  In the global table a null byte terminates the name and any remaining bytes are ignored. <P>
+
+The local table is searched sequentially backward, making it easy to implement the scope rules for local declarations.  The inefficiency of this method is compensated by the relatively small number of local declarations in any given function.  Since local declarations can occur at the beginning of any compound statement and compound statements can be nested, searching backwards guarantees that when the same name occurs more than once the search will find the one declared at the lowest level.
+<B>Locptr</B> controls placement of entries in the local table.  At the beginning of each function<B> dofunction()</B> resets it to STARTLOC, thereby emptying the table.  Also, at the beginning of each compound statement<B> compound()</B> saves <B>locptr</B> so it can restore it at the end, thereby causing the local table to forget declarations made in the block while remembering those made in superior blocks.  The function <B>declloc()</B> is then used to process local declarations except labels.  
+<B>Declloc()</B> in turn calls<B> addsym()</B> to actually place new symbols in the table; the same function adds entries to the global table also.  The address of <B>locptr</B> is passed to <B>addsym()</B> so it will know where to place the new entry and so it can set <B>locptr</B> to the address of the next entry to be placed in the local table; i.e., the byte following the name in the current entry.  Since the name is terminated with a byte containing the length of the name, the local table can be searched backward even
+ though it has variable length entries.  The function<B> addlabel()</B> adds labels to the local table.  The function<B> findloc()</B> searches the local table. <P>
+
+The global table is processed by means of a hashing algorithm.  This compensates for the large number of entries which it usually contains.  The function<B> findglb()</B> searches the global table by calling<B> search()</B>, the same function used for macro name searches.  Basically,<B> search()</B> hashes the sought symbol to pick an entry of choice.  It then proceeds sequentially (and cyclically) from that point, looking for a match.  A match or a vacant entry terminates the search.  
+The terminating entry's address is placed in the global pointer <B>cptr</B>, and true is returned if there was a match, or false otherwise.  If the search failed then <B>cptr</B> points to the place where a new entry with the specified name should go. <P>
+
+The function<B> declglb()</B> processes global declarations.  <B>Declglb()</B> in turn calls<B> addsym()</B>, the same function that adds entries to the local table, to place a new symbol in the global table.  The address of <B>glbptr</B> is passed to<B> addsym()</B> so it will know that it is working in the global table.  In that case it calls<B> findglb()</B> to locate a place for the new entry.  <P>
+
+<B>The While Queue<P>
+</B>
+
+The while queue is used to store information needed for breaking out of and continuing <B>while</B>, for, and <B>do</B> loops and for breaking out of <B>switch</B> statements.  A queue is needed because these constructs can be nested.  Obviously, the term while queue is a misnomer.  At one time Small C supported only the <B>while</B> statement for loop control, and the <B>switch</B> statement was not supported.  Then, with the addition of the new statements, the while queue was further 
+employed but not renamed. <P>
+
+Figure 20-4 shows the format of the while queue.  It is really just a short table of integers, three per entry.  <B>WQTABSZ</B> specifies the length of the queue in integers and so must be a multiple of three.  <B>WQSIZ</B> defines the length of an entry (three) and <B>WQMAX</B> points to the last possible entry.  The three items of information needed for continuing and breaking out of control constructs are: (1) the value of the compiler-relative stack 
+pointer (<B>csp</B>) upon entry to the construct, (2) the number of the label that marks the continuation point of a loop, and (3) the number of the label that marks the exit point of the construct.  The first item is needed so the stack can be adjusted back to its original value, thereby deallocating any block-local variables that are no longer needed.  The second and third are needed so that jumps can be generated which target the continuation and exit points respectively.<P>
+
+<CENTER>
+<img src="fg20-4.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Figure 20-4.  Format of the While Queue<P>
+</CENTER></B>
+
+The global pointer <B>wqptr</B> points to the next available entry in the queue.  It is initially set to the address of the first entry, <B>wq</B>.  As each <B>while</B>, <B>for</B>, <B>do</B>, or <B>switch</B> is encountered, an entry is made at <B>wqptr</B> which is then advanced to the next entry.  This action is performed by <B>addwhile()</B> which in turn calls<B> getlabel()</B> to create the two needed label numbers.<P>
+
+When a <B>break</B> or <B>continue</B> statement is found<B> readwhile()</B> is called to fetch the address of the last entry in the queue.  This is appropriate for <B>break</B> statements, but for <B>continue</B> statements, a superior entry might the desired one, since continues do not pertain to <B>switch</B> statements.  If the last entries in the queue correspond to <B>switch</B> statements, then a backward search must be made for the entry representing the most nested loop statement--the last entry 
+with a non-zero continue label number.  This is done by repeatedly calling<B> readwhile()</B>, each time passing it the pointer it returned previously.  With each call,<B> readwhile()</B> returns the next previous entry pointer. <P>
+
+Finally, at the end of the construct,<B> delwhile()</B> is called to remove the current (last) entry from the queue by backing up <B>wqptr</B> one entry. <B> Addwhile()</B> and<B> delwhile()</B> are called by <B>dowhile()</B>, <B>dofor()</B>, <B>dodo()</B>, and <B>doswitch()</B>.  <B>Readwhile()</B> is called by <B>dobreak()</B> and <B>docont()</B>. <P>
+
+<CENTER>
+Go to <a href="../chap21/chap21.htm">Chapter 21</a>        Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

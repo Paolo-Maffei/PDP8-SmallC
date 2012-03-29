@@ -1,0 +1,386 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 4:<P>
+VARIABLES<P></H1>
+</CENTER>
+</B>
+The most significant limitation of the Small C compiler is 
+its lack of support for many of the data types of the C language. 
+ It only recognizes integer and character variables.  Although 
+this may seem like a major limitation, Small C is, nevertheless, 
+adequate for writing device drivers, compilers, assemblers, text 
+processors, sort programs, and the like.  Witness the Small C 
+compiler itself.<P>
+
+A <I>variable</I> is a named object that resides in memory and is 
+capable of being examined and modified.  The term applies to 
+pointers as well as integers and characters.  Although arrays fit 
+this definition, for reasons that appear in 
+<a href="../chap6/chap6.htm">Chapter 6</a>, they are 
+better regarded as collections of variables.  Pointers are 
+treated in detail in the next chapter.<P>
+
+<B>Storage Class<P>
+
+</B>The term <I>storage class</I> refers to the method by which 
+an object is assigned space in memory.  Small C recognizes three 
+storage classes--<I>static</I>, <I>automatic</I>, and <I>external
+</I>. <P>
+
+<CENTER><B>Statics<P></CENTER></B>
+
+Static variables are given space in memory at some 
+fixed location within the program.  They exist when the program 
+starts to execute and continue to exist throughout the program's 
+operation.  The value of a static variable is faithfully 
+maintained until we change it deliberately.  At the assembly 
+language level, each static variable has a label and is described 
+to the assembler with a <B>DW</B> (define word) or <B>DB</B> 
+(define byte) directive.  The label consists of the variable's 
+name (up to eight characters) prefixed by a compiler generated underscore 
+character.  If a static integer <B>si</B> is to be loaded into 
+the accumulator register (AX) it would be done with the assembly 
+language instruction<P>
+
+<PRE> 		MOV AX,_SI<P>
+</PRE>
+
+which instructs the CPU to copy the word at address <B>_SI</B> 
+into <B>AX</B>. (See <a href="../append/appb.htm">Appendix B</a> for an overview of the 8086 
+processor.)<P>
+
+The fact that they exist in permanently reserved memory 
+locations, means that static variables can be initialized to 
+arbitrary values which they are guaranteed to have at the 
+beginning of program execution.  See <a href="../chap7/chap7.htm">Chapter 7</a> for more about 
+initializing static objects.<P>
+
+In Small C, global variables are always static and only global 
+variables are static.  Full C, however, supports static locals. <P>
+
+<CENTER><B>Automatics<P></CENTER></B>
+
+Automatic variables, on the other hand, do not have 
+fixed memory locations.  They are dynamically allocated when the 
+block in which they are defined is entered, and they are 
+discarded upon leaving that block.  Specifically, they are 
+allocated on the machine stack by subtracting a value (one for 
+characters and two for integers) from the stack pointer register 
+(SP).   Since automatic objects exist only within blocks, they 
+can only be declared locally.<P>
+
+If locals are dynamically allocated at unspecified memory (stack) 
+locations, then how does the program find them?  This is done by 
+using the base pointer register (BP) to designate a stack frame 
+(<a href="../chap8/fg8-1.gif">Figure 8-1</a>) for the currently 
+active function.  When the function is entered, the prior 
+value of BP is pushed onto the stack and then the new value of 
+SP is moved to BP.  This address--the new value of SP--then becomes the base for 
+references to local variables that are declared within the 
+function.<P>
+
+If, for example, an integer <B>i</B> and a character <B>c</B><B> 
+</B>are defined (in that order) as automatic variables, the stack 
+pointer would be decreased by three--two for <B>i</B> and one for 
+<B>c</B>.  If <B>i</B> is to be loaded into the accumulator, it 
+would be done with the assembly instruction<P>
+
+<PRE>		MOV AX,-2[BP]<P>
+</PRE>
+
+which tells the CPU to locate the word addressed by <B>BP</B> 
+minus <B>2</B> and copy its value into <B>AX</B>.  Similarly, <B>
+c</B> would be obtained by     <P>
+
+<PRE>		MOV AL,-3[BP]<P>
+</PRE>
+
+which locates the byte addressed by <B>BP</B> minus <B>3</B> 
+and copies it into <B>AL</B>, the lower half of AX.<P>
+Notice that this method of accessing local variables makes no use 
+of labels, and that with each call of a function its local 
+variables may have different addresses depending on the stack 
+address on entry to the function.<P>
+
+Obviously, when a local variable is created it has no dependable 
+initial value.  It must be set to an initial value by means of an 
+assignment operation.  Full C provides for automatic variables to 
+be initialized in their declarations, like globals.  It does this 
+by generating &quot;hidden&quot; code that assigns values 
+automatically after variables are allocated space.  Small C does 
+not support this feature; it requires the writing of assignment 
+statements.  This may seem like a shortcoming, but it really
+ is not.  For one thing, it takes very little more to write an 
+assignment statement than an initializer
+ (<a href="../chap7/chap7.htm">Chapter 7</a>).  And, for 
+another, the result in the object program is the same; Small C is 
+no less efficient for its lack of local initializers.<P>
+
+One last detail about automatics.  When the current function is 
+finished, it is necessary to restore BP and SP to their original 
+values so the calling function will operate properly again.  This 
+is done by first moving BP to SP--to deallocate local 
+variables--and then popping the original value of BP back into BP.<P>
+
+It is tempting to forget that automatic variables go away when 
+the block in which they are defined exits.  This sometimes leads 
+new C programmers to fall into the &quot;dangling reference&quot; 
+trap in which a function returns a pointer to a local variable, 
+as illustrated by     <P>
+
+<PRE>
+	func() {
+		int autoint;
+		...
+		return (&amp;autoint);
+		}
+
+</PRE><P>
+
+When callers use the returned address of <B>autoint</B> they will 
+find themselves messing around with the stack space which <B>
+autoint</B> used to occupy.  In Small C, local variables are 
+always automatic, and only local variables are automatic.  Full 
+C, however, supports static locals.<P>
+
+<CENTER><B>Externals<P></CENTER></B>
+
+Objects which are defined outside of the present 
+source module have the external storage class.  This means that, 
+although the compiler knows what they are, it has no idea where 
+they are.  It simply refers to them by name without reserving 
+space for them.  Then when the linker brings together the object 
+modules, it resolves these &quot;pending&quot; references by 
+finding the external objects and inserting their addresses into 
+the instructions that refer to them.  The compiler knows an 
+external variable by the keyword <B>extern</B> which must precede its 
+declaration.<P>
+
+In Small C, only global declarations can be designated <B>extern
+</B> and only globals in other modules can be referenced as external.<P>
+
+<B>Scope<P>
+
+</B>The <I>scope</I> of a variable is the portion of the program 
+from which it can be referenced.  We might say that a variable's 
+scope is the part of the program that &quot;knows&quot; or 
+&quot;sees&quot; the variable.  As we shall see, different rules 
+determine the scopes of global and local objects.<P>
+
+When a variable is declared globally (outside of a function) it's 
+scope is the part of the source file that follows the 
+declaration--any function following the declaration can refer to 
+it.  Functions that precede the declaration cannot refer to it.  
+Most C compilers would issue an error message in that case.  
+However, Small C assumes that any undeclared name refers to a 
+function, and automatically declares it as such.<P>
+
+The scope of local variables is the block in which they are 
+declared.  Local declarations must be grouped together before the 
+first executable statement in the block--at the head of the 
+block.  It follows that the scope of a local variable effectively 
+includes all of the block in which it is declared.  Since blocks 
+can be nested, it also follows that local variables are seen in 
+all blocks that are contained in the one that declares the variables.<P>
+
+If we declare a local variable with the same name as a global 
+object or another local in a superior block, the new variable 
+temporarily supersedes the higher level declarations.  Consider 
+the program in Listing 4-1.<P>
+<CENTER>
+<img src="ls4--1.gif">
+</CENTER>
+<CENTER><B>Listing 4-1: The Scope of Local Variables<P>
+</CENTER></B>This program declares variables with the name <B>x</B>, 
+assigns values to them, and displays them on the screen 
+with in such a way that, when we consider its output, the scope 
+of its declarations becomes clear.  When this program runs, it 
+displays <B>321</B>.  This only makes sense if the <B>x</B> 
+declared in the inner most block masks the higher level 
+declarations so that it receives the value <B>'3'</B> without 
+destroying the higher level variables.  Likewise the second <B>x</B> 
+is assigned <B>'2'</B> which it retains throughout the execution of the 
+inner most block.  Finally, the global <B>x</B>, which is 
+assigned<B> </B><B>'1'</B>, is not affected by the execution of 
+the two inner blocks.  Notice, too, that the placement of the 
+last two <B>putc(x);</B> statements demonstrates that leaving a 
+block effectively unmasks objects that were hidden by 
+declarations in the block.  The second <B>putc(x);</B> sees the 
+middle <B>x</B> and the last <B>putc(x);</B> sees the global <B>x</B>.<P>
+
+This masking of higher level declarations is an advantage, since 
+it allows the programmer to declare local variables for temporary 
+use without regard for other uses of the same names.<P>
+
+<B>Declarations<P>
+
+</B>Unlike BASIC and FORTRAN, which will automatically declare 
+variables when they are first used, every variable in C must be 
+declared first.  This may seem unnecessary, but when we consider 
+how much time is spent debugging BASIC and FORTRAN programs 
+simply because misspelled variable names are not caught for us, 
+it becomes obvious that the time spent declaring variables 
+beforehand is time well spent.<P>
+
+As we saw in <a href="../chap1/chap1.htm">Chapter 1</a>, 
+describing a variable involves two actions--declaring its 
+type and defining it in memory (reserving a place for it).  
+Although both of these may be involved, we refer to the C 
+construct that accomplishes them as a <I>declaration</I>.  As we 
+saw above, if the declaration is preceded by <B>extern</B> it 
+only declares the type of the variables, without reserving space 
+for them.  In such cases, the definition must exist in another 
+source file.  Failure to do so, will result in an &quot
+;unresolved reference&quot; error at link time.<P>
+
+Table 4-1 contains examples of legitimate variable declarations.  
+Notice that the first two declarations are introduced by a 
+keyword that states the data type of the variables listed.  The 
+keyword <B>char</B> declares characters, and <B>int</B> declares 
+integers.  This is the standard way to write declarations.  Since 
+it is not specified otherwise, both the character and integer 
+variables declared by these statements are assumed by the 
+compiler to contain signed values.  We shall see in a moment that 
+this assumption can be changed.  The trend today is to make this 
+assumption specific by placing the keyword <B>signed</B> before 
+the data type; but Small C does not recognize that keyword.<P>
+
+The next three declarations begin with the prefix <B>unsigned</B>
+which further qualifies the declaration by specifying 
+unsigned treatment of the variables.  When a declaration is 
+introduced by such a qualifier the data type may be omitted, 
+causing the compiler to assume <B>int</B>.<P>
+
+As stated earlier, the ability to specify unsigned characters is 
+new with this version of Small C.  The original C language and 
+earlier versions of Small C did not permit it.  However, the 
+trend in C compilers is to support this highly desirable feature, 
+as the present version of Small C does.<P>
+
+Notice that Table 4-1 gives three examples of external 
+declarations.  Here, too, when the data type is not given, the
+compiler assumes <B>int</B>. <P>
+
+When more than one variable is being declared, they are written 
+as a list with the individual names separated by commas.  Each 
+declaration is terminated with a semicolon as are all simple C 
+statements.<P>
+<CENTER>
+<img src="tb4--1.gif">
+</CENTER>
+<CENTER><B>Table 4-1: Variable Declarations<P>
+</CENTER></B>
+
+As we shall see, this same basic syntax--with slight 
+modifications--is used to declare pointers, arrays, and functions 
+(<a href="../chap5/chap5.htm">Chapters 5</a>, <a href="../chap6/chap6.htm">6</a>, and <a href="../chap8/chap8.htm">8</a>).<P>
+
+<B>Integer Variables<P>
+
+</B>Integers are 16-bit quantities.  Signed integers are 
+represented internally in two's complement notation.  The 
+high-order bit is a sign bit and the 15 low-order bits are 
+magnitude bits.  This gives signed integers a positive range of 0 
+through 32767, and a negative range of -1 through -32768.  As we 
+saw above, a variable is understood to be signed if it is not 
+explicitly declared unsigned.<P>
+
+Unsigned integers differ in that the high-order bit is taken as a 
+magnitude bit.  This gives unsigned integers a range of 0 through 65535.<P>
+
+When a signed integer enters into an operation with an unsigned 
+quantity, the signed integer is treated as though it were 
+unsigned.  There is no actual change to its bit pattern, it is 
+simply taken as an unsigned value.  The result of such operations 
+is also an unsigned value.<P>
+
+When a signed integer combines with another signed quantity, a 
+signed operation is performed and the result is considered to be 
+signed.  In many cases there is no difference between signed and 
+unsigned operations.  Examples are addition and subtraction, 
+equality and inequality comparisons.  Nevertheless, if either 
+operand is unsigned, the result is unsigned.<P>
+
+<B>Character Variables<P>
+
+</B>Character variables are stored as 8-bit quantities.  When 
+they are fetched from memory, they are always promoted 
+automatically to integers.  This is the only automatic data 
+conversion performed by Small C on fetched variables since 
+integers are the largest values it recognizes.  Full C likewise 
+promotes characters to integers, but it may also perform further 
+conversions if needed to match the other operand in a binary operation.<P>
+
+Originally, the C language did not distinguish between signed and 
+unsigned character variables.  It simply treated them as signed 
+quantities.  When it converted them to integers it did so by 
+extending the high-order (sign) bit throughout the high-order 
+byte.  But this approach often produces undesirable results when 
+working with characters that have the high-order bit turned on.  
+If, for example, a variable <B>ch</B> contains the value <B>0x80</B>, 
+one would expect the condition<P>
+
+<PRE>		(ch == 0x80)<P>
+</PRE>
+
+to yield true.  But since the high-order bit of <B>ch</B> is set, 
+the condition becomes effectively<P>
+
+<PRE>		(0xFF80 == 0x80)<P>
+</PRE>
+
+which is false.  This forces the programmer to reset the 8 
+high-order bits to zero by writing something like<P>
+
+<PRE>		(ch &amp; 0xFF == 0x80)<P>
+</PRE>
+
+where <B>&amp;</B> is the bitwise AND operator.  Written in this 
+form, the condition yields true.<P>
+
+Some compiler implementors have decided that it is better to 
+treat character variables as unsigned values (like character 
+constants).  This eliminates the need to strip high-order bits 
+and saves untold hours of debugging time.  Today, most 
+implementors still follow the UNIX convention, but also provide a 
+compile-time option to treat unqualified character variables as 
+unsigned.  Most recently, the ability to designate character 
+variables as either signed or unsigned has become standard.<P>
+
+Small C follows the UNIX convention by assuming that unqualified 
+character variables are signed.  However, the current version of 
+Small C does accept the <B>unsigned</B> qualifier in character 
+declarations to reverse this assumption.<P>
+
+Signed characters are represented internally in two's complement 
+notation--the high-order bit being the sign and the 7 low-order 
+bits specifying the magnitude.  This gives signed characters a 
+positive range of 0 through 127, and a negative range of -1 through -128.<P>
+
+Unsigned characters differ in that the high-order bit is taken as 
+a magnitude bit and the sign is always presumed to be positive.  
+This gives unsigned characters a range of 0 through 255.<P>
+
+As with integers, when a signed character enters into an 
+operation with an unsigned quantity, the character is interpreted 
+as though it were unsigned.  The result of such operations is 
+also unsigned.  When a signed character joins with another signed 
+quantity, the result is also signed.<P>
+
+There is also a need to change the size of characters when they 
+are stored, since they are represented in the CPU as a 16-bit 
+values.  In this case, however, it matters not whether they are 
+signed or unsigned.  Obviously there is only one reasonable way 
+to put a 16-bit quantity into an 8-bit location--the high-order 
+byte must be chopped off.  It is the programmer's responsibility 
+to ensure that significant bits are not lost when characters are stored.<P>
+
+<P>
+<CENTER>Go to <a href="../chap5/chap5.htm">Chapter 5</a>         Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

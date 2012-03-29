@@ -1,0 +1,350 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 8:<P>
+FUNCTIONS<P></H1>
+</CENTER>
+</B>The notion of <I>function</I> in programming languages is based on the mathematical concept of the same name.  The idea is that a named algorithm, a function, maps a set of values onto one of a set of result values.  When the algorithm's name is written in an expression, together with the values it needs, it represents the result that it produces.  In other words, an operand in an expression may be written as a function name together with a set of values upon which the function operates; the resulting
+ value, as determined by the function, replaces the function reference in the expression.  For example, in the expression<P>
+
+<PRE>		abc(a, 2) + 1<P>
+</PRE>
+
+the term<B> abc(a, 2)</B> names the function <B>abc</B> and supplies the variable <B>a</B> and the constant <B>2</B> from which <B>abc</B> derives a value which is then added to <B>1</B> for the final value of the expression.  If the algorithm of <B>abc</B> happens to form the product of its two values, then the expression effectively becomes<P>
+
+<PRE>		(a * 2) + 1<P>
+</PRE>
+
+Despite the simplicity of this illustration, functions are vary powerful devices.  Their power comes from two facts.  First, although a function may be invoked any number of places in a program, it is defined only once; and second, functions may have arbitrarily complex algorithms.  It follows from the first fact that functions save work (programming effort) and memory space.   And both facts together imply that functions may are an effective structuring device for organizing programs into logical
+units.   The trade off, of course, is the overhead of  performing the requisite function calls and returns.<P>
+
+<B>Functions and Subroutines<P>
+
+</B>Programming languages that support functions implement them as special subroutines which return a value and are called from within expressions.  They refer to them as <I>functions</I> to distinguish them from ordinary <I>subroutines</I> (or <I>procedures</I>) that do not return values and are not called from within expressions.  The C language uses functions as the basic procedural units of programs.  In fact, C does not even implement ordinary subroutines.  
+If one were not already aware of this, it may seem to be a major shortcoming.  But, as we shall see, it is really an elegant simplification that looses none of the generality of other languages.<P>
+
+C is unique in that it accepts an isolated expression as a statement.  Expressions need not be written as parts of larger constructs.  Thus we could write <B>i+5;</B> or just <B>5;</B> as independent statements if we wanted to.  But what is the point?  What do such statements accomplish?  Well, these particular statements accomplish nothing.  But when we consider that expressions may invoke functions, and may also include assignment, increment, and decrement operations, then it becomes clear 
+that expressions are capable of doing work beyond that of simply yielding a value.<P>
+
+In fact, C does not even recognize assignment statements as such.  Assignment statements are really just expressions containing assignment operators.  Furthermore, while the concept of function is essentially that of <I>algorithm yielding a value</I>, functions are not limited to this narrow definition.  There is no reason that functions cannot do other things which affect program execution--interact with the operating system, for instance.<P>
+
+These considerations lead to the observation that C has no need for a call statement.  To <I>call</I> a function, it is only necessary to write an expression consisting of nothing more than a function reference; that is, the function's name followed by parentheses containing the values to be passed to it.  Thus the expression<P>
+
+<PRE>		func();<P>
+</PRE>
+
+is a perfectly valid statement that calls the function <B>func()</B>.  Although no values are passed to <B>func()</B>, it is still necessary to write the parentheses so the compiler will know to interpret this as a call to <B>func()</B>.  Without the parentheses this would be taken as a reference to the function's address.<P>
+
+By eliminating the distinction between functions and subroutines, it would seem that C creates ambiguities relating to the handling of returned values.  Do all functions return a value?  And, if so, what happens to the value of a function like <B>func()</B>, above, which is called without a context to utilize its value?  The answer to the first question is &quot;no,&quot; not all functions actually return a value.  On the other hand <B>func()</B> may in fact return a value which in this case is 
+wasted; since it is not used it is simply ignored.  The only dangerous situation occurs when a function that does not return a value is called from a context that requires one.  Suppose, for instance, that the function <B>novalue()</B>,  which does not return a value, is called in the statement<P>
+
+<PRE>		if (novalue()) i = 5;<P>
+</PRE>
+
+Will the assignment be performed?  The answer is &quot;maybe so, maybe not.&quot;  When a function is written to not return a value, then when it returns to the point from which it was called, the last value that happens to be in Small C's <I>primary register</I> (the AX register) will be seen as the returned value.  So, functions that do not return a value, effectively return unpredictable values which should be ignored when the function is called.<P>
+
+<B>Terminology<P>
+
+</B>Over the years, accepted terminology concerning the implementation of functions in programming languages has accrued.  To begin with, we refer to the part of a program that describes a function as a function<I> declaration</I> or <I>definition</I>.  And, as we saw in <a href="../chap1/chap1.htm">Chapter 1</a>, C distinguishes between these terms.  It will become clear momentarily that we may declare a function's existence without actually defining its algorithm.<P>
+
+The values on which a function works are called <I>arguments</I>.  Arguments appear in two contexts--in function definitions and in function calls.  In the first case, the arguments are just names by which reference is made to the values that are actually passed to the function when it is called.  We call these <I>formal</I> or <I>dummy</I> arguments.  In the second case, the arguments specify what is actually passed to the function, and so they are called <I>actual</I> arguments.<P>
+
+We have already been using three terms that need to be identified--<I>call</I> refers to the act of invoking a function, <I>return</I> refers to the return of control from a function back to the point from which it was called, and <I>returned value</I> refers to the value produced by a function.<P>
+
+Functions may affect programs in ways other than through their returned values.  We call these actions <I>side effects</I>.  Typically, side effects take the form of changes to global objects, changes to objects pointed to by arguments, and input/output operations.<P>
+
+<B>Function Declarations<P>
+
+</B>As we noted above, the distinction which C makes between declarations and definitions applies to functions also.<P>
+
+Declarations, which specify the contents of a function, are said to <I>define</I> the function.  On the other hand, there are situations where it is necessary to only declare a function's existence and the type of value it returns.  We now consider declarations of the latter type.  Definitions will be discussed next.<P>
+
+Earlier we noted that it was the appearance of parentheses following a function's name that informed the compiler to generate a call to the function.  That same method is used to distinguish function declarations from other types of declarations.  Thus the first declaration in Table 8-1 identifies <B>abc</B> as the name of a function.<P>
+
+<CENTER>
+<img src="tb8-1.gif">
+</CENTER>
+<P>
+<CENTER><B>Table 8-1: Function Declarations<P>
+</CENTER></B>
+
+The second declaration in Table 8-1 looks a bit complicated because it has two sets of parentheses and an asterisk. 
+In fact, it only declares <B>fp</B> to be a pointer to any function that returns integers.  As in other declarations, the asterisk identifies the following name as a pointer.  Therefore, this declaration reads &quot;<B>fp</B> is a pointer to a function returning <B>int</B>.&quot;  Using the term <I>object</I> loosely, the asterisk may be read in its usual way 
+as &quot;object at.&quot;  Thus we could also read this declaration as &quot;the object at <B>fp</B> is a function returning <B>int</B>.&quot;<P>
+
+So why the first set of parentheses?  By now you have noticed that in C declarations follow the same syntax as references to the declared objects.  And, since the asterisk and parentheses (after the name) are expression operators, an evaluation precedence is associated with them.  In C, parentheses following a name are associated with the name before the preceding asterisk is applied to the result.  Therefore,<P>
+
+<PRE>		int *fp();<P>
+</PRE>
+
+would be taken as<P>
+<PRE>		int *(fp());<P>
+</PRE>
+
+which says that <B>fp</B> is a function returning a pointer to an integer, which is not at all like the second declaration in Table 8-1.<P>
+
+I do not mean to imply that Small C will accept these last two examples.  Among Small C's restrictions is its limit of only one declaration modifier (asterisk, parentheses, etc.) per name.  So, although these two declarations are acceptable C syntax, Small C will reject them.  The only exception is pointers to functions as shown in Table 8-1.<P>
+
+The last example in Table 8-1 shows how to declare functions that are defined in a different source file that is compiled separately.<P>
+
+Whereas most C compilers allow us to also declare (in non-definitional declarations) the types of the formal arguments, Small C does not.  The parentheses must be empty in Small C programs.  The reason some compilers permit this, is so they can ensure that arguments are passed to functions correctly.  These <I>prototype</I> declarations are a very useful debugging feature.  <a href="../chap28/chap28.htm">Chapter 28</a> discusses the possibility of adding prototype declarations to the Small C compiler.<P>
+
+There are three contexts in which non-definitional function declarations may appear--global declarations, local declarations, and declarations of formal arguments (below).   Small C does not accept every form of declaration in Table 8-1 in every context.  The first and third types of declaration may be written only at the global level.  Whereas the second type (pointer to function) may appear either in local or formal argument declarations.<P>
+
+Of the three types of function declaration in Table 8-1, only one is ever required in a Small C program--the pointer declaration.  Unlike most C compilers, when Small C encounters an undefined name it presumes to have a function name.  And, since Small C functions return only integers, the compiler is able to automatically declare such names as functions returning integers.<P>
+
+This means that we may freely reference functions in a source file before defining them.  At the end of the source file, if any of these automatically declared functions have not been defined, then code is generated which declares them to the assembler as external references.  It follows, therefore, that the first and third examples of Table 8-1 are never needed in Small C programs.  They are supported only for documentation purposes and for compatibility with full C compilers.<P>
+
+Although Small C does not support functions that return characters, it does accept such declarations.  This is because, since characters are automatically promoted to integers, there is no practical difference between functions returning integers and those returning characters.  So when Small C sees <B>char func();</B> it accepts it as <B>int func();</B><P>
+
+<B>Function Definitions<P>
+
+</B>The second way to declare a function is to fully describe it; that is, to <I>define</I> it.  Obviously every function must be defined somewhere.  Small C function definitions have the form<P>
+
+<PRE>
+		<I>Name</I> (<I>ArgumentList?</I>)
+			<I>ArgumentDeclaration?...</I>
+			<I>CompoundStatement</I>
+</PRE><P>
+
+<I>Name</I> is the name of the function.  <I>ArgumentList?</I> is a list of zero or more names for the arguments that will be received by the function when it is called.  These are the formal (dummy) arguments mentioned earlier.  They simply tag the actual arguments with names by which they can be referenced within the function.  The first actual argument corresponds to the first formal argument, the second with the second, and so forth.  <I>ArgumentDeclaration?...</I> is a series of declarations 
+which specify the attributes of the formal arguments.  Each name in <I>ArgumentList?</I> must be declared.  These are ordinary declarations of variables, pointers, arrays, and function pointers as described in Chapters 4-6 and previously in this chapter.  In this context, however, the declared items are not defined; instead, they are presumed to exist on the stack, below the return address, where they are placed before the function is called.<P>
+
+Since every actual argument is passed as a 16-bit value, characters are promoted to integers (as usual) and arrays and strings are passed as pointers.  This is entirely consistent with their treatment in expressions.  In fact, actual arguments are just that--expressions.<P>
+
+Although a character is passed as a word, we are free to declare its formal argument as either character or word.  If it is declared as a character, only the low-order byte of the actual argument will be referenced, and (as usual) will be promoted to an integer.  If it is declared as an integer, then all 16 bits will be referenced.  The only difference is the point at which the promotion to integer occurs.  In the first case it occurs both at the point of the call and at the points of reference in 
+the function being defined (according the argument's formal declaration--unsigned or signed).  In the second case it occurs only at the point of the call, where the actual argument is pushed onto the stack.  In that case the promotion is regulated by the actual argument's declaration.  Of course, the argument may be a character constant, in which case the promotion occurs at compile time, such that the value is positive.<P>
+
+It is generally more efficient to reference integers than characters because there is no need for a machine instruction to set the high-order byte.  So it is common to see situations in which a character is passed to a function which declares the argument to be an integer.  But there is one caveat here: not all C compilers promote character arguments to integers when passing them to functions; the result is an unpredictable value in the high-order byte of the argument.  This should be remembered 
+as a portability issue.<P>
+
+Since there is no way in C to declare strings, we cannot declare formal arguments as strings, but we can declare them as character pointers or arrays.  In fact, as we have seen, C does not recognize strings, but arrays of characters.  The string notation is merely a shorthand way of writing a constant array of characters.<P>
+
+Furthermore, since an unsubscripted array name yields the array's address and since arguments are passed by value (below), an array argument is effectively a pointer to the array.  It follows that, the formal argument declarations <B>arg[]</B> and <B>*arg</B> are really equivalent.  The compiler takes both as pointer declarations.  Array dimensions in argument declarations are ignored by the compiler since the function has no control over the size of arrays whose addresses are passed to it.  
+It must either assume an array's size, receive its size as another argument, or obtain it elsewhere.<P>
+
+The last, and most important, part of the function definition above is <I>CompoundStatement</I>.  This is where the action occurs.  Since compound statements may contain local declarations, simple statements, and other compound statements, it follows that functions may implement algorithms of any complexity and may be written in a structured style.  Nesting of compound statements is permitted without limit.<P>
+
+As an example of a function definition consider<P>
+
+<PRE>
+		func (i, ia, c, cp, fp)
+			int i, ia[], (*fp)();
+			char c, *cp;
+			{...}
+</PRE><P>
+
+Here is a function named <B>func</B> which takes five arguments--an integer, an integer array, a character, a character pointer, and a function pointer.  The ellipsis stands for whatever constitutes the function's algorithm.  Notice that each argument is declared and only arguments are declared between the argument list and the compound statement.  The order of the declarations is immaterial.   This function without arguments would be declared as<P>
+
+<PRE>		func () {...}<P>
+</PRE>
+
+Notice that these definitions do not specify whether or not a function returns a value or the type of value returned.  Full C compilers accept keywords like <B>int</B>, <B>char</B>, and <B>void</B> before a function definition to provide this information.  The word <B>void</B><B> </B>is a recent innovation which explicitly states that the function does not return a value.  This version of Small C accepts <B>void</B><B> </B>as a comment, but does not accept <B>int</B> or <B>char</B>.<P>
+
+For every function definition, Small C generates an assembler directive declaring the function's name to be <I>public</I>.  This means that every Small C function is a potential entry point and so can be accessed externally.<P>
+
+<B>Function Calls<P>
+
+</B>A function is called by writing its name followed by a parenthesized list of argument expressions.  The general form is<P>
+
+		<I>Name</I> <B>(</B> <I>ExpressionList?</I> <B>)</B><P>
+
+where <I>Name</I> is the name of the function to be called.  As indicated by the question mark, <I>ExpressionList?</I> is optional.  Notice that each argument is in fact an expression.  It may be as simple as a variable name or a constant, or it may be arbitrarily complex, including perhaps other function calls.  What ever the case, the resulting value is pushed onto the stack where it is passed to the called function.<P>
+
+Small C programs evaluate arguments from left to right, pushing them onto the stack in that order.  Then they call the function.  On return, the arguments are removed from the stack and execution continues with the primary register containing the value returned by the function.<P>
+
+When the called function receives control, it refers to the first actual argument using the name of the first formal argument.  The second formal argument refers to the second actual argument, and so on.  In other words, actual and formal arguments are matched by position in their respective lists.  Extreme care must be taken to ensure that these lists have the same number and type of arguments.  Small C does not verify that functions are called properly.<P>
+
+It was mentioned earlier, that function calls appear in expressions.  But, since expressions are legal statements, and since expressions may consist of only a function call, it follows that a function call may be written as a complete statement.  Thus the statement<P>
+
+<PRE>		func (x, y+1, 33);<P>
+</PRE>
+
+is legal.  It calls <B>func()</B>, passing it three arguments--<B>x</B>, <B>y+1</B>, and <B>33</B>.  Since this call is not part of a larger expression, any value that <B>func()</B> might return will be ignored.  As another example, consider<P>
+
+<PRE>		x = func();<P>
+</PRE>
+
+which is also an expression.  It calls <B>func()</B> without arguments and assigns the returned value to <B>x</B>.  If <B>func()</B> should fail to explicitly return a value, then an unpredictable value will be assigned.<P>
+
+The ability to pass one function a pointer to another function is a very powerful feature of the C language.  It enables a function to call any of several other functions with the caller determining which subordinate function is to be called.  We shall see this used to good effect in the Small C expression analyzer.<P>
+
+As an example of this technique, consider three functions <B>func()</B>, <B>f1()</B>, and <B>f2()</B> where <B>func()</B> is to call either <B>f1()</B> or <B>f2()</B> depending on instructions from its caller.  If we call <B>func()</B> with<P>
+
+<PRE>		func (f1);<P>
+</PRE>
+
+it will know to call <B>f1()</B> instead of <B>f2()</B>.  (Recall that a function name, like <B>f1</B>, without parentheses yields the function's address.)  Now, if <B>func()</B> is defined as<P>
+
+<PRE>
+		func (arg) int (*arg)(); {
+			...
+			(*arg)();
+			...
+			}
+</PRE><P>
+it will perform properly.  Notice that <B>arg</B> is declared to be a function pointer.  Also, notice that the designated function is called by writing an expression of the same form as the declaration.  Although not strictly necessary to make sense of this expression, the asterisk meaning loosely &quot;object at&quot; appearing before <B>arg</B> refers to the function itself.  The first set of parentheses must be written as shown so the compiler will not apply the asterisk to the value returned by th
+e call, instead of the function pointer.  This syntax, which was introduced with version 2.1 of Small C, is consistent with full C.<P>
+Originally, Small C accepted<P>
+
+<PRE>		int arg;<P>
+</PRE>
+
+to declare such an argument, and<P>
+
+<PRE>		arg (...)<P>
+</PRE>
+
+to call the function.  Although, Small C still accepts this notation, to avoid portability problems, it should not be used.<P>
+
+<B>Argument Passing<P>
+
+</B>Now let us take a closer look at the matter of argument passing.  With respect to the method by which arguments are passed, two types of subroutine calls are used in programming languages--<I>call by reference</I> and <I>call by value</I>.<P>
+The first method passes arguments in such a way that references to the formal arguments become, in effect, references to the actual arguments.  In other words, references (pointers) to the actual arguments are passed, instead of copies of the actual arguments themselves.  In this scheme, assignment statements have implied side effects on the actual arguments; that is, variables passed to a function are affected by changes to the formal arguments.  Sometimes side effects are beneficial, 
+but usually they are not.  Frequently, with this approach, it becomes necessary to declare temporary variables into which the arguments are copied, just so the function can work with them without affecting the originals.<P>
+
+The C language, on the other hand, uses the call by value scheme in which values, not references, are passed to functions.  Within a called function, references to formal arguments see values on the stack, instead of the objects from which they were taken.<P>
+
+The most important point to remember about passing arguments in C is that there is no connection between an actual argument and its source.  Changes to the arguments received by a function, have no affect what so ever on the objects that might have supplied their values.  They can be changed with abandon and their sources will not be affected in any way.  This removes a burden of concern from the programmer since he may use arguments as local variables without side effects.  It also avoids the 
+need to define temporary variables just to prevent side effects.<P>
+
+It is precisely because C uses call by value that we can pass expressions--not just variables--as arguments.  The value of an expression can be copied, but it cannot be referenced since it has no existence in memory; it is not an lvalue.  Therefore, call by value adds important generality to the language.<P>
+
+Although the C language uses the call by value technique, it is still possible to write functions that have side effects; but it must be done deliberately.  This is possible because of C's ability to handle expressions that yield addresses.  And, since any expression is a valid argument, addresses can be passed to functions.<P>
+
+There are two ways to refer to objects that are pointed to by arguments--by using the indirection operator (<B>*</B>) and by subscripting.  Recall from <a href="../chap5/chap5.htm">Chapters 5</a> and <a href="../chap6/chap6.htm">6</a> that pointers may be subscripted just like array names.<P>
+
+To see how a function may produce side effects through a pointer argument, consider<P>
+
+<PRE>
+		func (p) int *p; {
+			*p = 0;
+			}
+</PRE><P>
+
+Notice that <B>p</B> is declared to be a pointer to integers.  The assignment statement does not assign zero to <B>p</B> but to the<P>
+object at <B>p</B>; that is, the integer to which <B>p</B> points.<P>
+
+Since expressions may include assignment, increment, and decrement operators (<a href="../chap9/chap9.htm">Chapter 9</a>), it is possible for argument expressions to affect the values of arguments lying to their right.  (Recall that Small C evaluates argument expressions from left to right.)  Consider, for example,<P>
+
+<PRE>		func (y=x+1, 2*y);<P>
+</PRE>
+
+where the first argument has the value <B>x+1</B> and the second argument has the value <B>2*(x+1)</B>.  What would be the value of the second argument if arguments were evaluated from right to left?  This kind of situation should be avoided, since the C language does not guarantee the order of argument evaluation.  The safe way to write this is<P>
+<PRE>
+		y=x+1;
+		func (y, 2*y);
+</PRE><P>
+
+As we noted earlier, the Small C compiler does not verify the number and type of arguments passed to functions.  It is the programmer's responsibility to ensure that they match the formal arguments in the function's definition.  If too many arguments are given, the function will see only the trailing arguments.  If too few are given, however, the function will use items on the stack, below the argument list, as though they were arguments.  And that will surely produce undesirable results.  
+This mistake--mismatching actual and formal arguments--is perhaps the most common and most troublesome error made by C programmers.<P>
+
+Occasionally, the need arises to write functions that work with a variable number of arguments.  An example is <B>printf()</B> in the library.<P>
+
+In full C, these situations are handled by designing such functions so that the first (left-most) argument indicates how many other arguments are being passed.  Then using the knowledge that arguments are pushed onto the stack from right to left (opposite to Small C), the function declares only one argument--the first one written, the last one pushed.  The address of that argument is easily assigned to a pointer by writing an address operator (<B>&amp;</B>) before the argument name.  It then 
+becomes a simple matter to obtain the following arguments by incrementing the pointer.  And, since the first argument indicates how many others follow, the function knows when to quit.<P>
+
+However, since Small C pushes arguments from left to right, this technique would only work if such functions were designed to have the last (right most) argument indicate how many arguments precede it.  But that option is not open if functions like <B>printf()</B> are to be compatible with their full C counterparts.<P>
+
+Consequently, Small C provides a means by which a function may determine how many arguments were actually passed to it.  With each call, a count of the arguments being passed is placed in the 8086's CL register.  This count may be obtained by calling a special function <B>CCARGC()</B> and assigning the returned value to a variable.  This function exists in the <B>CALL</B> module of the Small C library.  <B>CCARGC()</B> must be called first in the function since the CPU registers are volatile and 
+the argument count would soon be lost.  A statement like<P>
+
+<PRE>		count = CCARGC();<P>
+</PRE>
+
+will do the job.  Four functions in the Small C library require argument counts; they are <B>printf()</B>, <B>fprintf()</B>, <B>scanf()</B>, and <B>fscanf()</B>.<P>
+
+<B>The Stack Frame<P>
+
+</B>The machine stack is used by Small C programs for three purposes--for passing arguments, for saving return addresses, and for allocating local objects.  Notice that each of these relates to the invocation of a function.  The part of the stack that is used when a function is invoked is called the function's <I>stack frame</I>.  Chapter 1 pointed out that C programs are initially given control by performing a normal call to <B>main()</B>.  Therefore, every function, including <B>main()</B>, 
+operates within the context of a stack frame.  Figure 8-1 illustrates the structure of a Small C stack frame.<P>
+
+<CENTER>
+<img src="fg8-1.gif">
+</CENTER>
+<CENTER><B>Figure 8-1. The Stack Frame<P>
+</CENTER></B>
+
+When a function is to be called, the actual arguments are pushed onto the stack in the order in which they are evaluated--left to right.  Then the function is called by means of a <B>CALL</B> instruction which pushes the return address--the address of the following instruction--onto the stack above the arguments.<P>
+
+When the called function receives control it immediately pushes the previous frame pointer, in the BP register, onto the stack to preserve it.  It then moves the stack pointer (SP) to BP thereby establishing a fixed point of reference for the current stack frame.  Arguments are referenced with respect to BP by adding a positive offset. (See Appendix B for an overview of the 8086 CPU registers.)<P>
+
+As local objects are created, they are allocated on the stack by subtracting from SP.  They are then referenced like arguments, except with negative offsets.  When control exits a block in which locals were allocated, SP is incremented to its original value so the same stack space may be used by other locals.<P>
+
+When control returns to the caller, BP is moved to SP so that a <B>POP</B> instruction can restore BP to its previous value.  Then a return instruction, pops the return address from the stack into the processor's instruction pointer (IP).  This effects the return by causing the next instruction to come from the location indicated by the return address.<P>
+
+Finally, on return from the function, the calling function, which pushed the arguments onto the stack, removes them by the most efficient means possible--by adding a constant to the stack pointer, by popping an argument or two into an unused register, or by taking no action if no arguments were passed to the function.<P>
+
+Each call allocates a stack frame.  As the calls are nested, the frames are stacked one above the other.  And, as the calls unnest, the frames are unstacked in the reverse order.  As a result there is no interference between function calls, even calls to functions that already have frames on the stack.<P>
+
+Since memory is limited, there is a practical limit to the amount of nesting that can be done.  It is the programmer's responsibility to determine that his programs do not overflow the stack space that is available.  The Small C library (<a href="../chap12/chap12.htm">Chapter 12</a>) includes a function<B> </B><B>avail()</B> which checks for a stack overflow condition.<P>
+
+<B>Returning from Functions<P>
+
+</B>There are two instances where control is caused to return from a function to its caller.  When control reaches the right-most brace of the function's body, an implied return is taken.  In that case, no return value is specified and so none is provided.  The caller will see whatever happens to be in Small C's primary register at the time of the return.  It is important to be sure that any function which is supposed to return a value does not return by this means.<P>
+
+On the other hand, explicit returns are possible by writing statements of the form<P>
+
+<PRE>		return <I>ExpressionList?</I>;<P>
+</PRE>
+
+where <B>return</B> is a required keyword and <I>ExpressionList?</I> is an optional list of expressions.  If an expression (list) is provided, its value (the value of the last expression in the list) is returned to the caller.  But if there is not an expression, then, as with implicit returns, the returned value is unpredictable and should not be used by the caller.<P>
+
+In full C, functions are declared according to the type of value they return.  However, in Small C functions return only integer values.  This is a reasonable simplification, when we consider that Small C only supports character and integer variables, and that characters are automatically promoted to integers whenever they are referenced.  We are free to write functions that return characters, but the value returned will actually be an integer.<P>
+
+But suppose we should want to have a function return a pointer.   How can that be done?  Well, since integers and pointers in Small C have the same size, there is no real problem.  We can just write our return expression to produce an address instead of an integer.  But we must be aware that the returned value will be seen as an integer in the expression in which the function is called.  In some expressions the difference is immaterial, but in others it is important.  If the difference matters, 
+we can break down the expression into two parts.  First, assign the function's value to a pointer of the desired type, and then write the pointer in the expression where the function would have been called.  For example, if we wanted to assign five to the character pointed to by <B>func()</B> we would write<P>
+
+<PRE>
+		cp = func();
+		*cp = 5;
+</PRE><P>
+
+where <B>cp</B> is a character pointer.<P>
+
+<B>Recursive Calls<P>
+
+</B>Using the stack for actual arguments, return addresses, and local objects has the advantage that it permits <I>recursive</I> calls.  A function is called recursively when it either calls itself directly or it calls other functions which directly or indirectly call it.  Use of recursion can simplify many algorithms, but it does drive up the amount of stack space needed and it usually makes the program logic less obvious.  Take the function <B>backward()</B> in Listing 8-1, for example.  
+This function displays the characters of a string in reverse order.  It receives the character string (actually a pointer to the first character) as an argument when it is first called.  If the character at that address is not zero, it calls itself again passing the address of the next character.  This nesting continues until a zero character is found, at which point the current instance of <B>backward()</B> simply returns to the prior one.  Control resumes in that instance at <B>putchar()</B> which writes 
+the current character to the standard output file (<a href="../chap12/chap12.htm">Chapter 12</a>).
+ That instance then returns to the prior one, and so on.  The calls continue to unnest until the first instance displays the first character and returns to its caller.  As an exercise, you might try writing this function without recursion.<P>
+
+<CENTER>
+<img src="ls8-1.gif">
+<P>
+</CENTER>
+<CENTER><B>Listing 8-1: Sample Recursive Function Call<P>
+</CENTER></B>
+
+<B>A Sample Function<P>
+
+</B>Suppose we need a function which will compare two character strings, returning zero if they differ, and their length if they match.  The first string may be a substring of a larger string, so it is not necessarily terminated with a zero byte.  Whereas, the second string being a full string, does have a null terminator.   We might write this function as follows: <P>
+
+<PRE>
+		streq (str1, str2)  char str1[], str2[]; {
+			int k;
+			k = 0;
+			while (str2[k]) {
+				if(str1[k] != str2[k]) return 0;
+				++k;
+				}
+			return k;
+			}
+</PRE><P>
+
+The function's name is <B>streq</B> meaning string equality.  It expects two arguments, to which it gives the formal names <B>str1</B><B> </B>and <B>str2</B>.  These are declared to be character arrays; however, since array arguments are passed as addresses, these are actually pointer arguments.<P>
+
+A local integer <B>k</B> is defined and initially set to zero; it will serve as both a subscript into the strings and the value to return if the strings match.  The <B>while</B> statement executes repeatedly as long as the character in the second string subscripted by <B>k</B> is not zero; i.e., the end of the second string has not been reached.  With each iteration, the compound statement is executed.  It first compares corresponding characters (subscripted by <B>k</B>) in the two strings.  
+If they are not equal, the function quits by returning zero to the caller.  However, if they match, <B>k</B> is incremented by <B>++k</B>.  At this point, the compound statement is exhausted, so the <B>while</B> condition is checked again, this time with a larger value of <B>k</B>.<P>
+
+If this continues until a zero character is found in <B>str2</B> then a match has occurred, since none of the preceding characters differed.  In that case, <B>k</B> is returned since it contains the length of the matched string.  This is true because array elements are numbered from zero.  Thus, if <B>str2</B> contains three characters and a null terminator, then the terminator will be reached when <B>k</B> equals three.<P>
+
+This is one of the string matching functions used by Small C; it finds keywords in programs.  The first argument is a pointer into a line of code in a program, and the second is a literal string containing the keyword being sought.<P>
+
+<CENTER>Go to <a href="../chap9/chap9.htm">Chapter 9</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

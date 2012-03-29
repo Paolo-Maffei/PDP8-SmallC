@@ -1,0 +1,140 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>PART 1:<P>
+THE SMALL C LANGUAGE<P></H1>
+</CENTER>
+</B>
+
+The following chapters introduce the Small C language in a 
+natural order.  However, since each chapter deals with a narrow 
+aspect of the language, they may also be read independently for 
+reference purposes.<P>
+
+<B>Conventions Followed in the Text<P>
+</B>
+
+Although most of the concepts in the following chapters 
+pertain to both Small C and full C, some relate only to Small C 
+or only to full C.  So, to avoid confusion, I refer to these 
+languages in a systematic way.  The term <I>C</I>, with no 
+adjective, refers to both Small C and full C.  Statements about 
+<I>Small C</I> apply only to Small C, and statements about <I>
+full C</I> pertain only to the complete language.<P>
+Following customary practice, functions are distinguished from 
+other things by suffixing their names with a set of matching 
+parentheses.  Because it follows C syntax, programmers 
+instinctively think &quot;it's a function&quot; when they see 
+this.  Similarly, array names are followed by matching square 
+brackets.<P>
+Occasionally you will see the ellipsis (<B>...</B>) used as an 
+abbreviation for anything that might appear at some point.  An 
+example is <B>if...else...</B> which appears a few paragraphs 
+below.   Note that the ellipsis assumes special meaning in syntax 
+definitions.  Syntax definitions employ the following devices:<P>
+
+<OL>
+<LI>Generic terms are italicized and begin with a capital 
+letter.  They specify the kind of item that must or may appear at 
+some point in the syntax.  Frequently two terms are combined to 
+identify a single item.     
+<LI>Symbols and special characters in boldface are required by 
+the syntax.  They must appear exactly as shown.
+<LI>The term String refers to a contiguous string of items.
+<LI>The term List refers to a series of items separated by commas 
+and (possibly) white space.
+<LI>An ellipsis (...) means that entities of the same type 
+may be repeated any number of times.
+<LI>A question mark at the end of a term identifies it as 
+optional; it may or may not be needed.<p>
+</OL>
+
+<B>The 8086 Family of Processors<P>
+</B>
+
+Since an understanding of any compiled language requires some 
+knowledge of the way data is represented in the processor that 
+interprets the compiled programs, you will find numerous 
+references to the 8086 processor.  The Intel 8086 was the first 
+of a family of 16 bit processors upon which IBM's personal 
+computers, and compatible machines, are based.  See Appendix B 
+for a survey of the architecture of these processors.<P>
+
+<B>A Sample Program<P>
+</B>
+
+Before proceeding, let's get a feel for the C language by 
+surveying a small program.  
+<a href="../chap1/ls1-1.gif">Listing 1-1</a> is a program, 
+called <B>words</B>, which takes each word from an input file and places it 
+on a line by itself in an output file.  A word, in this case, is 
+any contiguous string of printable characters.<P>
+
+The first line of the program is a comment giving the name of the 
+program and a brief description of its function.  The second line 
+instructs the compiler to include text from the file <B>STDIO.H</B>.  
+The included text appears to the compiler exactly as 
+though it had been written in place of the <B>#include</B> 
+directive.  The curious angle brackets enclosing <B>STDIO.H</B> 
+give some compilers a clue about where to find the file (Chapter 11).  
+The third and fourth lines define the symbols <B>INSIDE</B> 
+and <B>OUTSIDE</B> to stand for 1 and 0 respectively.  A 
+preprocessor built into the compiler scans each line replacing 
+all such symbols with the values they represent.  Such symbols 
+are often called <I>macros</I> since they stand for substitution 
+text that may be larger and more complex than its name.<P>
+The next two lines define variables: a character named <B>ch</B> 
+and an integer named <B>where</B> which is given the initial 
+value zero (represented by <B>OUTSIDE</B>).<P>
+The procedural part of the program consists of three functions: 
+<B>main()</B>,<B> white()</B>, and<B> black()</B>.  Execution 
+begins in<B> main()</B> which contains calls to<B> white()</B> 
+and <B>black()</B>.  The <B>while</B> statement in<B> main()</B> 
+controls repeated execution of the <B>if...else...</B> 
+statement enclosed in braces.  With each repetition it calls
+ <B>getchar()</B> to obtain the next character from the input 
+file.  (Although <B>getchar()</B> is not defined in this program,
+ it is nevertheless available for use because it exists in a 
+library of functions that can be linked with the program.)<P>
+
+The character obtained is assigned to the character 
+variable <B>ch</B>.  If it is not equal (<B>!=</B>) to the value represented 
+by <B>EOF</B> (defined in <B>STDIO.H</B>), then the <B>if</B> 
+statement is performed; otherwise, control passes through the end 
+of<B> main()</B> and back to the operating system.<P>
+With each iteration, the current character is checked to see if 
+it is a white character--space (<B>' '</B>), newline (<B>'\n'</B>), 
+or tab (<B>'\t'</B>).  If so,<B> white()</B> is called. 
+<B>White()</B> then checks to see if the previous character was 
+within a word (where equals <B>INSIDE</B>).  If so, the current 
+character must be the first white character following a word, 
+therefore<B> putchar()</B> (another library function) is called 
+to write a special newline character to the output file to 
+terminate the current line and start another one.  It then sets 
+<B>where</B> to <B>OUTSIDE</B> so that no more newlines will be written 
+for that word.  When the next black (printable) character is 
+found, a call is made to<B> black()</B> which writes the 
+character to the output file and sets the variable <B>where</B> 
+to <B>INSIDE</B>, indicating that the most recent character was 
+within a word.<P>
+
+As this program executes it has the effect of squeezing all 
+continuous runs of white characters into a single occurrence of 
+the newline character which has the effect of a carriage return, 
+line feed sequence.<P>
+
+Although this quick tour through a C program leaves many 
+questions unanswered, it illustrates the general form of C 
+programs, how variables and functions are defined, and how 
+control flows through a programs.  The following chapters fully 
+explain these concepts.<P>
+
+<P>
+<P>
+<CENTER>Go to <a href="../chap1/chap1.htm">Chapter 1</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+</BODY>
+</HTML>

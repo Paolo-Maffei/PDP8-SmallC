@@ -1,0 +1,124 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 18:<P>THE CALL ROUTINES</H1></B>
+</CENTER>
+
+The term <B>CALL</B> is an acronym for C Arithmetic and Logical Library, the original name for this collection of routines.  Actually, however, the 
+<B>CALL</B> routines are not a library but a single module of routines in the library; furthermore, they no longer contain arithmetic routines since the 8086 processor supports all four basic math operations directly.  In addition, two of the three types of routines in <B>CALL</B> do not even fit the description.  Nevertheless, the name has stuck.  So the term <B>CALL</B> is really better understood not as an acronym but as the word call, referring to the fact that these routines are called in lieu 
+of in-line code.  The <B>CALL</B> module is always linked to every Small C program. <P>
+
+See <a href="../append/appd.htm">Appendix D</a> for a listing of the <B>CALL</B> module.  Since the <B>CALL</B> module is written in assembly language, it might be helpful to review the 8086 CPU architecture in Appendix B before proceeding.  Also keep in mind that the mapping of Small C registers to 8086 registers is:<P>
+
+<PRE>
+		<B>Small C		  	8086</B><P>
+
+		primary			  AX
+		secondary	  	  BX
+		stack pointer		  SP<P>
+
+</PRE>
+
+The <B>CALL</B> module breaks down into four parts--the start up routine, a short routine for fetching the number of arguments passed to a function, the logical comparison routines, and the <B>switch</B> evaluation routine.  <P>
+
+<B>The Start Up Routine<P>
+</B>
+
+The first section of code in <B>CALL</B> begins with the label  <B>start</B> which is designated, by the <B>end</B> directive (that terminates <B>CALL</B>) as the initial entry point for the program.  This is the point at which every Small C program receives control from the operating system.  Since this is the only <B>end</B> directive (of all the modules in a program) that specifies an initial entry point there is no ambiguity.  When we write modules in assembly language which are to be linked with 
+
+Small C (or any other language) programs, we must be sure not to specify an initial entry point with the <B>end</B> instruction.  One look at the output of the compiler should convince us that the compiler also adheres to this rule. <P>
+
+The start up routine serves four purposes--it sets up the CPU's memory segmentation registers, it sets up the memory heap, it sets up the stack, and it jumps to the function <B>_main()</B> in the library module <B>CSYSLIB</B>.  That function then parses the command line arguments, and calls<B> main()</B> in the program.  With this arrangement, if control reaches the end of <B>main()</B> it returns back to<B> _main()</B> in <B>CSYSLIB</B> where the statement <P>
+
+<PRE>		exit(0);<P>
+</PRE>
+
+is waiting to terminate the program gracefully.<P>
+
+See <a href="../chap5/fg5--1.gif">Figure 5-1</a> for a diagram of the memory arrangement which this routine sets up. <P>
+
+The first thing <B>start</B> does is to set the data segment register (DS) with the paragraph address of the data segment (where the global objects reside). <P>
+
+<I>Note: A paragraph is a 16 byte unit of memory that begins on a 16 byte boundary.<P>
+</I>
+
+This ensures that the globals will be referenced properly.  Next it subtracts this address from the amount of memory that is currently available to the program, to derive the amount of memory in paragraphs that can be used for the heap and the stack.  If more than 64K bytes remain then only 64K bytes are used; if less, then whatever remains is used.  This number, the length in paragraphs of the combined data/heap/stack segment is added to data segment address to arrive at the value which is placed in 
+the stack pointer (SP).  This makes the stack begin at the high end of the segment.  Finally, the stack segment register (SS) is set to the same value as DS. <P>
+
+Next, a check is made to ensure that there is enough memory for a minimum stack of 256 bytes.  If that should fail, there is not enough memory for the program to even start, so the program aborts with an exit code of 1. <P>
+
+However, if there is enough memory, the global integer <B>_memptr</B> in <B>CSYSLIB</B> is set to the address (offset) of the beginning of the heap.  This is where the memory allocation routines keep track of the end of the heap, the beginning of free memory.  If this should ever exceed SP a stack overflow occurs. <P>
+
+Last of all, a jump to<B> _main()</B> is executed to continue the start up process in <B>CSYSLIB</B>.<P>
+
+Three instructions are commented out at the end of <B>start</B>.  If they were enabled, they would return to DOS the part of available memory that is not being used by the program.  If they are used, however, the MS-DOS <B>DEBUG</B> utility will not work.  So they have been deactivated.  <P>
+
+<B>The Argument Count Routine<P>
+</B>
+
+<B>_Ccargc</B> is the routine (function), referred to in <a href="../chap8/chap8.htm">Chapter 8</a>, that returns a count of the number of arguments passed to a function.  Small C places this count in the CL register before calling a function.  The called function can get the count by calling<B> CCARGC()</B> before doing anything else.  There are only three steps to this routine--move CL to AL, set AH to zero, and return to the caller.  The number of arguments passed to the function is then returned in the primary register (AX) where
+ functions normally return their values.  <P>
+
+<B>Logical Routines<P>
+</B>
+
+Ten logical comparison routines reside in the <B>CALL</B> module.  They are<P>
+
+<PRE>
+		<B>Label		Operation</B><P>
+		
+		 __eq		  equal to
+		 __ne		  not equal to
+		 __lt		  less than
+		 __le		  less than or equal to
+		 __ge		  greater than or equal to
+		 __gt		  greater than
+		 __ult		  unsigned less than
+		 __ule		  unsigned less than or equal to
+		 __uge		  unsigned greater than or equal to
+		 __ugt		  unsigned greater than<P>
+</PRE>
+
+Except for the type of comparison made, each routine operates in the same way.  It compares BX (left operand) to AX (right operand), and returns one if the condition is true or zero if it is false. <P>
+
+A macro instruction called <B>compare</B> is defined and then expanded to produce each routine. <P>
+
+An additional routine <B>__lneg</B> performs the logical negation of the value in AX.  If it is true (non-zero), false (zero) is returned; otherwise, true (one) is returned. <P>
+
+By implementing these operations as subroutines, rather than in-line code, we save several bytes per call.  This is a size-over-speed compromise.   <P>
+
+<B>The Switch Evaluation Routine<P>
+</B>
+
+<B>__Switch</B> is the routine that evaluates <B>switch</B> conditions.  Having a routine for this purpose reduces the size of programs that use <B>switch</B> statements with large numbers of cases, since each case does not require in-line code to compare the case value to the <B>switch</B> expression. <P>
+
+See <a href="../chap10/chap10.htm">Chapter 10</a> for details on the operation of <B>switch</B> statements.  When Small C encounters a <B>switch</B> statement, it generates code to evaluate the <B>switch</B> expression and place its value in AX.  This is followed by a jump around the code which is associated with the various <B>case</B> prefixes.  At that point there is a call to <B>__switch</B> followed by a table of address/value pairs.  Each pair gives the address of the code for a <B>case</B> together with the case's value.  The table 
+is terminated with a zero address.  Next, if a <B>default</B> prefix exists, there is a jump instruction to the <B>default</B> address.  Finally, all of this is followed by whatever code comes next in the program.  Figure 18-1 illustrates the arrangement.<P>
+
+<CENTER>
+<img src="fg18-1.gif">
+</CENTER>
+</B><CENTER><B>Figure 18-1: Set-up When __Switch is Called<P>
+</CENTER></B>
+
+Notice that the return address for the call to <B>__switch</B> is really the address of the switch table, not the address to which control should return; in fact, control should never get there. <B>__Switch</B> will see to it that control goes to one of the <B>case</B> addresses, the <B>default</B> address, or the continuation code.<P>
+
+<B>__Switch</B> pops the table address into BX.  This adjusts the stack properly for the jump that transfers control back into the program.  That is, the pop...jump sequence is effectively a return.  But in this case, one of a number of possible locations is chosen. <P>
+
+Next control enters a loop in which:<P>
+
+<OL>
+<LI>The address in the current table entry (pointed to by BX) is moved to CX where it is tested for zero, signaling the end of the table.  In that case, a jump instruction takes control to the address in BX (plus 2); that is, to whatever follows the table.  If a default prefix exists, then this location holds a jump to the default address.  Otherwise, this is the beginning of whatever code follows the switch statement.
+<LI>The case value at BX+2 is compared to the value of the expression in AX.  If they match, a jump to the address in CX transfers control to the code for the matching case prefix.  However, if they do not match, the current table address in BX is incremented by four (to the next address/value pair) and control goes back to step 1.<p>
+</OL>
+
+One way or another, control reenters the program.  Either it goes to a matching <B>case</B> prefix, the <B>default</B> prefix, or (if there is no <B>default</B>) to whatever follows the <B>switch</B> statement. <P>
+
+<CENTER>
+Go to <a href="../chap19/chap19.htm">Chapter 19</a>         Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>

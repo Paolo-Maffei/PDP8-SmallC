@@ -1,0 +1,466 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 9:<P>
+EXPRESSIONS<P></H1>
+</CENTER>
+</B>Most programming languages support the traditional concept of an expression as a combination of constants, variables, array elements, and function calls joined by various operators (<B>+</B>, <B>-</B>, etc.) to produce a single numeric value.  Each operator is applied to one or two operands (the values operated on) to produce a single value which may itself be an operand for another operator.  This idea is generalized in C by including non-traditional data types and a rich set of operators.  Pointers,
+ unsubscripted array names, and function names are allowed as operands.  And, as Table 9-1 illustrates, a large number of operators is available.  All of these operators can be combined in any useful manner in an expression.  As a result, C allows the writing very compact and efficient expressions which at first glance may seem a bit strange.  Another unusual feature of C is that anywhere the syntax calls for an expression, a list of expressions, with comma separators, may appear. <P>
+
+Expression lists are evaluated from left to right with the right-most expression determining the value of the list.  Before looking at the kinds of expressions we can write in C, we will first consider the process of evaluating expressions and some general properties of operators.  <P>
+
+<B>Operator Properties<P>
+
+</B> The basic problem in evaluating expressions is deciding which parts of an expression are to be associated with which operators.  To eliminate ambiguity, operators are given three properties: <I>operand count</I>, <I>precedence</I>, and <I>associativity</I>.  <P>
+
+Operand count refers to the classification of operators as unary, binary, or ternary according to whether they operate on one, two, or three operands.  The unary minus sign, for instance, reverses the sign of the following operand, whereas the binary minus sign subtracts one operand from another. <P>
+
+<CENTER>
+<img src="tb9-1.gif">
+</CENTER>
+<B><P>
+</B><CENTER><B>Table 9-1: Small C Operators<P>
+</CENTER></B>
+
+Precedence refers to the priority used in deciding how to associate operands with operators.  For instance, the expression  <P>
+
+<PRE>		a + b * c<P>
+</PRE>
+
+</B>would be evaluated by first taking the product of <B>b</B> and <B>c</B> and then adding <B>a</B> to the result.  That order is followed because multiplication has a higher precedence than addition. <P>
+Parentheses may be used to alter the default precedence or to make it more explicit.  They must always be used in matching pairs.  Evaluation of parenthesized expressions begins with the innermost parentheses and proceeds outward, with each parenthesized group yielding a single operand.  Within each pair of parentheses, evaluation follows the order dictated by operator precedence and subordinate parentheses.  Writing the above example as<P>
+
+<PRE>		(a + b) * c<P>
+</PRE>
+
+overrides the default precedence, so that the addition is performed before the multiplication.  On the other hand,<P>
+
+<PRE>		a + (b * c)<P>
+</PRE>
+
+simply makes the default precedence explicit.  Table 9-1 lists the Small C operators in descending order of precedence, going from top to bottom in the left column and then in the right.  All operators listed together have the same precedence.  Except as grouped by parentheses, they are evaluated as they are encountered. <P>
+
+The last property, associativity, determines whether evaluation of a succession of operators at a given precedence level proceeds from left to right or from right to left.  This is also called <I>grouping</I> because the evaluation of each operator/operand(s) group yields a single value which then becomes an operand for the next operator.  Of course, the result of the last operation becomes the value of the whole expression.  Grouping is shown in Table 9-1 by arrows in the upper right corner 
+of each precedence box. <P>
+
+Since addition groups left to right, the expression<P>
+
+<PRE>		a + b + c<P>
+</PRE>
+
+is evaluated by first adding <B>a</B> to <B>b</B> then adding <B>c</B> to the result.<P>
+
+<B>Operands<P>
+
+</B>Operands that are not the immediate result of the application of an operator are called <I>primary</I> operands, or just <I>primaries</I>.  Examples are constants, variable names, and so on.  Although we treat function calling and subscripting as operations, the values they produce are still considered primaries.  We might consider these as operations that help fetch primary values, rather than operations that determine values. <P>
+
+As Table 9-1 indicates, a pair of parentheses are considered an operator when they designate a function call; but when they direct the evaluation precedence they do not function as operators.  Instead, they direct the expression analyzer to treat the enclosed expression as a simple operand.  For this reason, parenthesized expressions are considered to be primaries.  When we study the Small C expression analyzer (<a href="../chap26/chap26.htm">Chapter 26</a>) we shall see that precedence setting parentheses are handled in the same function 
+that deals with primary objects.  Small C accepts 11 kinds of primary operand.  They are:<P>
+
+<OL>
+<LI>Numeric Constants.  Numeric constants (decimal, hexadecimal, or octal) are stored internally as 16-bit values.  Ordinarily, they are treated as signed integers; however, if they are written without a sign and are greater than 32767(decimal), Small C treats them as unsigned integers.
+<LI>Character Constants.  <a href="../chap3/chap3.htm">Chapter 3</a> described how character constants are in fact stored internally as 16-bit values.  Single-character constants always have zeroes in the high-order byte, making them positive.  Double-character constants, however, could have the sign bit set if the left-most character is written as an octal escape sequence.  Character constants of either type are treated as signed quantities.
+<LI>String Constants.  A string constant, in an expression, yields the 16-bit address of the string.  Being an address, it is treated as an unsigned quantity.     
+<LI>Integer Variables.  Integer variables are stored as 16-bit values.  They enter into operations either as two's complement signed or as unsigned values depending on their declarations.  Elements of integer arrays are treated as integer variables.
+<LI>Character Variables.  As indicated in <a href="../chap4/chap4.htm">Chapter 4</a>,
+ character variables are automatically promoted to integers, either by sign extension or zero padding depending on whether they are signed or unsigned.  They are treated as two's complement signed or unsigned quantities depending on their declarations.  When values are assigned to character variables, the high-order byte is truncated.  Elements of character arrays are treated as character variables.
+<LI>Integer Array Names.  The unsubscripted name of an integer array yields the address of the array.  Being an address it is treated as an unsigned quantity.  Furthermore, values added to, or subtracted from, such an address are doubled so the effect of the operation will be to offset the address by the specified number of integers.  Also, when the difference of two integer addresses is taken, the result is divided by two so the answer will reflect the number of integers between the addresses.
+<LI>Character Array Names.  The unsubscripted name of a character array yields the address of the array.  Being an address it is treated as an unsigned quantity.  These addresses cause no scaling of values added to or subtracted from them since characters occupy one byte each.  Likewise, the difference of two character addresses is not scaled because it already reflects the number of characters between them.
+<LI>Integer Pointers.  An integer pointer yields the address of an integer.   Being an address it is treated as an unsigned quantity.  Furthermore, values added to, or subtracted from, such an address are doubled so the effect of the operation will be to offset the address by the specified number of integers.  Also, when the difference of two integer addresses is taken, the result is divided by two so the answer will reflect the number of integers between the addresses.
+<LI>Character Pointers.  An character pointer yields the address of an character.  Being an address it is treated as an unsigned quantity.  Character addresses cause no scaling of values added to or subtracted from them since characters occupy one byte each.  Likewise, the difference of two character addresses is not scaled because it already reflects the number of characters between them.
+<LI>Function Calls.  Functions in Small C are always considered to yield signed integer values.  A function name followed by parentheses generates a call to the function which yields the value returned by the function.  If an undefined name is found in an expression, it is implicitly declared to be a function name, and is treated as such.
+<LI>Function Names.  A function name without trailing parentheses yields the address of the named function.  If an undefined name is encountered in an expression, it is implicitly declared to be a function name, and is treated as such.<p>
+</OL>
+
+Each operator in an expression yields a value which itself may serve as an operand for another operator.  These computed operands inherit certain attributes from their subordinate operands.  If either of the subordinate operands of a binary operator is unsigned, then an unsigned operation (if there are distinct signed and unsigned versions of the operation) is performed and the result is considered to be unsigned.  If either of the subordinate operands is an address, then the same unsigned treatment 
+is received and the result is also considered to be an address.  The operations which have separate signed and unsigned versions are: <P>
+
+<PRE>			<B>*</B>	multiply<P>
+			<B>/</B>	divide<P>
+			<B>%</B>	modulo<P>
+			<B>&gt;</B>	greater than
+			<B>&gt;=</B>	greater than or equal
+			<B>&lt;</B>	less than<P>
+			<B>&lt;=</B>	less than or equal<P>
+</PRE>
+
+All other operations are the same whether operating on signed or unsigned quantities.<P>
+
+<B>Constant and Variable Expressions<P>
+
+</B>When the Small C compiler encounters an expression, it does one of two things.  If the expression contains only constant (numeric or character) primaries, the result is a constant, so the compiler evaluates the expression and generates the result.  However, if the expression contains variables or addresses (e.g., string constants), the result cannot be determined at compile time, so the compiler generates code that will perform the evaluation at run time.  As we shall see in Chapter 26, 
+the same expression analyzer performs both tasks.  It assumes it is dealing with a variable expression, and so generates run-time code in a staging buffer.  However, at each step along the way, it knows whether or not it has a constant value.  If the entire expression yields a constant, then the code in the buffer is replaced by code that yields the final value directly.  This compile-time evaluation of constant expressions means that we can write constants in complex ways, that reveal their constituent parts, without 
+incurring any run-time overhead.  This technique can add clarity to a program's logic by documenting the derivation of &quot;magic&quot; numbers.<P>
+
+<B>Operators<P>
+
+</B>Every operator in a Small C expression yields a 16-bit value.  Normally, these are numeric values representing numbers, character codes, addresses, or whatever.  Some operators, however, produce <I>Boolean</I> (logical) values.  There are only two such values, <I>true</I> and <I>false</I>.  When an operand is tested for its logical value, zero is interpreted as false and any non-zero value is considered true.  C places no limit on the kinds of values that may be tested logically.  It 
+matters not whether a value is a number, an address, or a Boolean value, zero means false and non-zero means true. <P>
+
+There are four operators which interpret operands as Boolean values--the <I>logical AND</I> (<B>&amp;&amp;</B>), the <I>logical OR</I> (<B>||</B>), the <I>logical NOT</I> (<B>!</B>), and the <I>conditional operator</I> <B>(?:</B>).  The first three of these also yield Boolean values.  Boolean values produced by operators are always set to one for true and zero for false. <P>
+
+There are three bitwise operators--<I>AND</I> (<B>&amp;</B>), <I>inclusive OR</I> (<B>|</B>), and <I>exclusive OR</I> (<B>^</B>)--which perform logical operations on the individual bits of their operands and reflect the results in the bits of the values they yield.  These operators test corresponding bits of two operands to determine the corresponding bit of the result.  The same operation is performed simultaneously on all 16 bits of the operands to produce a 16-bit result. <P>
+
+We now look at the individual operators in the order of precedence (high to low) as shown in Table 9-1.    <P>
+
+<CENTER><B>Function Calls and Subscripts<P>
+</CENTER></B>
+
+Unless the precedence is changed by parentheses, these operations are performed before any others.  They group left to right.<P>
+
+<B>()	Function Call<P>
+
+</B>Parentheses, possibly containing a list of argument expressions, may follow a primary expression.  Such parentheses are taken as an operator causing the function designated by the primary expression to be called.  <P>
+
+Normally the primary expression is just a function name.  Sometimes it is a pointer reference like (<B>*fp</B>).  It might even be a subscripted pointer reference, as in<B> </B><B>fpa[5]</B>.  Since Small C does not perform type checking, <B>fpa</B> can be an ordinary integer array containing function  addresses.  When a function name is used, the function is called directly by referencing its label.  In other cases, the primary expression is evaluated to produce the function's address in 
+the primary register.  The function is then called indirectly through the primary register.<P>
+
+The argument expressions are evaluated from left to right and passed to the called function.  The value yielded by this operator is the value returned by the function.  In Small C it will always be interpreted as a signed integer.<P>
+
+<B>[]	Subscript<P>
+
+</B>A pair of square brackets following a primary expression is considered to contain a subscript into an array of objects.  The subscript can be any legal expression, and its value will be interpreted as an integer.  The primary expression should yield an address.  If it produces a character address, then the subscript will be added to it.  The resulting address is then used to obtain a character.  If the primary expression produces an integer address, then the subscript will be doubled before 
+being added to it.  The resulting address is then used to obtain an integer.  As we can easily verify, these operations are consistent with the concept of subscripting from zero.  The value yielded by this operation is the value of the object referenced. <P>
+
+The primary expression is usually an array name, but pointer names are also frequently used.  Since any expression surrounded by parentheses is a primary expression, we can perform arithmetic on array and pointer names before applying the subscript. <P>
+
+<CENTER><B>Unary Operators<P>
+</CENTER></B>
+
+The operators in this group operate on a single operand.  Normally they are written to the left of the operand; however the increment and decrement operators may be written on either side of the operand.  All of the operators in this group associate right to left.<P>
+
+<B>!	Logical NOT<P>
+
+</B>This operator yields the logical negation of the operand to its right.  If the operand is false it yields true  (one).  And if it is true it yields false (zero).<P>
+
+<B>~	One's Complement<P>
+
+</B>This operator complements the bits of the operand to its right.  Each bit containing one becomes zero and each bit containing zero becomes one.<P>
+
+<B>++	Increment<P>
+
+</B>This operator increments an operand by one.  If it precedes the operand, it yields the incremented value.  However, if it follows the operand, it yields the original value in the expression, although it leaves the operand itself  incremented.  If the operand is an address, it increments to the next character or integer depending on the type of the address.  The operand must be an lvalue.<P>
+
+<B>--	Decrement<P>
+
+</B>This operator decrements an operand by one.  If it precedes the operand, it yields the decremented value.  However, if it follows the operand, it yields the original value in the expression, although it leaves the operand itself decremented.  If the operand is an address, it decrements to the prior character or integer depending on the type of the address.  The operand must be an <i>lvalue</i>.<P>
+
+<B>-	Unary Minus<P>
+
+</B>The unary minus operator reverses the sign of the operand on its right.  This is accomplished by taking the two's complement of the operand.  This operator is distinguished from the binary minus by its context; in this case there is no operand on the left.<P>
+
+<B>*	Indirection<P>
+
+</B>When this operator is written to the left of an address it changes the meaning from &quot;address of&quot; to &quot;object at.&quot;  In other words, it indirectly obtains the object pointed to by its operand.  An integer address, yields an integer and a character address yields a character.<P>
+
+<B>&amp;	Address<P>
+
+</B>The address operator yields the address of the operand to its right.  In Small C, the address operator does not group; it can only be applied directly to variable, pointer, and subscripted pointer and array names.        <P>
+
+<B>sizeof()<P>
+
+</B>To promote the writing of more portable programs, the C language incorporates an unusual operator that yields the size in bytes of a specific object or of objects of a given type.  This operator has the form<B> </B><B>sizeof(...)</B><B> </B>where the ellipsis stands for a defined object or a data type.  Although it looks like a function call, this is really an operator.  It has the effect of returning an integer constant which is the size of the named object or of objects of the specified type.  If, f
+or example, we have the declaration int <B>ia[10];</B> then <B>sizeof(ia)</B> will yield the constant 20--the number of bytes occupied by the array. <P>
+If a data type, instead of a specific object, is given then it is written as a declaration statement without an identifier.  For example, <B>sizeof(unsigned int)</B> or just <B>sizeof(unsigned)</B> yields two, since Small C integers occupy two bytes.  Likewise, <B>sizeof(char *)</B> yields two since that is the size of a character pointer.  Small C does not accept the array modifier<B> [ ]</B>. <P>
+This operator should be used whenever writing code that depends on the size of variables of a given type, or of a specific object.  It is legal anywhere a constant is appropriate.  And, since it is evaluated at compile time, there is no run-time overhead associated with its use. <P>
+
+<CENTER><B>Multiplicative Operators<P>
+</CENTER></B>
+
+The operators in this group associate left to right.  Separate signed and unsigned versions of these three operations are implemented.  If either operand is unsigned (including addresses), both operands are assumed to be unsigned, an unsigned operation is performed, and the result assumes the unsigned property.<P>
+
+<B>*	Multiplication<P>
+
+</B>The multiplication operator yields the product of the operands on its left and right.  Although the operation produces a 32-bit result, only the lower 16 bits are retained. <P>
+
+<B>/	Division<P>
+
+</B>The division operator yields the quotient of the left operand divided by the right operand.<P>
+
+<B>%	Modulo<P>
+
+</B>The modulo operator yields the remainder of the left operand divided by the right operand.<P>
+
+<CENTER><B>Additive Operators<P>
+</CENTER></B>
+
+The operators in this group associate left to right.<P>
+
+<B>+	Addition<P>
+
+</B>The addition operator performs an algebraic addition of the two adjoining operands.  If one of the operands is an address, the other is interpreted as a character or integer offset, depending on the type of the address.  In that case, if the address points to integers, the non-address operand is doubled before the operation is performed.  The value generated by an address offset addition is an address of the same type. <P>
+
+<B>-	Subtraction<P>
+
+</B>The subtraction operator subtracts the right operand from the left operand.  If one of the operands is an address, the other operand is interpreted as a character or integer offset, depending on the type of address.  In that case, if the address points to integers, the non-address operand is doubled before the operation is performed.  The value generated by an address offset subtraction is an address of the same type. <P>
+If both operands are addresses of the same type, the result is adjusted to represent the number of objects lying between them.  In the case of integer addresses, the result is divided by two.  In the case of character addresses, no adjustment is necessary.  The result is an integer, not an address.  The final result is likely to be useless under any of the following conditions: (1) both addresses are not of the same type, (2) the first address is smaller than the second, or (3) both addresses are 
+not in the same array.<P>
+
+<CENTER><B>Shift Operators<P>
+</CENTER></B>
+
+The operators in this group associate left to right.  They yield a value which is the left operand arithmetically shifted left or right the number of bit positions indicated by the right operand.<P>
+
+<B>&lt;&lt;	Shift Left<P>
+
+</B>This operator shifts the left operand left the number of bit positions indicated by the right operand.  Zeroes are inserted into the low end of the result.  For each position shifted, the left operand is effectively multiplied by two.  Thus, <B>x &lt;&lt; 2</B> multiplies <B>x</B> by four.  Since shifting is much faster than multiplying, this is the preferred way to multiply by powers of two. <P>
+
+<B>&gt;&gt;	Shift Right<P>
+
+</B>This operator shifts the left operand right the number of bit positions indicated by the right operand.  The sign bit retains its value and is replicated into the next lower bit with each shift.  Thus the sign of the left operand is preserved.  For each position shifted, the left operand is effectively divided by two.  Thus,<B> </B><B>x &gt;&gt; 2</B><B> </B>divides <B>x</B> by four.  Since shifting is much faster than dividing, this is the preferred way to divide by powers of two.<P>
+
+<CENTER><B>Relational Operators<P>
+</CENTER></B>
+
+All four of the relational operators perform a comparison of two operands and yield one of the logical values true (one) or false (zero) according to whether or not the specified relationship is true.  If neither of the operands is an address or an unsigned value, a signed comparison is performed.  However, if either operand is an address or an unsigned value, then both are considered to be unsigned.  These operators associate from left to right.<P>
+
+<B>&lt;	Less Than<P>
+
+</B>This operator yields true if the left operand is less than the right operand.<P>
+
+<B>&lt;=	Less Than or Equal<P>
+
+</B>This operator yields true if the left operand is less than or equal to the right operand.<P>
+
+<B>&gt;	Greater Than<P>
+
+</B>This operator yields true if the left operand is greater than the right operand.<P>
+
+<B>&gt;=	Greater Than or Equal<P>
+
+</B>This operator yields true if the left operand is greater than or equal to the right operand.<P>
+
+<CENTER><B>Equality Operators<P>
+</CENTER></B>
+
+These two operators determine whether or not the two adjoining operands are equal.  They return the Boolean value true if the specified relationship is true, and false otherwise.  They associate from left to right.<P>
+
+<B>==	Equal<P>
+
+</B>This operator yields true if the two operands are equal.<P>
+
+<B>!=	Not Equal<P>
+
+</B>This operator yields true if the two operands are not equal.<P>
+
+<CENTER><B>Bitwise AND Operator<P>
+</CENTER></B>
+
+<B>&amp;	Bitwise AND<P>
+
+</B>This operator yields the bitwise AND of the adjoining operands.  If both corresponding bits are one, the corresponding bit of the result is set to one; however, if either is zero, the resulting bit is reset to zero.  This operator associates left to right.<P>
+
+<CENTER><B>Bitwise Exclusive OR Operator<P>
+</CENTER></B>
+
+<B>^	Bitwise Exclusive OR<P>
+
+</B>This operator yields the bitwise exclusive OR of the adjoining operands.  If either, but not both, corresponding bits are one, the corresponding bit of the result is set to one; on the other hand, if both bits are the same (zero or one) the resulting bit is set to zero.  This operation is exclusive in the sense that it excludes from the OR the case where both corresponding bits are ones.  This operator associates left to right.<P>
+
+<CENTER><B>Bitwise Inclusive OR Operator<P>
+</CENTER></B>
+
+<B>|	Bitwise Inclusive OR<P>
+
+</B>This operator yields the bitwise OR of adjacent operands.  If either corresponding bit is one, the corresponding bit of the result is set to one; however, if both are zero, the resulting bit is zero.  It is inclusive in the sense that it includes in the OR the case where both corresponding bits are ones.  This operator associates left to right.<P>
+
+<CENTER><B>Logical AND Operator<P>
+</CENTER></B>
+
+<B>&amp;&amp;	Logical AND<P>
+
+</B>This operator yields the logical AND of the adjoining operands.  If both operands are true it yields true (one); otherwise, it yields false (zero).  This operator associates left to right. <P>
+
+If an expression contains a series of these operators at the same precedence level, they are evaluated left to right until the first false operand is reached.  At that point the outcome is known, so false is generated for the entire series, and the right-most operands are not evaluated.  This is a standard feature of the C language, so it can be used to advantage without fear of portability problems.  For greater efficiency, compound tests should be written with the most frequently false 
+operands first; in that case the trailing operands will be evaluated only rarely.  This feature, together with the fact that the operands can be expressions of any complexity (including function calls), makes it possible to write very compact code.  For example, <P>
+
+<PRE>		func1() &amp;&amp; func2() &amp;&amp; func3() ;<P>
+</PRE>
+
+is equivalent to<P>
+
+<PRE>
+		if(func1()) {
+			if(func2()) {
+				func3() ;
+				}
+			}
+</PRE><P>
+
+Also, trailing operands may safely reference variables (e.g., subscripts) which have been verified in preceding tests.  For example,<P>
+<PRE>		if(ptr &amp;&amp; *ptr == '-') ...;<P>
+</PRE>
+
+performs <B>...</B> only if the pointer is not null and it points to a hyphen.<P>
+
+<CENTER><B>Logical OR Operator<P>
+</CENTER></B>
+
+<B>||	Logical OR<P>
+
+</B>This operator yields the logical OR of the adjoining operands.  If either is true it yields true, (one); otherwise, it yields false (zero).  This operator associates left to right. <P>
+
+If the expression contains a series of these operators, the operands are evaluated left to right until the first true operand is reached.  At that point the outcome is known, so true is generated for the entire series, and the right-most operands are not evaluated.  This is a standard feature of the C language, so it can be used to advantage without fear of portability problems.  For greater efficiency, compound tests should be written with the most frequently true operands first; in that case 
+the trailing operands will be evaluated only rarely.  This feature, together with the fact that the operands can be expressions of any complexity (including function calls), makes it possible to write very compact code.  For example, <P>
+
+<PRE>		func1() || func2() || func3() ;<P>
+</PRE>
+
+is equivalent to
+
+<PRE><P>
+		if(func1()) ;
+		else if(func2()) ;
+		else func3() ;
+
+</PRE><P>
+
+<CENTER><B>Conditional Operator<P>
+</CENTER></B>
+
+<B>?:	Conditional Operator<P>
+
+</B> This unusual operator tests the Boolean value of one expression to determine which of two other expressions to evaluate.  Since it is the only operator that requires three operands it is sometimes called the <I>ternary</I> operator.  It consists of two characters--a question mark and a colon--which separate the three expressions.  The general form is <P>
+
+<PRE>		<I>Expression1</I> <B>?</B> <I>Expression2</I> <B>:</B> <I>Expression3</I><P>
+</PRE>
+
+This sequence may appear anywhere an expression (or subexpression) is acceptable.  <I>Expression1</I> is evaluated for true (non-zero) or false (zero).  If it yields true then <I>Expression2</I> is evaluated to determine the value of the operator.  However, if <I>Expression1</I> is false then <I>Expression3</I> determines the result.  Only one of the last two expressions is evaluated.  Consider this example: <P>
+
+<PRE>		(y ? x/y : x) + 5<P>
+</PRE> 
+
+If <B>y</B> is not zero, this expression yields <B>(x/y)+5</B>; otherwise,<B> x+5</B>. <P>
+
+Unless they are enclosed in parentheses, there are restrictions on the operators that can be used in the three expressions.  The first expression can contain only operators that are higher in precedence than the conditional operator; that is, assignment and conditional operators are disallowed.  The second and third expressions cannot contain assignment operators, but may have conditional operators or any operators of higher precedence.  Considering these restrictions and the fact that 
+this operator associates from right to left, the expression <P>
+
+<PRE>		a ? b : c ? d : e<P>
+</PRE>
+
+is equivalent to<P>
+
+<PRE>		a ? b : (c ? d : e)<P>
+</PRE>
+
+and<P>
+
+<PRE>		a ? b ? c : d : e<P>
+</PRE>
+
+is equivalent to<P>
+<PRE>		a ? (b ? c : d) : e<P>
+</PRE>
+
+Obviously, whenever more than one conditional operator is used in combination, it is a good idea to use parentheses even if they are not strictly needed. <P>
+
+Since this operator must yield a single value, and that value comes from either of two expressions which could yield different data types, some further restrictions must apply to the second and third expressions.  Otherwise, the compiler might not be able to assign a data type to the result.  In other words, it is impossible to determine the attributes of the result at compile time if they are allowed to be determined at run time.  Therefore, the last two expressions must observe the following additional 
+restrictions: <P>
+
+<UL>
+<LI>Both expressions yield numeric constants.  In this case, because the two possible constant values are assumed to be different (otherwise, there would be no point selecting between them), the result is considered to be an integer variable.
+<LI>Either one or the other yields a numeric constant.  In these cases, the numeric constant  (often zero) is considered to be an exceptional value of the same type as the other expression.  Therefore, the result is given the attributes of the non-constant expression.
+<LI>Both expressions yield addresses of the same data type.  In this case, both expressions have the same properties, and naturally the result is the same.
+<LI>Both yield integer values.  Likewise, in this case, the expression properties match and, therefore, determine the resulting attributes.
+</UL>
+
+If none of these conditions is met, then message &quot;<B>mismatched expressions</B>&quot; is issued.<P>
+
+<CENTER><B>Assignment Operators<P>
+</CENTER></B>
+
+Each of these operators assigns a value to the object on its left side.  These operators associate right to left.  The new value is either the right hand operand or a value derived from both operands. <P>
+
+The left (receiving) operand must be an lvalue; that is, it must be an object which occupies space in memory and is therefore capable of being changed.  An unadorned array name, <B>array</B> for instance, will not do; whereas, <B>*array</B> and <B>array[x]</B> are lvalues.  Other operands that do not qualify as lvalues are calculated values which are not prefixed by the indirection operator, and names which are prefixed by the address operator.  Conversely, the only allowable <i>lvalues</i>
+ in Small C are (1) variable names, (2) pointer names, (3) subscripted pointer names, (4) subscripted array names, and (5) subexpressions that are prefixed by the indirection operator. <P>
+
+If the receiving object is a character, it receives only the low-order byte of the value being assigned. <P>
+
+All but one of the assignment operators have the form <B>?=</B> where <B>?</B> stands for a specific non-assignment operator.  These operators provide a shorthand way of writing expressions of the form<P>
+
+<PRE>		a = a ? b<P>
+</PRE>
+
+Thus,<P>
+
+<PRE>		a += b<P>
+</PRE>
+
+is equivalent to<P>
+
+<PRE>		a = a + b<P>
+</PRE>
+
+and<P>
+
+<PRE>		a &lt;&lt;= b<P>
+</PRE>
+
+is equivalent to<P>
+<PRE>		a = a &lt;&lt; b<P>
+</PRE>
+
+and so on.  These operators produce more efficient code since the receiving operand is evaluated only once. <P>
+
+UNIX C originally implemented these operators with the equal sign leading instead of trailing.  The result was that some of them (<B>=+</B>,<B> =-</B>, <B>=*</B>, and <B>=&amp;</B>) were ambiguous.  Small C always takes these as a pair of separate operators.  To avoid portability problems, always put a space between these character pairs. <P>
+
+Since assignment is a part of expression evaluation, traditional assignment statements are really just stand alone expressions.  And, since all operators yield values which may be used in the further process of expression evaluation, any number of assignment operators may appear in an expression.  Most common are multiple assignments like <P>
+
+<PRE>		a = b = c = 5<P>
+</PRE>
+
+Since these operators group right to left, <B>5</B> is first assigned to <B>c</B>, then the right-most operator yields the value assigned.  The middle operator then assigns that value to <B>b</B> and yields the same value for the next operator.  Finally, the left-most operator assigns that value to <B>a</B>.  It is the same as if the expression were written  <P>
+
+<PRE>		a = (b = (c = 5))<P>
+</PRE>
+
+Expressions like <P>
+
+<PRE>		val[i] = i = 5 <P>
+</PRE>
+
+deserve special consideration.  Notice that the variable <B>i</B> is modified on the right side of the first assignment operator and is also used as a subscript on the left side.  Small C uses the original value of <B>i</B> for the subscript, but full C uses the modified value.  It is best to avoid such expressions to maintain compatibility with full C. <P>
+
+The assignment operators are: <P>
+
+<B>=	Assignment<P></B> 
+This operator assigns the value of the right operand to the left operand.<P>
+
+<B>+=	Add and Assign<P></B> 
+This operator assigns the sum of the left and right operands to the left operand.<P>
+
+<B>-=	Subtract and Assign<P></B>
+This operator subtracts the right operand from the left operand and assigns the result to the left operand.<P>
+
+<B>*=	Multiply and Assign<P></B>
+This operator assigns the product of the left and right operands to the left operand.<P>
+
+<B>/=	Divide and Assign <P></B>
+This operator divides the left operand by the right operand and assigns the quotient to the left operand.<P>
+
+<B>%=	Modulo and Assign<P></B>
+This operator divides the left operand by the right operand and assigns the remainder to the left operand.<P>
+
+<B>&amp;=	Bitwise AND and Assign<P></B>
+This operator assigns to the left operand the bitwise AND of the left and right operands.<P>
+
+<B>|=	Bitwise Inclusive OR and Assign<P></B>
+This operator assigns to the left operand the bitwise inclusive OR of the left and right operands.<P>
+
+<B>^=	Bitwise Exclusive OR and Assign<P></B>
+This operator assigns to the left operand the bitwise exclusive OR of the left and right operands.<P>
+
+<B>&lt;&lt;=	Left Shift and Assign<P></B>
+This operator shifts the left operand left the number of bits indicated by the right operand.  The result is assigned to the left operand.<P>
+
+<B>&gt;&gt;=	Right Shift and Assign<P></B>
+This operator shifts the left operand right the number of bits indicated by the right operand.  The result is assigned to the left operand.<P>
+
+<P>
+<CENTER>Go to <a href="../chap10/chap10.htm">Chapter 10</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

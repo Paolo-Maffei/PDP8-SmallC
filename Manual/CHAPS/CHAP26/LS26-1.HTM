@@ -1,0 +1,74 @@
+<HTML>
+<PRE>
+           <B>PSEUDOCODE                                  COMMENTS</B><P> 
+    
+     1 save stage current address                       before, start 
+     2 assume result will not be (l op z) or (z op r)   is[SA]=0 
+     3 if left == constant                              (c op r) 
+     4     parse right into PRIMARY 
+     5     if left == zero                              (z op r) 
+     6         pass current stage address               is[SA]=snext 
+     7     if right == int address                      double() 
+     8     and op == add or subtract 
+     9         double constant                          (2*c +- ia) 
+    10     LOAD CONSTANT INTO SECONDARY                 GETw2n 
+    11 else                                             (v op r) 
+    12     PUSH LEFT ONTO STACK                         PUSH1 
+    13     parse right into PRIMARY                     down1() 
+    14     if right == constant                         (v op c) 
+    15         if right == zero                         (v op z) 
+    16             pass original stage address          is[SA]=start 
+    17         purge PUSH instruction and adjust csp 
+    18         if op == add                             commutative 
+    19             if left == int address               double() 
+    20                 double constant                  (ia +- 2*c) 
+    21             LOAD CONSTANT INTO SECONDARY         GETw2n 
+    22         else                                     not commutative 
+    23             MOVE PRIMARY TO SECONDARY            MOVE21 
+    24             if left == int address               double() 
+    25             and op == add or subtract                 
+    26                 double constant                  (ia +- 2*c) 
+    27             LOAD CONSTANT INTO PRIMARY           GETw1n 
+    28     else                                         (v op v) 
+    29         POP LEFT INTO SECONDARY                  POP2 
+    30         if left == int address                   double() 
+    31         and op == add or subtract  
+    32         and right == not address 
+    33             DOUBLE PRIMARY (RIGHT)               (ia +- 2*v) 
+    34         if right == int address                  double() 
+    35         and op == add or subtract 
+    36         and left == not address     
+    37             DOUBLE SECONDARY (LEFT)              (2*v +- ia) 
+    38 if op == binary 
+    39     if left or right is unsigned 
+    40         select unsigned operation                oper=oper2 
+    41     if both constants                            (c op c) 
+    42         pass constant designation                is[TC] 
+    43         pass constant value                      is[CV]=calc() 
+    44         purge RIGHT CODE 
+    45         if unsigned result 
+    46             pass unsigned constant designation   is[TC]=UINT 
+    47     else 
+    48         pass variable designation                is[TC] 
+    49         OPERATION                                gen(oper,0) 
+    50         if op == subtract 
+    51         and both int addresses                   (ia - ia) 
+    52             DIVIDE PRIMARY (RESULT) BY 2         integers between 
+    53         pass operator p-code                     is[OP]=oper 
+    54     if op == add or subtract 
+    55         if both are addresses                    (a +- a) 
+    56             pass &lt;result not an address&gt;         is[TA]=0 
+    57         else 
+    58             if right == address                  (? +- a) 
+    59                 pass right table address         is[ST]=is2[ST] 
+    60                 pass right indirect data type    is[TI]=is2[TI] 
+    61                 pass right address data type     is[TA]=is2[TA] 
+    62             else  
+    63                 pass left by default 
+    64     if left not in symbol table 
+    65     or right is in symbol table and is unsigned 
+    66         pass right symbol table entry            is[ST]=is2[ST] 
+    67     else 
+    68         pass left symbol table entry or zero     default
+</PRE> 
+</HTML>

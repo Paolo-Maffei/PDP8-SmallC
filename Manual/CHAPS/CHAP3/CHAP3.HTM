@@ -1,0 +1,240 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<H1><B>CHAPTER 3:<P>
+CONSTANTS</B></H1>
+</CENTER>
+<P>
+ Small C recognizes three types of constants; they are <I>
+numeric</I>, <I>character</I>, and <I>string</I>.  Furthermore,  
+numeric constants may be written in three bases: <I>decimal</I>, 
+<I>octal</I>, and <I>hexadecimal</I>.  Each type of constant is  
+discussed below.</P>
+<P>
+<B>Decimal Constants</B></P>
+<P>
+Ordinary decimal constants are written as a sequence of  decimal 
+digits, possibly preceded by a plus or minus sign.  The  minus sign gives 
+the constant a negative value; whereas, the  absence of a minus sign, makes it 
+positive.  The plus sign is  optional for positive values.  The normal range of 
+decimal constants is -32768 through +32767.</P>
+<P>
+However, Small C allows us to write constants in the range 32768  
+through 65535. Former versions of the compiler would interpret  these as their 
+negative equivalents -32768 through -1; that is,  the negative values with 
+the same bit patterns.  But this is an  unexpected interpretation and is not 
+consistent with full C  compilers which preserve the value of large positive 
+constants by  converting them to long integers.</P>
+<P>
+The current version of Small C takes these large positive  
+constants as unsigned values.  While this preserves their value  and yields expected 
+results, there is one caveat.  In order to  produce reasonable results, operations 
+performed on unsigned  values are necessarily unsigned operations.  For most 
+expression operators there is no difference between the signed and unsigned  
+operations. But for the following operations there is a  difference:<P>
+<PRE>
+
+		<B>*</B>  	multiplication
+
+	         <B>/</B>  	division
+
+		<B>%</B>  	modulo (remainder)
+
+		<B>&lt;</B>  	less than
+
+		<B>&lt;=</B> 	less than or equal
+
+		<B>&gt;</B>  	greater than
+
+		<B>&gt;=</B> 	greater than or equal<P>
+</PRE>
+
+Also, when an unsigned operand is operated on (unary or binary  
+operation), the result is considered to be unsigned.  So in  complex expressions, 
+we may get some unexpected unsigned  operations.</P>
+<P>
+There is one final caution about large positive values.  Although 
+ Small C treats them as unsigned values, they nevertheless appear  in the 
+output file as negative values.  But don't panic, this is  really okay.  Recall 
+that each unsigned value over 32767 has the  high-order bit set and so has 
+an equivalent negative value with  the same bit pattern.  When these negative 
+values pass through  the assembler they produce the same binary patterns as 
+their  unsigned equivalents.  So the end result is the same.</P>
+<P>
+With earlier versions of the Small C compiler, if we wanted an  
+unsigned comparison we had to make sure that one of the operands  was 
+thought by the compiler to be an address.  This could be done   by falsely 
+declaring an integer to be a character pointer  (<A HREF="../chap5/chap5.htm">Chapter 
+5</A>).  And, in fact, this unorthodox practice has been  used to 
+good effect in many Small C programs.  With the current  compiler, however, we 
+can write exactly what we intend by using  the keyword <B>unsigned</B>.<P>
+As was implied in the previous discussion, decimal constants are  
+reduced to their two's complement or unsigned binary equivalent  and stored 
+in 16-bit words.  Some examples of legitimate decimal constants are 
+<B>0</B>, <B>12345</B>, <B>-1024</B>, and <B>+256</B>.<P>
+
+<B>Octal Constants</B><P>
+
+If a sequence of digits begins with a leading <B>0</B> (zero)   
+it is taken as an octal value.  In this case the word digits  refers only to the 
+octal digits (0 through 7).  As with decimal  constants, octal constants are 
+converted to their binary  equivalent in 16-bit words.  Octal constants may, 
+therefore, range from 0 through 0177777.  Here as with decimal constants, we 
+  must realize that large values (100000 and higher) will be  treated by the 
+compiler as unsigned values.  Some examples of  legitimate oct al constants 
+are <B>010</B>, <B>01234</B>, and <B>077777</B>.   Notice that the octal values 0 
+through 07 are equivalent to the  decimal values 0 through 7.<P>
+
+The old CP/M version of Small C did not recognize octal  
+constants.  It took constants with leading zeroes as decimal  values.  Therefore, 
+when converting a program written for that  compiler we should strip leading zeroes 
+from its numeric  constants.<P>
+
+<B>Hexadecimal Constants</B><P>
+
+If a sequence of digits begins with <B>0x</B> or <B>0X</B>  then 
+it is taken as a hexadecimal value.  In this case the word  digits refers to 
+hexadecimal digits (0 through F).  The lowercase   letters <B>a</B> through 
+<B>f</B> are acceptable.  As with  decimal constants, hexadecimal constants 
+are converted to their  binary equivalent in 16-bit words.  Hexadecimal constants 
+may  range from 0 through ffff.  Here as with decimal constants, we  must realize 
+that large values (8000 and higher) will be treated  by t he compiler as 
+unsigned values. Some examples of legitimate  hexadecimal constants 
+are <B>0x0</B>, <B>0x1234</B>, and <B>0xffff</B>.<P>
+
+<B>Character Constants</B><P>
+
+Character constants consist of one or two characters  surrounded 
+by apostrophes.  It may seem odd that a character  constant could have two 
+characters in it, but it makes sense when   we consider that, like numeric constants, 
+character constants  become 16-bit words (integer sized objects) and so 
+have room for  two characters.<P>
+
+The constant<B>'B'</B>, for instance, produces 0042 hex  
+(the ASCII value for an uppercase B).  And the constant <B>'AB'
+</B> produces 4142 hex, which is simply the two characters A and  
+B in the high-order and low-order bytes respectively.  Some  compilers do 
+not support multi-character constants because they  present a portability 
+problem when the byte order of the CPUs  differ.<P>
+
+Character constants are always treated as signed integers.   
+Therefore, unlikethe large numeric constants, mentioned above,  character 
+constants receive unsigned operations only when they  are combined with unsigned 
+operands.  In either case,  single-character constants are always positive 
+because the high-order bit is always zero.<P>
+
+We should realize that the same is not always true of character  
+variables. Unless a character variable is specifically declared  to be 
+unsigned, its high-order bit will be taken as a sign bit.   When the character 
+is referenced it will be converted to a signed   integer by extending that bit 
+throughout the eight high-order  bits that are appended to it.  Therefore, we 
+should not expect a  character variable, that is not declared unsigned, to compare  
+equal to the same character constant if the high-order bit is  set.  For more 
+on this see <A HREF="../chap4/chap4.htm">Chapter 4</A>.<P>
+
+<B>String Constants</B><P>
+
+Strictly speaking, C does not recognize character strings,  but 
+it does recognize arrays of characters and provides a way to  write 
+constant character arrays which are called <I>strings</I>.    Surrounding a 
+character sequence with quotation marks (<B>&quot; </B>), sets up an array of characters and generates the address  
+of the array. In other words, at the point in a program where it   appears, a 
+string constant produces the address of the specified  array of character 
+constants.  The array itself is locate d elsewhere.  This is very important to 
+remember.  Notice that this differs from a character constant which generates the value  
+of the constant directly.  Just to be sure that this distinct  feature 
+of the C language is not overlooked, consider the  following 
+illustrations:<P>
+
+In the program<P>
+<PRE>
+         		main() {
+ 			char *cp;
+			cp = &quot;hello world\n&quot;;
+			printf(cp);
+			}
+</PRE>
+<P>
+the function <B>printf()</B> must receive the address of a   
+string as its first (in this case, only) argument.  First, the  address of the 
+string is assigned to the character pointer <B>cp </B>.  Then the value of <B>cp</B> is passed to the function.   
+Unlike other languages, the string itself is not assigned to <B> cp</B>, only its address is.  After all, <B>cp</B> is a 16-bit  
+object and, therefore, cannot hold the string itself.  The same  program 
+could be written better as <P>
+
+<PRE>		 main() {
+			printf(&quot;hello world\n&quot;);
+			}
+</PRE>
+<P>
+In this case, it is tempting to think that the string itself  is 
+being passed to <B>printf()</B>; but, as before, only its  address is.<P>
+
+Since strings may contain as few as one or two characters, they  
+provide an alternative way of writing character constants in  situations 
+where the address, rather than the character itself,  is needed.<P>
+
+It is a convention in C to identify the end of a character string 
+  with a null (zero) character.  Therefore, C compilers  automatically suffix 
+character strings with such a terminator.   Thus, the string 
+<B> &quot;abc&quot;</B> sets up an array of four  characters (<B>'a'</B>, 
+<B>'b'</B>,<B> 'c'</B>, and zero) and  generates the address of the first character, for use 
+by the program.<P>
+
+Full C compilers permit long strings to be split between lines;  
+but, Small C makes no such provision.  See <a href="../chap28/chap28.htm">Chapter 28</a> for  suggestions on how 
+to add this capability to Small C; it is  really quite easy.<P>
+
+<B>Escape Sequences</B><P>
+
+Sometimes it is desirable to code nongraphic characters in a  
+character or string constant.  This can be done by using an <I>
+escape sequence</I>--a sequence of two or more characters in  
+which the first (escape) character changes the meaning of the  following 
+character(s).  When this is done the entire sequence  generates only one character.  
+C uses the backslash (<B>\</B>)  for the escape character.  The following 
+escape sequences are  recognized by the Small C compiler:<P>
+<PRE>
+
+	<B>\n</B>		newline
+
+	<B>\t</B>		tab
+
+	<B>\b</B>		backspace
+
+	<B>\f</B>		form feed
+
+	<B>\</B><I>ooo</I>		value represented by the octal digits <I>ooo</I></P>
+</PRE><P>
+
+The term <I>newline</I> refers to a single character which, when  
+written to an output device, starts a new line.  Directed to a  CRT screen it 
+would place the cursor at the first column of the  next line.  When written to an 
+output device or a character  stream file, the newline character becomes a 
+sequence of two characters: carriage return and line feed (not necessarily in  
+that order). Conversely, on input a carriage return or a  carriage return/line 
+feed pair becomes a single newline  character.  Some impl ementations of C 
+use the ASCII carriage return (13) as the  newline character while others use 
+the ASCII line feed (10).  It  really doesn't matter which is the case as long 
+as we write <B>\n</B> in our programs.  Avoid using the ASCII value directly since 
+  that could produce compatibility problems between different  compilers.<P>
+
+The sequence <B>\</B><I>ooo</I> may be used to represent any  
+character.  It consists of the escape character followed by one,  two, or three 
+octal digits. The number ends when three digits  have been processed, or a 
+non-octal character is found.<P>
+
+There is one other type of escape sequence: anything undefined.   
+If the backslash is followed by any character other than the ones   
+described above, then the backslash is ignored and the following  character is 
+taken literally. So the way to code the backslash  is by writing a pair of 
+backslashes and the way to code an  apostrophe or a quote is by writing <B>\'</B> or 
+<B>\&quot; </B>  respectively.<P>
+
+<CENTER>Go to <a href="../chap4/chap4.htm">Chapter 4</a>     Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

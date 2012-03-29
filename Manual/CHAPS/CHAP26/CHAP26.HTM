@@ -1,0 +1,1055 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 26:<P>
+EXPRESSION ANALYSIS<P></B></H1>
+</CENTER>
+
+We come now to the last remaining task, the parsing of expressions.  This is clearly the most difficult part of the compiler.  Therefore, it has been separated from the previous chapter for special treatment.<P>
+
+To help us appreciate the overall organization and operation of the expression analyzer, Figure 26-1 presents a graphic view of the major analyzer functions, the operators they recognize, and the grouping of the operators.  On the left side are the functions; the most important ones (in terms of the flow of control through the analyzer) are in boxes for emphasis.  The basic flow of control is from the top down.  To save space, in many cases the connecting lines have been squeezed out.  So, where 
+we see function names stacked above one another, there is an implied call from the upper to the lower function.  Recursion is evident where lines of control go from a function back to itself or to<B> level1()</B>.<P>
+
+Functions<B> level1()</B> through<B> level14()</B> correspond to the precedence levels of the expression operators, such that <B>level1()</B> recognizes the operators at the lowest precedence level and<B> level14()</B> the highest.<P>
+
+To the right of each function, enclosed in boxes, are the operators which the function recognizes.  Each set of operators is preceded by an arrow showing the way the operators associate.  Notice that the functions for the only three levels that associate from right to left (<B> level1()</B>, <B>level2()</B>, and<B> level13()</B> ) perform recursive calls to themselves.  This causes the analyzer to scan its way to the right most instance of a run of operators at that level (lower level operators
+being parsed along the way) before generating code for these operators as the recursion unwinds from right to left.<P>
+
+At the bottom of Figure 26-1 is the function<B> primary()</B> which recognizes the operands upon which the operators work.  These appear as identifiers (variables, pointers, and functions), constants, or subexpressions in parentheses.  A function name stands for the address of the function.  If it is followed by a left parenthesis, it is recognized by<B> level14()</B> as a function call; otherwise, its address figures into the expression.  Small C is unique in that it interprets an undeclared symbol to be
+ a function name and places it in the global symbol table as such.<P>
+
+As we saw in <a href="../chap25/chap25.htm">Chapter 25</a>, there were several points in the syntax where expressions had to be parsed.  For example, the <B>if</B> statement has an expression (or list of expressions) in parentheses which must be evaluated and tested at run time.  Therefore<B> doif()</B> contained<P>
+
+<PRE>		test(flab1 = getlabel(), YES);<P>
+</PRE>
+
+to parse the expression and generate code for its evaluation and testing.  As we can see from Figure 26-1<B> test()</B> is one of three lead-in functions for the expression analyzer.  Another is<B> constexpr()</B> which is called when a constant expression, such as a <B>case</B> value or an array dimension, is expected.  Finally, there is<B> doexpr()</B> which attempts to interpret an entire statement as an expression.<P>
+
+Now, what about those unboxed functions--<B>skim()</B>,<B> down()</B>, <B>down1()</B>, and<B> down2()</B>?  Basically, they contain logic which used to be imbedded in the <B>level</B> functions.  While that arrangement used less stack space and was somewhat faster, it made the compiler considerably larger by replicating virtually identical logic many times.  So this version of Small C has extracted this redundant logic into these pipeline functions through which most levels of the analyzer call other levels.<P>
+
+<img src="fg26-1a.gif">
+<img src="fg26-1b.gif">
+<img src="fg26-1c.gif">
+<img src="fg26-1d.gif">
+<CENTER><B>Figure 26-1: Expression Analysis Functions<P>
+</CENTER></B>
+
+<B>An Introductory Example<P>
+</B>
+
+Before launching right into a study of the analyzer, it should help to first get a feel for the overall flow of control by tracing out the parsing of a sample expression.  Consider the program<P>
+
+<PRE>		int i, j, k;
+			main() {
+			i = j+k/5;
+			}<P>
+</PRE>
+
+In this case, the expression is a complete statement, so we enter the analyzer from<B> statement()</B> through<B> doexpr()</B> and <B>expression()</B>, at the top of Figure 26-1.  Before anything else,<B> level1()</B> calls<B> level2()</B> through<B> down1()</B> which remembers the staging buffer location in case a constant results.  In that case, on return, it would discard everything that was generated by lower functions, on the assumption that a higher function will replace it 
+with a single statement that puts the constant in the primary register.<P>
+
+<B>Level2()</B> immediately calls<B> Level3()</B> by way of<B> down1()</B>.  <B>Level3()</B> then immediately calls<B> skim()</B> which in turn immediately calls<B> level4()</B> through<B> down1()</B>.  <B>Level4()</B> then, likewise, calls<B> level5()</B> through<B> skim()</B> and<B> down1()</B>.<P>
+
+<B>Level5()</B> is the first of eight functions which are virtually identical.  It immediately calls<B> level6()</B> by way of<B> down()</B> and <B>down1()</B>.  This process continues all the way down to <B>level13()</B>.<P>
+
+Notice that until now there has been no attempt to scan the expression.  In this function, however, since unary operators may precede an operand, attempts are made to match on any of the seven unary operators (Figure 26-1).  That failing, <B>level13()</B> calls<B> level14()</B> directly.  <B>Level14()</B> then immediately calls<B> primary()</B> which (1) sees the symbol <B>i</B> in the input line, (2) skips over it, (3) finds it in the global symbol table, (4) passes its table address and 
+data type (<B>int</B>) up the line as a side effect, and (5) returns true (meaning that <B>i</B> has yet to be fetched).<P>
+
+At this point, the calls begin to unnest as the <B>level</B> functions, in reverse order, attempt to recognize the operators to which they are sensitive.  As each fails, it returns to the next higher level the value that originated in <B>primary()</B>.  As each preceding instance of<B> down1()</B> regains control, it merely returns the value from<B> primary()</B> up the line.  Likewise, each instance of<B> down()</B> (which is empowered by the level function above to recognize and act 
+on selected operators) does nothing but return the value from<B> primary()</B> up the line.  A quick look at the listing for<B> level5()</B> through <B>level12()</B> makes it obvious that all they do is return the value (in this case true) that they receive.  This unwinding continues up through levels four and three with the pipeline function<B> skim()</B> finding nothing to do.<P>
+
+Finally, control arrives back in<B> level1()</B> where the assignment operator (<B>=</B>) is recognized and bypassed.  <B>Level1()</B> then takes note of the table address and the data type of <B>i</B> and proceeds to call itself; this is because other assignment operators could appear to the right of this one.<P>
+
+Now we descend all the way down the ladder again and in <B>primary()</B> recognize <B>j</B>.  Again, control runs back up the ladder.  Only, this time, since the next token is a plus sign, something different happens in the instance of<B> down()</B> called by<B> level11()</B>.  It recognizes the plus sign.  And, seeing that <B>j</B> has yet to be fetched, it generates code to load it into AX.  It then bypasses the plus sign and calls<B> level12()</B> again, but this time 
+through<B> down2()</B> and<B> down1()</B>.  <B>Down2()</B> first generates code to push AX (containing <B>j</B>) onto the stack.  This preserves it until whatever lies to the right of the plus sign has been evaluated.  Then it can be popped into BX and added to the right side. <P>
+
+Again, control steps down to<B> primary()</B> where, this time, <B>k</B> is recognized.  On the way back up, the following token (a slash), is recognized by the instance of<B> down()</B> beneath <B>level12()</B>.  Seeing that <B>k</B> has yet to be fetched, it generates code to load it into AX.  It then bypasses the slash and calls<B> level13()</B> again, but this time through<B> down2()</B> and <B>down1()</B>.  Before calling<B> down1()</B>, however,<B> down2()</B> generates code to push 
+AX (containing <B>k</B>) onto the stack.  This preserves it until whatever lies to the right of the slash has been evaluated, at which time it can be popped and divided by the right side.<P>
+
+Once again, control goes down to<B> primary()</B> where the number 5 is recognized as a constant.  It is converted to an internal integer and passed as a side effect back up the line.  Finally,<B> primary()</B> returns false meaning that this operand has already been fetched.<P>
+
+At this point, the constant 5 is being passed to higher functions, the values of <B>j</B> and <B>k</B> are on the stack (more correctly, they would be at run time), and the next token is the semicolon that terminates the statement.  As control runs back up the ladder, it reaches the instance of<B> down2()</B> beneath<B> level12()</B> where the value <B>5</B> (received as a side effect from<B> primary()</B> ) is seen as a constant.  And, since BX is not needed to evaluate the constant, the code that pushes
+ <B>k</B> onto the stack is purged from the staging buffer, and in its place<P>
+
+<PRE>		MOV BX,AX
+		MOV AX,5
+</PRE>
+
+(p-codes <B>MOVE21</B> and <B>GETw1n</B>) is generated.  Now, with <B>5</B> in AX and <B>k</B> in BX,<B> down2()</B> generates<P>
+
+<PRE>		XCHG AX,BX
+		CWD
+		IDIV BX<P>
+</PRE>
+
+(p-code <B>DIV12</B>) which performs the division operation, leaving the quotient in AX and the remainder in DX. (The <B>XCHG AX,BX</B>, which is automatically generated by<B> gen()</B> when it sees <B>DIV12</B>, swaps the operands so they will be in the appropriate registers for the 8086 divide instruction.  The <B>CWD</B> instruction converts the dividend in AX to a double word by extending its sign through DX.  The <B>IDIV BX</B> instruction performs a signed divide of DX,AX by BX.)<P>
+
+After this, control works its way up to the instance of <B>down2()</B> beneath<B> level11()</B> where code is generated that pops 
+<B>j</B> from the stack into BX.  Now with <B>k/5</B> in AX and <B>j</B> in BX,<B> down2()</B> generates<P>
+
+<PRE>		ADD AX,BX<P>
+</PRE>
+
+(p-code <B>ADD12</B>) which adds BX to AX, placing the sum in AX.<P>
+
+Next control propagates all the way up to<B> level1()</B> again, where an attempt to recognize further assignment operators fails and control returns to the previous instance of <B>level1()</B> that had called itself.  Here code is generated to store AX in memory where <B>i</B> resides, thereby effecting the assignment operation.<P>
+
+Finally,<B> level1()</B> returns to<B> expression()</B> which returns to <B>doexpr()</B> and the analysis is finished.  The result is<P>
+
+<PRE>
+	MOV AX,_J		fetch <B>j</B> into AX
+	PUSH AX			push <B>j</B> on the stack
+	MOV AX,_K		fetch <B>k</B> into AX
+	MOV BX,AX		move <B>k</B> to BX
+	MOV AX,5		load <B>5</B> into AX
+	XCHG AX,BX		swap AX and BX
+	CWD			sign extend AX into DX
+	IDIV BX			divide <B>k</B> (DX,AX) by <B>5</B> (BX)
+	POP BX			pop <B>j</B> into BX
+	ADD AX,BX		add <B>j</B> (BX) to <B>k/5</B> (AX)
+	MOV _I,AX		store<B> j+k/5</B> (AX) into <B>i</B><P>
+</PRE>
+
+which carries out the desired expression evaluation.<P>
+
+It is interesting to see what happens when the default order of precedence is changed by parentheses as in<P>
+
+<PRE>		i = (j+k)/5<P>
+</PRE>
+
+In this case, after scanning the equal sign, control runs down the line to<B> primary()</B> where the left parenthesis is seen, causing it to directly call<B> level1()</B> for the evaluation of <B>j+k</B>.  Then, since the right parenthesis is not recognized, control reverts back up to<B> level1()</B> which, thinking it is finished, returns.  However, this time <B>primary()</B> receives control, enforces the right parenthesis and returns control back up the ladder, causing analysis to continue.  
+The result is<P>
+
+<PRE>
+	MOV AX,_J		fetch <B>j</B> into AX
+	PUSH AX			push <B>j</B> onto the stack
+	MOV AX,_K		fetch <B>k</B> into AX
+	POP BX			pop <B>j</B> into BX
+	ADD AX,BX		add <B>j</B> (BX) to <B>k</B> (AX)
+	MOV BX,AX		move <B>j+k</B> (AX) to BX
+	MOV AX,5		load <B>5</B> into AX
+	XCHG AX,BX		swap <B>5</B> (AX) and <B>j+k</B> (BX)
+	CWD			sign extend AX into DX
+	IDIV BX			divide <B>j+k</B> (AX) by <B>5</B> (BX)
+	MOV _I,AX		store <B>(j+k)/5</B> (AX) in <B>i</B><P>
+</PRE>
+
+Notice how the placement of higher-precedence operators toward the bottom of the evaluation hierarchy and the lower-precedence operators toward the top ensures that operations are performed in the proper order.  Also notice how easy it is allow parentheses to alter the default order by making<B> primary()</B> sensitive to them.  We simply treat anything between matching parentheses as an entire expression within the context of a larger expression.<P>
+
+Lets draw from this overview some additional concepts.  First, notice that the unary operators (level 13) that precede operands are recognized on the way down the hierarchy, while those that follow are recognized on the way up.  By &quot;on the way down&quot; I mean before calling the next lower level, and by &quot;on the way up&quot; I mean after returning from the lower level.  This is obvious after thinking about it a bit, however it helps to keep this in mind as we study the analyzer functions.  
+
+Analogously, the binary operators are recognized on the way up from scanning the left operand; however, since they require an operand on the right side, they must descend from the present level back down the hierarchy to evaluate the right hand operand.  Then, on return from that, code is generated to effect the binary operation before returning to the next higher level.<P>
+
+This behavior is reflected in Figure 26-1 by the repeated pattern of the <B>down</B> functions connecting levels 5 through 13.  <B>Down()</B> starts the descent to the next lower level.  <B>Down1()</B> suffices as the pipeline for the left operand, and <B>down2()</B> followed by<B> down1()</B> serves to handle the right operand if an operator at the current level is recognized.  So, the main path is the left path, with the right path being used only to descend one level after a binary operator 
+has been detected.  As a mnemonic device, these paths are arranged in Figure 26-1 on the left and right under<B> down()</B> according to which operand is being sought.  As we shall see later, the mechanism by which information is passed--through side effects--from<B> primary()</B> to higher functions must be duplicated so that information about both operands entering into a binary operation is available to<B> down2()</B> for analysis. <P>
+
+<B>The Lead-in Functions<P>
+</B>
+
+Having established a feel for the flow of control, we now look into the actual functions which constitute the analyzer.  First, we examine the lead-in functions<B> doexpr()</B>, <B>constexpr()</B>, and<B> test()</B>.<P>
+
+<B>Doexpr()<P>
+</B>
+
+<B>Doexpr()</B> is called when<B> statement()</B> cannot recognize a keyword, the assumption being that it must have an expression statement.  <B>Doexpr()</B> is a small function that does just two things.  In case there is a string of expressions, it checks for a comma after every call to<B> expression()</B> and, finding one, loops back for another call.  It also manipulates the staging buffer by calling<B> setstage()</B>, to set the staging buffer to its initial position, before<B> expression()</B> 
+is called.  Afterward it calls<B> clearstage()</B> to optimize and dump the buffer to the output file.<P>
+
+<B>Constexpr()<P>
+</B>
+
+<B>Constexpr()</B> is called when the syntax demands a constant expression.  This is often simply a constant--numeric or character--but it may be any legal expression resulting in a constant value.  Unlike<B> doexpr()</B>, this function does not expect or handle a list of expressions; so it only looks for one.  But, like<B> doexpr()</B>, it sets and clears the staging buffer.  There is a major difference, however.  When it calls <B>clearstage()</B> it passes a zero for the second argument, 
+meaning that the staging buffer is to be cleared but not dumped.  In other words the code generated by analyzing the expression is discarded.<P>
+
+This seemingly strange behavior is understandable when we consider two things.  First, constant expressions must sometimes be evaluated for compile-time use (e.g., array dimensions), in which case it would be inappropriate to generate code for run-time execution.  And, even when the expression occurs in a run-time context, it is more efficient to generate a single instruction to load the constant value than to generate a set of instructions that perform a stepwise evaluation of the expression.<P>
+
+So,<B> expression()</B> has been written to return two items as side effects: the value of the expression and either true or false depending on whether or not that value is a constant.  <B>Constexpr()</B> tests the first of these to see if the expression was indeed constant as expected.  If it was not, then &quot;<B>must be constant expression</B>&quot; is issued.  Finally, it returns the value of the expression.  Of course, this is a bogus value if the message was issued.<P>
+
+<B>Expression()<P>
+</B>
+
+<B>Expression()</B> is one of two functions that initiate expression analysis by calling<B> level1()</B>.  Besides calling<B> level1()</B> and returning the two items mentioned above, it does one very important thing.  It declares locally an array of seven integers into which<B> level1()</B> and subordinate functions place vital information about the expression.  This is the first instance of the, soon to be familiar,<B> is[]</B> and<B> is2[]</B> arrays.  These arrays are the means by which, starting 
+with<B> primary()</B>, information is returned by side effects up the hierarchy.  The term is in these array names is not an acronym, but the word.  These arrays tell the analyzer what the entire expression or any part of it is.  In other words, they carry the properties of whatever has been parsed at every point in the process.<P>
+
+This first instance of the array is for the left leg of the descent through all of the levels.  Another (<B>is2[]</B>) is declared--for use with the right operand--at each level where a binary operator is recognized.  Before control rises to a higher level, the left array is adjusted to reflect the result of the operation, and the right, being local and having served its purpose, is discarded.  At lower levels, the right array appears as a left array, and other right arrays are declared as other 
+binary operators are encountered.  Figure 26-2 illustrates the points where these arrays are declared during the analysis of the expression<P>
+
+<PRE> 		i=j+k/5;<P>
+</PRE>
+
+It shows a parse tree for the expression with the left and right arrays written in where they are created.<P>
+
+<CENTER>
+<img src="fg26-2.gif">
+</CENTER>
+<CENTER><B>Figure 26-2: Is[] Arrays for i=j+k/5;<P>
+</CENTER></B>
+
+So, what kinds of information is carried in these arrays?  We shall now see; however, the usefulness of this information will not become clear until the subordinate analyzer functions are studied.  Nevertheless, for an introductory look and for future reference, a summary of the contents of the <B>is[]</B> arrays, is provided in Table 26-1.<P>
+
+<CENTER>
+<img src="tb26-1.gif">
+</CENTER>
+<CENTER><B>Table 26-1: Is[] Array Contents<P>
+</CENTER></B>
+
+A brief description of each element follows:<P>
+
+<B>Is[ST]</B> contains the address of the symbol table entry that describes the operand.  Its purpose is to allow information from the symbol table to be used in generating code that accesses the operand.  Since constants are not represented in the symbol table, however, this element sometimes contains zero.  Obviously, this information could have value only with respect to a primary operand.  Therefore, when a primary operand combines into some larger entity, this element loses its 
+significance and so is reset to zero. <P>
+
+<B>Is[TI]</B> contains the data type of indirectly referenced objects.  These are objects which are referenced by way of an address in a register.  This includes (1) function arguments, (2) local objects, and (3) globally declared arrays.  In the first two cases, the address is calculated relative to BP, the stack frame pointer.  In the third case an array element's address is calculated relative to the label which identifies the array.  Static objects other than arrays, on the other hand, are 
+directly referenced by their labels, so they produce zero in this element.  In some cases--e.g., an array name without a subscript or a leading ampersand (<B>&amp;</B>)--the address is all that is desired, and so no action is taken based on this information. <P>
+
+<B>Is[TA]</B> contains the data type of an address (<I>pointer</I>, <I>array</I>, <B>&amp;</B><I>variable</I>); otherwise, zero. <P>
+
+<B>Is[TC]</B> contains the data type (<B>INT</B> or <B>UINT</B>) if the (sub)expression yields a constant value; otherwise, zero.  The unsigned designation applies only to values over 32767 that are written without a sign (<a href="../chap3/chap3.htm">Chapter 3</a>). <P>
+
+<B>Is[CV]</B> contains the value produced by a constant (sub)expression.  This element has alternate uses when it is known that the (sub)expression is not a constant. <P>
+
+<B>Is[OP]</B> contains the p-code that generates the highest binary operator in an expression.  Its purpose is to determine, in the case of expressions of the form <P>
+
+<PRE>		<I>left  oper  zero</I><P>
+</PRE>
+
+ (where <I>left</I> is the left subexpression, <I>oper</I> is a binary operator, and <I>zero</I> is a subexpression which evaluates to zero) which form of optimized code to generate.  This element is used by<B> test()</B>.  <B>Is[SA]</B> contains the staging buffer address where code that evaluates the oper zero part of an expression of the form <P>
+
+<PRE>		<I>left  oper  zero<P></I>
+</PRE>
+
+is stored.  If not zero, it tells<B> test()</B> that better code can be generated and how much of the end of the staging buffer to replace. <P>
+
+<B>Test()<P>
+</B>
+
+Of the three lead-in functions,<B> test()</B> is the most complicated.  Its purpose is to generate code to evaluate and test an expression (or expression list), for true or false.  If an expression list is given, the expressions are evaluated from left to right, with the last expression determining the outcome.<P>
+
+This function receives two arguments--a label number for the false branch and a Boolean value indicating whether or not to require parentheses around the expression.  As with <B>expression()</B> above, this function calls<B> level1()</B> and so must allocate an initial <B>is[]</B> array.<P>
+
+It then calls<B> need()</B> to enforce an open parenthesis (if told to).  Next it falls into a loop setting the staging buffer, calling<B> level1()</B>, and checking for a comma.  Each comma means that another expression follows, so it dumps the staging buffer to the output file and continues the loop.  After the loop (if told to) it enforces a closing parenthesis.<P>
+
+Finally, before dumping the code for the last expression in the list,<B> test()</B> attempts to do some optimizing.  If the expression yields a constant (<B>is[TC]</B> is true) then there is no need for code to evaluate the expression.  If the constant value in <B>is[CV]</B> is true, the false jump can never be taken, so<B> test()</B> simply returns without generating anything; actually,<B> clearstage()</B> is called to delete the code that was generated by the last expression.  The effect on the program 
+is that control simply goes directly into the portion of the statement that executes under the true condition.  However, if the expression is false, an unconditional jump to the indicated label is generated.<P>
+
+Even though the last expression in the list does not yield a constant it may still be optimizable.  If its form is<P>
+
+<PRE>		<I>left  oper  zero<P></I>
+</PRE>
+
+where <I>oper</I> is a relational operator, then instead of generating the normal code for testing the expression,<P>
+
+<PRE>		OR AX,AX
+		JNE $+5
+		JMP <I>label</I><P>
+</PRE>
+
+(p-code <B>NE10f</B>), it is possible to take advantage of the fact that the 8086 CPU has several instructions for comparing values to zero.  By replacing the code for the<P>
+
+<PRE>		<I>oper  zero</I><P>
+</PRE>
+
+portion of the expression with these instructions, less and faster code results.  So, if <B>is[SA]</B> is nonzero and <B>is[OP]</B> contains the p-code for one of the relational operators, <B>zerojump()</B> is called to replace the unwanted part of the expression with better code.  The preferred p-code is passed to<B> zerojump()</B> as an argument.<P>
+
+For an example of the improvement this provides, see <a href="../chap19/ls19-23.gif">Listing 19-23</a>.  Table 26-2 shows the original p-codes and the ones that replace them.  Most of the substitution p-codes in this table have the form<P>
+
+<PRE>		<I>xx</B></I>10f<P>
+</PRE>
+
+where <I>xx</I> designates the type of comparison (e.g., <B>EQ</B> for equal), <B>1</B> refers to the primary register (AX) which is to be tested, <B>0</B> designates the value against which it is to be tested, and <B>f</B> means that a jump is generated on the false condition.<P>
+
+Notice that <B>LE12u</B> maps to <B>EQ10f</B> since unsigned values, by definition, cannot be less than zero, making equality with zero the only possibility.  Also, <B>GT12u</B> maps to <B>NE10f</B> for a similar reason.  The case of <B>GE12u</B> receives the ultimate optimization; no code is generated, since unsigned values are always equal to or greater than zero.  Finally, the p-code <B>LT12u</B> maps to an unconditional jump to the false label since unsigned values can never be negative.<P>
+
+<CENTER>
+<img src="tb26-2.gif">
+</CENTER>
+<CENTER><B>Table 26-2: Original and Optimized Relational Test P-codes<P>
+</CENTER></B>
+
+<B>The Pipeline Functions<P>
+</B>
+
+Now we look at what, for lack of a better term, I call the pipeline functions.  The ones through which the <B>level</B> functions call each another.  Their purpose is to collect in one place logic that would otherwise have been replicated in many <B>level</B> functions.  It is helpful to view these functions an extension of the <B>level</B> functions that call them.<P>
+
+Before going into these four functions, however, we shall consider a few techniques which they have in common.  First, <B>level3()</B> through<B> level12()</B> do not directly scan for the operators at their precedence levels; they relegate that common task to the underlying instance of<B> skim()</B> or<B> down()</B>.  They do this by passing a string containing a list of operators to the called function.  These functions then pass it on to<B> nextop()</B> which compares the current token against 
+each operator in the list until it either finds a match or exhausts the list.  It returns true on success, and false on failure.  It also sets two global variables for use by the caller.  <B>Opsize</B> is set to the length of the token, if one is recognized; this is passed by the calling function to <B>bump()</B> when it is time to bypass the token.  <B>Opindex</B> is set to designate which operator in the list matched--zero for the first, one for the second, and so on.<P>
+
+Another common technique is the means by which the pipeline functions know which hierarchy level to call next.  This is accomplished by having the calling <B>level</B> function pass to the first pipeline function the address of the next <B>level</B> function.  It simply passes the function name as an argument. (Recall that a naked function name evaluates to the address of the function.) This is passed from one pipeline function to the next until<B> down1()</B> finally calls the next level with 
+the statement<P>
+
+<PRE>		k = (*level)(is);<P>
+</PRE>
+
+in which <B>k</B> receives the Boolean value indicating whether or not the subexpression parsed by the call is an lvalue, <B>level</B> is the address of the target function, and <B>is</B> is the address of the array for conveying to higher levels the attributes of the subexpression being parsed.<P>
+
+<B>Skim()<P>
+</B>
+
+This function is only called when the <B>||</B> or <B>&amp;&amp;</B> operators are sought--levels 3 and 4 respectively.  Essentially this is an embellished version of<B> down()</B> that generates additional code to jump over the remainder of a series of the specified operators when the outcome is known.  For instance, the outcome of<P>
+
+<PRE>		(a &gt; b) || (c == d) || (e != f)<P>
+</PRE>
+
+is known if<P>
+
+<PRE>		(a &gt; b)<P>
+</PRE>
+
+is true.  The remaining subexpressions need not, indeed must not, be evaluated.  The C language guarantees that these trailing subexpressions will not be executed, and many programs depend on this behavior of the logical operators.<P>
+
+Similarly, the outcome of<P>
+
+<PRE>		(a &gt; b) &amp;&amp; (c == d) &amp;&amp; (e != f)<P>
+</PRE>
+
+is known if<P>
+
+<PRE>		(a &gt; b)<P>
+</PRE>
+
+is false.  So the purpose of this function is to skim from left to right across a given level of the expression, ensuring that this rule is enforced.  <B>Skim()</B> falls into a loop in which it first calls<B> down1()</B> to parse a subexpression--perhaps only a single primary operand.  It then looks to see if the next token is the one being sought (<B>||</B> or <B>&amp;&amp;</B>).  If not, it simply returns the value it got from<B> down1()</B>.  If it is, however, three things occur:<P>
+
+<OL>
+<LI>the operator is bypassed,
+<LI>if this is the first instance of the operator in the present series, a number for the dropout label is allocated, and
+<LI>the function dropout() is called to generate the code that tests for the dropout condition.  <p>
+</OL>
+
+<B>Dropout()</B> first, if necessary, generates code to either fetch the subexpression value (an unfetched lvalue), or to load it (a constant) directly with p-code GETw1n.  It then generates either <B>EQ10f</B> (for <B>||</B>) or <B>NE10f</B> (for <B>&amp;&amp;</B>) to jump to the dropout label under the right condition.  Remember that these codes produce a jump on the false condition.  The specific p-code that applies is determined by the second argument that<B> skim()</B> receives.<P>
+
+Finally, when the series ends:<P>
+
+<OL>
+<LI> <b>dropout()</b> is called for the last subexpression,
+<LI> code is generated to load AX with the outcome (zero or one depending on the fourth argument) when none of the subexpressions indicates otherwise,
+<LI> an exit label number is allocated and a jump to it is generated,
+<LI> the dropout label is generated,
+<LI> code is generated to load AX with the outcome when one of the subexpressions determines it,
+<LI> the exit label is generated,
+<LI> appropriate elements of is[] are reset, and
+<LI> zero (meaning that nothing needs to be fetched) is returned.<p>
+</OL>
+
+For an example of the code generated by this sequence, see <a href="../chap19/ls19-18.gif">Listing 19-18</a>.<P>
+
+<B>Down()<P>
+</B>
+
+<B>Down()</B> is much simpler than<B> skim()</B>.  It is called by each level of the hierarchy that looks for binary operators.  It first passes control down the left leg (by way of<B> down1()</B> ) to parse an operand that might be on the left side of a binary operator.  On receiving control again (the operand has been parsed), if it sees one of the anticipated operators, it passes control down the right leg (by way of<B> down2()</B> then <B>down1()</B> ) to parse the right hand operand 
+and to generate code for the operation itself.  The first call<P>
+
+<PRE>		k = down1(level, is);<P>
+</PRE>
+
+is simple enough and uses only techniques already described.  Also, the examination of the current token to see if it is one of the anticipated operators<P>
+
+<PRE>		if(nextop(opstr)==0) return k;<P>
+</PRE>
+
+is simple.  If one of the anticipated operators is not found, <B>k</B> is returned to the next higher level.<P>
+
+However, if<B> nextop()</B> returns true, the operator in the list (<B>opstr</B>) indicated by <B>opindex</B> has been identified.  In this case,<B> fetch()</B> is called to generate code to load the left operand (if an unfetched lvalue) into the primary register, and control falls into a loop.  The loop bypasses the matched operator then calls<B> down2()</B> to evaluate the right operand and generate code for the matched operator.  This continues until the operators at the current precedence 
+level (and at the current level of parenthesized nesting) have been exhausted.  Finally, zero is returned to the next higher level, indicating that nothing needs to be fetched (<B>down2()</B> fetched the right operand and applied the operator).<P>
+
+Only one thing about this function is not obvious--the way <B>down2()</B> is told which operator is being parsed.  To understand this, we must recall that there are two global integer arrays <B>op[]</B> and <B>op2[]</B> which contain p-codes for the signed and unsigned binary operators respectively.  Except for seven elements, both arrays are the same.  The p-codes are assigned to the array elements according to their level in the parsing hierarchy as indicated in Table 26-3.  Within each level 
+they are ordered the same as they appear in the operator lists passed to<B> down()</B>.  This is important as we will see shortly.  Some operators are not represented in these tables because some <B>level</B> functions do not call<B> down()</B>.<P>
+
+Each time<B> down()</B> calls<B> down2()</B>, one of the operators in its list (its first argument) has been recognized, and the corresponding entries (p-codes) from these arrays are passed to it.  Now, as we saw,<B> nextop()</B> sets the global integer <B>opindex</B> to designate which operator in the list of operators was found.  By design, these lists follow the order in Table 26-3.  Finally, notice that<B> down()</B> also receives an argument which is the offset into these arrays of the first operator
+ in the list.  By adding this offset <B>opoff</B> to <B>opindex</B> a subscript into the arrays for the matched operator is created.  This is how<B> down()</B> determines the p-codes to pass to <B>down2()</B>.<P>
+
+<CENTER>
+<img src="tb26-3.gif">
+</CENTER>
+<CENTER><B>Table 26-3: Contents of the Op[] Arrays<P>
+</CENTER></B>
+
+One last thing to note about<B> down()</B> is that when an operator has been recognized,<B> down()</B> declares a new <B>is</B> array, called <B>is2[]</B>.  It passes this array, along with <B>is[]</B> (which it received as its fourth argument) to<B> down2()</B> which must be able to compare the separate attributes of the left and right operands.<P>
+
+As long as<B> down()</B> keeps recognizing operators in its list (operators at the same precedence level) it keeps on calling <B>down2()</B> in this way.  This is what establishes the left to right association of the operators which<B> down()</B> parses.  When no more operators in its list are seen it returns zero, indicating that no operand fetch is pending.<P>
+
+<B>Down1()<P>
+</B>
+
+Not much needs to be said about this function.  It receives the address of the target <B>level</B> function, remembers the current position in the staging buffer, calls the target function, and, if <B>is[TC]</B> indicates that a constant value resulted, reverts the staging buffer back to its original position, thereby throwing away the code that was generated.  This discarding of the generated code keeps happening with the application of each operator as long as constants result.  If an operation does
+ finally produce a non-constant result, then either<B> skim()</B> (through<B> dropout()</B>) or<B> down2()</B> generates one instruction to load the constant before it enters into the operation.  If the entire expression yields a constant then<B> level1()</B> generates an instruction to load the value into the primary register--the only code produced by the expression.<P>
+
+<B>Down2()<P>
+</B>
+
+<B>Down2()</B> is probably the most difficult analyzer function.  It cannot possibly make sense without an understanding of the material presented thus far.  At this point, though, we should be ready to for it.<P>
+
+Remember that this function is called by<B> down()</B> when a binary operator has been recognized. (An exception is the call from <B>level14()</B> which we shall not consider here.)<P>
+
+Besides the signed and unsigned p-codes mentioned above (<B>oper</B> and <B>oper2</B>) and the target level (<B>level</B>),<B> down2()</B> receives two is arrays--<B>is[]</B> containing the properties of the left operand which has already been parsed and<B> is2[]</B> which will receive the properties the right operand.  <B>Is2[]</B> was declared locally in the preceding instance of<B> down()</B> and will be deallocated when it exits.  This temporary array is passed to the target function, after 
+which it appears to lower instances of<B> down2()</B> as <B>is[]</B>.  Since<B> is2[]</B> is temporary,<B> down2()</B> must indicate in <B>is[]</B> the properties of the subexpression resulting from this binary operation.<P>
+
+Since this function is so large and obscure, a pseudocode version is presented in Listing 26-1.  This listing follows the function exactly, making it easy to read the pseudocode as commentary on the function.  Further explanation is given below; before that, however, some of the terms, abbreviations, and conventions used in Listing 26-1 need explaining.<P>
+
+<UL>
+<LI>The terms primary and secondary refer to the primary register (AX) and secondary register (BX) respectively. 
+<LI>The term constant (abbreviated c) stands for a constant operand which may be the left or right subexpression or the result of the operation. 
+<LI>The term variable (abbreviated v) stands for a variable operand which may be the left or right subexpression. 
+<LI>The term address (abbreviated a) stands for an address operand which may be the left or right subexpression.  This could be a pointer, an array name, the result of the address operator (&), or the result of adding to or subtracting from an address. 
+<LI>The term int address (abbreviated ia) stands for an integer address which may be the left or right subexpression.  This is the address of an integer, as opposed to a character. 
+<LI>The term left (abbreviated l) stands for the left subexpression.  It asserts nothing about its attributes. 
+<LI>The term right (abbreviated r) stands for the right subexpression.  It asserts nothing about its attributes. 
+<LI>The term both stands for both left and right subexpressions.  It asserts nothing about their attributes. 
+<LI>The term zero (abbreviated z) stands for the constant value zero. 
+<LI>The term op stands for the operator that has been recognized and whose subexpressions are being parsed. 
+<LI>The term result stands for the outcome of the operation in question (l op r).
+<LI>The term pass refers to the act of passing information up to higher parsing levels by way of side effects in the left is array.  Where this occurs, the comment column indicates which element of the array is used.
+<LI>The plus sign (+) stands for the addition operator.
+<LI>The minus sign (-) stands for the subtraction operator.
+<LI>The plus and minus signs together (+-) stand for either an addition or subtraction operator.
+<LI>The use of parentheses indicates that the symbols within show the form of the subexpression surrounding the operator.
+<LI>Finally, the use of capitalization refers to the generation of code that performs the indicated actions at run time.  Lowercase actions, on the other hand, occur at compile time.  The presence of uppercase actions means that the code to accomplish them is being generated (or modified) at the indicated point in the algorithm.<p>
+</UL>
+
+<PRE>
+           <B>PSEUDOCODE                                  COMMENTS</B><P> 
+    
+     1 save stage current address                       before, start 
+     2 assume result will not be (l op z) or (z op r)   is[SA]=0 
+     3 if left == constant                              (c op r) 
+     4     parse right into PRIMARY 
+     5     if left == zero                              (z op r) 
+     6         pass current stage address               is[SA]=snext 
+     7     if right == int address                      double() 
+     8     and op == add or subtract 
+     9         double constant                          (2*c +- ia) 
+    10     LOAD CONSTANT INTO SECONDARY                 GETw2n 
+    11 else                                             (v op r) 
+    12     PUSH LEFT ONTO STACK                         PUSH1 
+    13     parse right into PRIMARY                     down1() 
+    14     if right == constant                         (v op c) 
+    15         if right == zero                         (v op z) 
+    16             pass original stage address          is[SA]=start 
+    17         purge PUSH instruction and adjust csp 
+    18         if op == add                             commutative 
+    19             if left == int address               double() 
+    20                 double constant                  (ia +- 2*c) 
+    21             LOAD CONSTANT INTO SECONDARY         GETw2n 
+    22         else                                     not commutative 
+    23             MOVE PRIMARY TO SECONDARY            MOVE21 
+    24             if left == int address               double() 
+    25             and op == add or subtract                 
+    26                 double constant                  (ia +- 2*c) 
+    27             LOAD CONSTANT INTO PRIMARY           GETw1n 
+    28     else                                         (v op v) 
+    29         POP LEFT INTO SECONDARY                  POP2 
+    30         if left == int address                   double() 
+    31         and op == add or subtract  
+    32         and right == not address 
+    33             DOUBLE PRIMARY (RIGHT)               (ia +- 2*v) 
+    34         if right == int address                  double() 
+    35         and op == add or subtract 
+    36         and left == not address     
+    37             DOUBLE SECONDARY (LEFT)              (2*v +- ia) 
+    38 if op == binary 
+    39     if left or right is unsigned 
+    40         select unsigned operation                oper=oper2 
+    41     if both constants                            (c op c) 
+    42         pass constant designation                is[TC] 
+    43         pass constant value                      is[CV]=calc() 
+    44         purge RIGHT CODE 
+    45         if unsigned result 
+    46             pass unsigned constant designation   is[TC]=UINT 
+    47     else 
+    48         pass variable designation                is[TC] 
+    49         OPERATION                                gen(oper,0) 
+    50         if op == subtract 
+    51         and both int addresses                   (ia - ia) 
+    52             DIVIDE PRIMARY (RESULT) BY 2         integers between 
+    53         pass operator p-code                     is[OP]=oper 
+    54     if op == add or subtract 
+    55         if both are addresses                    (a +- a) 
+    56             pass &lt;result not an address&gt;         is[TA]=0 
+    57         else 
+    58             if right == address                  (? +- a) 
+    59                 pass right table address         is[ST]=is2[ST] 
+    60                 pass right indirect data type    is[TI]=is2[TI] 
+    61                 pass right address data type     is[TA]=is2[TA] 
+    62             else  
+    63                 pass left by default 
+    64     if left not in symbol table 
+    65     or right is in symbol table and is unsigned 
+    66         pass right symbol table entry            is[ST]=is2[ST] 
+    67     else 
+    68         pass left symbol table entry or zero     default
+</PRE> 
+<P>
+
+<CENTER><B>Listing 26-1: Pseudocode Representation of Down2()<P>
+</CENTER></B>
+
+Now, with these preliminaries out of the way, we examine Listing 26-1.  First, the current stage address is saved so that code generated beyond this point can be purged from the staging buffer.  The next line sets <B>is[SA]</B> to zero as a default assumption that the subexpression will not have either of the forms (<B>l op z</B>) or (<B>z op r</B>) which can be optimized within<B> test()</B>.  If this assumption proves to be wrong it will be changed later.<P>
+
+Next there is a check (line 3) to see if the left operand is a constant. (Recall that the left operand has already been parsed and <B>is[TC]</B> indicates whether or not it is a constant.) If so, we have a subexpression of the form (<B>c op r</B>) and the code that would have evaluated the constant has already been purged from the staging buffer by<B> down1()</B>.  So at this point we know that the left side is a constant and we have its value in <B>is[CV]</B>, but no code for it exists yet.  The 
+important thing here is that, since there is no code yet for the left operand, there is nothing to save on the stack with a push (as in line 12).<P>
+
+In this case, the right operand is parsed (line 4) to generate code which evaluates it.  After that the primary register (at run time) contains its value.  Now, before generating code for the operator (line 49), if <B>left</B> is zero, the current stage address (after right, but before left and op are generated) is passed through <B>is[SA]</B> for use by <B>test()</B> in its optimizing efforts.  Now, if <B>right</B> is an integer address and the operation is addition or subtraction, 
+the constant in <B>is[CV]</B> is doubled by shifting it left one bit and (doubled or not) code to load it into secondary is generated.  This (lines 7-11) all occurs in the source statement<P>
+
+<PRE>		gen(GETw2n, is[CV] &lt;&lt; double(oper, is2, is));<P>
+</PRE>
+
+The reason for doubling the constant is that it must displace the address by the indicated number of objects (integers), and there are two bytes per integer.  After this, control resumes at line 38.<P>
+
+Lines 12-37 similarly look for other cases requiring special handling; beginning with line 12, the subexpression must be some variant of the form (<B>v op r</B>).  Since <B>left</B> is a variable, it must be preserved on the stack (line 12) at run time so that the primary register can be used in evaluating <B>right</B>.  Since <B>left</B> must be in the secondary register when the operator is applied, it would be tempting to simply move it from <B>primary</B> to <B>secondary</B> before 
+parsing <B>right</B>.  However, <B>right</B>, may require the use of <B>secondary</B>, so we cannot safely do that.  Therefore, we push it onto the stack, intending to pop it into <B>secondary</B> just before the operator is applied.<P>
+
+Now <B>right</B> is parsed (line 13), after which <B>is2[]</B> can be tested to see what it produced.  If it turns out to be a constant (line 14) lines 15-27 are effective.  Furthermore, if the constant is zero (line 15), the stage address on entry to this function is passed up through <B>is[SA]</B> where, as we saw earlier,<B> test()</B> may eventually use it to replace everything generated in this instance of<B> down2()</B> with optimized code.  Since left is not a constant, code for it was 
+already in the staging buffer before entering this function, so <B>is[SA]</B> designates the point in the buffer immediately after the calculation of <B>left</B>.  Therefore,<B> test()</B> will not purge that code.  Now, since <B>right</B> is known to be constant, the push instruction that was just generated is purged from the staging buffer (line 17) since right can be loaded directly into the appropriate register at the right time.  Furthermore, since <B>left</B> is currently (at run time) 
+in <B>primary</B> where it was originally calculated, it can simply be left there or moved to <B>secondary</B>, depending on where it is needed; no push/pop sequence is needed.  The compiler-relative stack pointer, <B>csp</B>, is also increased by two to account for the fact that the purged push had decreased it by two.<P>
+
+Now, if the operation at hand is commutative, it doesn't matter which register the operands are in when the operator is applied.  Thus, there is no need for code to move <B>left</B> to <B>secondary</B> where it would ordinarily need to be; it can stay in <B>primary</B> and <B>right</B> can be loaded directly into <B>secondary</B>.  First, however, the constant will need to be doubled if <B>left</B> is an integer address and <B>op</B> is addition.  This is all shown in lines 18-21.  The 
+only commutative operation recognized is addition.<P>
+
+On the other hand, if <B>op</B> is not commutative (line 22), <B>right</B> (a constant) must be loaded into <B>primary</B> (line 27); but <B>left</B> must first be moved to <B>secondary</B> (lines 23).  Also before loading the constant, it may have to be doubled (lines 24-26) as before.  Finally, code to load <B>right</B> into <B>primary</B> is generated.  From here, control resumes at line 38.<P>
+
+Lines 29-37 show what occurs when both <B>left</B> and <B>right</B> are variable.  First, <B>left</B> is popped from the stack into <B>secondary</B> where it needs to be when the operator is applied.  (Recall that <B>primary</B> contains <B>right</B> which was just parsed.)  Then, if necessary, code to double <B>left</B> or <B>right</B> is generated.  This is because the opposite side is an integer address, the doubled side is not an address, and the operation is either addition or subtraction--conditions
+ which are verified by<B> double()</B>.  This doubling action differs from that performed on constants, in that it occurs at run time, not compile time.  This is done to <B>right</B> in line 33 and to <B>left</B> in line 37.<P>
+
+The remainder of<B> down2()</B> generates the code that actually performs the designated operation; but only if the operator is a binary operator--argument <B>oper</B> is not zero.  The purpose of this check is to exclude the simple assignment operator (<B>=</B>) from<B> level1()</B> and the left bracket and left parentheses from<B> level14()</B>.  A quick look at these functions will show that they pass zeroes for <B>oper</B> and <B>oper2</B> in the cases mentioned.  The 
+other unary operators (in<B> level13()</B>) do not go through this function and so present no problem.  The code for these excluded operators is generated in the <B>level</B> functions themselves.  The distinction between the simple assignment (<B>=</B>) and the other assignment operators (like <B>+=</B>) is because the latter operators are really a combination of two operations--first a binary operation, then an assignment.<P>
+
+First, a choice is made between the signed and unsigned versions of the operation.  In most cases, these are the same, but in seven cases they are different (Table 26-3).  <B>Oper2</B> is the unsigned operator's p-code.  If either operand is unsigned, an unsigned operation is to be performed.  This is effected by copying <B>oper2</B> to <B>oper</B> (initially the signed p-code) which is used later to generate code for the operator.  The function<B> nosign()</B> is called once for each operand, 
+to determine whether or not it is unsigned.  It is considered to be unsigned if it is (1) an address, (2) an unsigned integer constant (greater than 32767), or (3) an unsigned variable (integer or character).<P>
+
+Now, if both operands are constants<B> calc()</B> is called to calculate (at compile time) the result and pass it up through  <B>is[TC]</B> and <B>is[CV]</B> (lines 42-43).  Then the code generated by <B>right</B> is purged (line 44).  What happened to the code for <B>left</B>, since it too must be purged?  The answer is that the lowest instance of<B> down1()</B>, through which <B>left</B> was parsed, purged the code when it saw that <B>left</B> was a constant.  So the code for <B>left</B> was not even in
+ the staging buffer when <B>down2()</B> was entered to evaluate <B>right</B>.<P>
+
+At this point, we must make sure that if either constant is unsigned, the result is likewise designated unsigned.  <B>Is[TC]</B> indicates this already for <B>left</B> and, since that is also where the result must be indicated, it follows that we need only inspect <B>is2[TC]</B>.  If it is found to be unsigned, forcing that designation in <B>is[TC]</B> indicates the true result.  There are only two possible values for constant types--<B>INT</B> and <B>UINT</B>.  So, if <B>is2[TC]</B> contains <B>UINT</B> 
+the same value is forced into <B>is[TC]</B>.<P>
+
+Now, if either side is variable, then a variable result must be calculated (at run time) by code that applies the pertinent operator to the two registers which are now set up properly.  This code is generated (line 49) by the statement<P>
+
+<PRE>		gen(oper, 0);<P>
+</PRE>
+
+The passing of the constant or variable designation of the result (lines 42 and 48) is accomplished coincidentally with the decision that the result is or is not a constant (line 41).  Therefore, lines 42 and 48 do not occur in the source listing.<P>
+
+Now (at run time) primary contains the result which must be checked for another possible adjustment (lines 50-52).  If the current operation is a subtraction and each operand was an address, then the result is interpreted as the number of objects between them.  Furthermore, if the addresses point to integers, then the difference must be divided by two (line 52).<P>
+
+Note that senseless combinations of addresses are possible, such as when one address points to integers and the other to characters, or when the addresses refer to different arrays (makes sense only by presuming a knowledge of how the compiler allocates storage).  Small C does not try to deal with these, it only verifies that both addresses point to integers and generates the code to adjust the result.  This covers the case of elements in a single array, and allows for pointers of the same type to be used
+ in ways that make sense.  If the data types are mismatched, no adjusting code is generated.<P>
+
+Finally, if addition or subtraction (the only two sensible address operations) is being performed, we must to tell the higher parsing levels whether or not the result is an address.  If both sides are addresses then the result should not be considered an address, so <B>is[TA]</B> is set to zero (line 56).  That failing, then one side or the other or perhaps both are not addresses.  Here again, since <B>is[]</B>, which classifies the result, already has <B>left</B> classified, we only need to 
+inspect <B>right</B> to see if it should override what is already there.  Thus, if right is an address, then <B>left</B> must not be, and so we have the form (<B>? +- a</B>) which means that the result must be classified as an address.  In that case, as lines 59-61 show, three attributes from right are passed up the hierarchy--ST, TI, and TA.  In all other cases, these attributes are passed by default from <B>left</B>.  This logic makes sure that the forms (<B>a +- r</B>) and (<B>l +- a</B>) pass the attributes of the
+ address to higher parsing levels.<P>
+
+Note that adding two addresses yields nonsense.  Anything we say about it is wrong, so there is no point in going to the trouble of excluding that case; it would only make the compiler larger and it would still produce a lie.  Small C declares that such a result is not an address. <P>
+
+<B>The Precedence Levels<P></B>
+
+<B>Level1()<P></B>
+
+This function is small but subtle.  It recognizes and generates code for the operators at the lowest precedence level, the assignment operators: <B>=</B>, <B>|=</B>, <B>^=</B>, <B>&amp;=</B>, <B>+=</B>, <B>-=</B>, <B>*=</B>, <B>/=</B>, <B>%=</B>, <B>&gt;&gt;=</B>, and <B>&lt;&lt;=</B>.  Since these operators group from right to left the assignments must be made in the reverse order from which the expression is scanned.  Therefore, after parsing the left subexpression, if one of these 
+operators is recognized and if the parsed subexpression produced an lvalue, then<B> level1()</B> calls itself again.  On parsing the second subexpression, the cycle repeats and continues to repeat until the series of assignments ends.  At that point, <B>store()</B> is called to generate code for the right most assignment, then control returns to the previous instance of <B>level1()</B>.  Assignment code is again generated and control again returns to the prior instance.  This continues until the initial 
+instance of<B> level1()</B> returns to one of the lead-in functions or to<B> primary()</B> or<B> level14()</B> (by way of<B> down1()</B> and <B>down2()</B> ). <P>
+
+As we have already pointed out,<B> level1()</B> first calls<B> level2()</B> to parse whatever comes first (or next) in the expression.  Since the lower lying functions do not recognize the assignment operators, control returns when an assignment operator (or the end of the expression or something unrecognizable) is reached.  The attributes of the parsed subexpression are then found in <B>is[]</B>.  If <B>is[TC]</B> indicates that the subexpression yielded a constant, then no code has been 
+generated yet, so <B>GETw1n</B> is generated to load the constant into the primary register.<P>
+
+Now tests are made for one of the assignment operators.  It may be that none are found; if so, control returns to the caller.  However, if an assignment operator is recognized, the local variable <B>oper</B> is set to the p-code for the binary operation that is to be performed before assignment.  Likewise, <B>oper2</B> is set to the unsigned version of the same p-code.  This identifies the operation to<B> down2()</B>, as we have seen.  The simple assignment (<B>=</B>) is a special case, 
+because no other operation is implied; in that case, zero is assigned to <B>oper</B> and <B>oper2</B>.  This causes<B> down2()</B> to generate no code for a binary operation; it simply returns control back here, where code for the assignment is generated.<P>
+
+If an assignment operator is recognized, a check is made to ensure that the left subexpression is an lvalue, meaning that assignment is possible and legal.  That failing, &quot;<B>must be lvalue</B>&quot; is issued and control returns.<P>
+
+Assuming the target is an lvalue, two of its attributes, <B>ST</B> (address of the symbol table entry) and <B>TI</B> (data type if the reference is indirect), are saved in a local array <B>is3[]</B> for use in making the assignment.  This is because <B>is[]</B> will be altered when the right side is evaluated.<P>
+
+Next, two general cases are considered--the case of an indirect reference to the target (by means of an address in the primary register) and the case of a direct reference (by means of a label).<P>
+
+If the target reference is indirect, then the primary register contains its address which must be preserved while the right side is being calculated.  This is handled automatically by<B> down2()</B> as we have already seen.  However, if a binary operation is being performed, the original value of the target must be fetched into the primary register before the right side is evaluated, and that would destroy the address.  So the address is first pushed onto the stack.  Then after evaluating the 
+right side and performing the binary operation, the address is popped to the secondary register where the assignment code generated by<B> store()</B> expects to find it.  Of course, if only a simple assignment (<B>=</B>) is being performed, the push/fetch/pop sequence is not necessary; in that case,<B> down2()</B> sees to it that the target address migrates to the secondary register.<P>
+
+Direct references are simpler since, in those cases, the code generated by<B> store()</B> makes use of a label to locate the target.  If a binary operation applies, as before, the original value of the target must be fetched; however, there is no need to protect a target address as before.  So<B> down2()</B> is simply called to generate code that evaluates the right side and applies the operation in question.  On the other hand, if the operation is a simple assignment (<B>=</B>) there is no need to fetch 
+the initial value of the target or to go through<B> down2()</B>, so<B> level1()</B> calls itself directly to parse the right side.<P>
+
+Finally, before returning,<B> level1()</B> calls<B> store()</B> to generate code that stores the primary register in memory at the target address.  It passes <B>is3[]</B> which contains information <B>store()</B> needs about the target.<P>
+
+<B>Level2()<P></B>
+
+This level parses the conditional operator (?:).  Recall that this operator has the form<P>
+
+<PRE>		<I>Expression1</I> ? <I>Expression2</I> : <I>Expression3</I><P>
+</PRE>
+
+The operation of<B> level2()</B> is quite straight forward.  First, it calls<B> level3()</B> by way of<B> down1()</B> to parse the first expression.  Then, if the next token is not a question mark, we do not have a conditional operator, so control returns to the caller.  By calling<B> level3()</B>, assignment and conditional operators are disallowed in the first expression--unless it is enclosed in parentheses, that is.<P>
+
+On the other hand, if this is a conditional operation, then <B>getlabel()</B> is called to reserve a label number for use in jumping around <I>Expression2</I>, and<B> dropout()</B> is called to generate code to perform that jump if <I>Expression1</I> is false.<P>
+
+Next, <I>Expression2</I> is parsed by recursively calling<B> level2()</B> through<B> down1()</B>.  Notice that since<B> level2()</B> is called, <I>Expression2</I> may contain the conditional operator, but not assignment operators.  Of course, with parentheses, it can include any operator.<P>
+
+Now, if necessary,<B> fetch()</B> obtains the expression's value from memory, or the expression's constant value is loaded directly.<P>
+
+Next, the second character of the operator (the colon) is enforced by<P>
+
+<PRE>		need(&quot;:&quot;);<P>
+</PRE>
+
+which complains on not finding it.<P>
+
+Having parsed <I>Expression2</I>, it is necessary now to generate an unconditional jump around <I>Expression3</I> so that it too will not be executed when <I>Expression2</I> is selected.  As before, <B>getlabel()</B> reserves an exit label number.  This is then passed to<B> gen()</B> for use in generating the jump.<P>
+
+Now, before parsing <I>Expression3</I>, we generate the target label for the false jump which we generated earlier by calling <B>dropout()</B>.  <I>Expression3</I> is then parsed just as <I>Expression2</I> was.  And, last of all, the exit label is generated.<P>
+
+This completes the processing of the conditional operator; but it is still necessary to decide what attributes to pass up to the calling level.  Three arrays--<B>is1[]</B>, <B>is2[]</B>, and <B>is3[]</B>--are used in parsing the three expressions respectively. <B> Is1[]</B> is received from the caller, so it must convey the attributes of the result back up the line.<P>
+
+The task of determining the correct attributes is complicated by the fact that either of two separate expressions is selected at run time, but we must decide at compile time how to treat the result in the further process of expression evaluation.  Because of this, the two expressions must either have similar attributes, or it must be clear which expression's attributes to choose if they differ.<P>
+
+First, if both expressions (2 and 3) yield constants, the compiler assumes that they have different values, since otherwise there would be no sense in writing the conditional operator.  Therefore, since a choice is being made at run time between two different constants, the result is designated as variable.  Furthermore, the following properties are asserted: it is not an address, nothing is to be fetched indirectly, and no symbol table entry applies.  These are all accomplished by zeroing the <B>TC</B>, 
+<B>TA</B>, <B>TI</B>, and <B>SA</B> entries of <B>is1[]</B>.<P>
+
+The next two acceptable cases are where either expression yields a constant.  In these cases, the result is given the attributes of the non-constant expression.  This is based on the assumption that the constant is a special value of whatever the non-constant expression would otherwise have computed.  Typically, these might be an address expression and the constant zero--the null address. <P>
+
+The last acceptable possibilities are that both expressions yield either addresses or non-addresses.  In these cases, the choice of attributes is arbitrary since both expressions agree--the attributes of the third expression are chosen.<P>
+
+Should all four cases fail, the message &quot;<B>mismatched expressions</B>&quot; is issued.<P>
+
+<B>Level3() through level12()<P></B>
+
+After the material already covered, this should be easy.  These ten functions are essentially alike and very simple.  Each one descends to the next lower level in the parsing hierarchy by way of either<B> skim()</B> or<B> down()</B>.  In so doing, it passes a string of the operators to be recognized at the current level, the address of the target <B>level</B> function, the address of the <B>is[]</B> array that it received, and various other arguments.<P>
+
+Basically, these function only serve to direct the flow of control through the central part of the expression analyzer.  In so doing, they enforce the operator precedence rules.  We have already seen the function that calls them (<B>down1()</B>) and the ones which they call (<B>skim()</B> and<B> down()</B>).<P>
+
+<B>Level13()<P></B>
+
+This function handles the unary operators: <B>++</B>, <B>--</B>, <B>~</B>, <B>!</B>, <B>-</B>, <B>*</B>, <B>&amp;</B>, and<B> sizeof()</B>.  Listing 26-2 is a pseudocode version of this function.<P>
+
+<PRE>
+
+        <B>PSEUDOCODE                                      COMMENTS</B><P> 
+
+     1 if op == pre-increment                              ++ 
+     2     parse operand recursively                       level13() 
+     3     if operand is not an lvalue 
+     4          issue &quot;must be an lvalue&quot; 
+     5          return &lt;request no fetch&gt; 
+     6     generate rINC1 on operand in memory             step() 
+     7     return &lt;request no fetch&gt; 
+     8 if op == pre-decrement                              -- 
+     9     parse operand recursively                       level13() 
+    10     if operand is not an lvalue 
+    11          issue &quot;must be an lvalue&quot; 
+    12          return &lt;request no fetch&gt; 
+    13     generate rDEC1 on operand in memory             step() 
+    14     return &lt;request no fetch&gt; 
+    15 if op == one's complement                           ~ 
+    16     parse operand recursively                       level13() 
+    17     if operand is an lvalue 
+    18          FETCH OPERAND INTO PRIMARY 
+    19     generate COM1 
+    20     pass ~is[CV] 
+    21     pass zero stage address                         is[SA] 
+    22     return &lt;request no fetch&gt; 
+    23 if op == logical not                                ! 
+    24     parse operand recursively                       level13() 
+    25     if operand is an lvalue 
+    26          FETCH OPERAND INTO PRIMARY 
+    27     generate LNEG1 
+    28     pass !is[CV] 
+    29     pass zero stage address                         is[SA] 
+    30     return &lt;request no fetch&gt; 
+    31 if op == unary minus                                - 
+    32     parse operand recursively                       level13() 
+    33     if operand is an lvalue 
+    34          FETCH OPERAND INTO PRIMARY 
+    35     generate ANEG1 
+    36     pass -is[CV] 
+    37     pass zero stage address                         is[SA] 
+    38     return &lt;request no fetch&gt; 
+    39 if op == indirection                                * 
+    40     parse operand recursively                       level13() 
+    41     if operand is an lvalue 
+    42          FETCH OPERAND INTO PRIMARY 
+    43     if operand is symbolic 
+    44          pass indirect data type from symbol table  is[TI] 
+    45     else pass indirect data type integer            is[TI] 
+    46     pass zero stage address                         is[SA] 
+    47     pass &lt;not address&gt;                              is[TA] 
+    48     pass &lt;not constant&gt;                             is[TC] 
+    49     pass &lt;do not fetch if function call&gt;            is[CV] 
+    50     return &lt;request fetch&gt; 
+    51 if op == sizeof                                     sizeof() 
+    52     bypass and remember ( 
+    53     default size to 0 
+    54     if &quot;unsigned&quot; set size to 2 
+    55     if &quot;int&quot; set size to 2 
+    56     else if &quot;char&quot; set size to 1 
+    57     if size != 0 and &quot;char *&quot; set size to 2 
+    58     if size == 0 and symbol and in symbol table 
+    59          fetch size from symbol table 
+    60     else if size = 0 issue &quot;must be object or type&quot;           
+    61     bypass ) if there was a ( 
+    62     pass &lt;integer constant&gt;                         is[TC] 
+    63     pass size as &lt;constant value&gt;                   is[CV] 
+    64     pass &lt;not address&gt;                              is[TA] 
+    65     pass &lt;not indirect fetch&gt;                       is[TI] 
+    66     pass &lt;not in symbol table&gt;                      is[ST] 
+    67     return &lt;request no fetch&gt; 
+    68 if op == address                                    &amp; 
+    69     parse operand recursively                       level13() 
+    70     if operand is not an lvalue 
+    71          issue &quot;illegal address&quot; 
+    72          return &lt;request no fetch&gt; 
+    73     pass address data type from symbol table        is[TA] 
+    74     if indirect object reference 
+    75          return &lt;request no fetch&gt; 
+    76     generate POINT1m 
+    77     pass indirect data type from symbol table       is[TI] 
+    78     return &lt;request no fetch&gt; 
+    79 parse operand at higher precedence level            level14() 
+    80 if op == post increment                             ++ 
+    81     if operand is not an lvalue 
+    82          issue &quot;must be an lvalue&quot; 
+    83          return &lt;request no fetch&gt; 
+    84     generate rINC1                                  step() 
+    85     generate rDEC1     
+    86     return &lt;request no fetch&gt; 
+    87 if op == post decrement                             -- 
+    88     if operand is not an lvalue 
+    89          issue &quot;must be an lvalue&quot; 
+    90          return &lt;request no fetch&gt; 
+    91     generate rDEC1                                  step() 
+    92     generate rINC1 
+    93     return &lt;request no fetch&gt; 
+    94 return &lt;fetch request status from below&gt; 
+</PRE> 
+<P>
+<CENTER><B>Listing 26-2: Pseudocode Representation of Level13()<P>
+</CENTER></B>
+
+Although this is a large function, it is quite straight forward and involves a good bit of repetition.  It first attempts to recognize the operators that precede an operand (lines 1, 8, 15, 23, 31, 39, 51, and 68).  Those operators are:<P>
+
+<B>++...<P>
+</B>
+
+If an increment operator is found (line 1), the following operand is parsed (line 2) by calling <B>level13()</B> again.  This recursive call allows for the fact that these operands group from right to left, and further occurrences of them (and higher precedence operators) may appear within the subexpression that becomes the operand for the current operator.  The resulting operand must be an lvalue; otherwise, it cannot be incremented.  If it is not (line 3), 
+the message &quot;<B>must be an lvalue</B>&quot; is issued and control returns.  On the other hand, if it is an lvalue, code is generated to increment it in memory (line 6).  This action also leaves a copy of it in the primary register for use at the current point in the expression.  On return, the caller is told (line 7) that there is no need to fetch anything. <P>
+
+The function<B> step()</B> is used to generate code for increment and decrement operators.  It accepts, as its first argument, one of the p-codes <B>rINC1</B> or <B>rDEC1</B>.  The second argument is the address of <B>is[]</B> for the lvalue being stepped.  And the third argument is either zero or a second p-code--either <B>rDEC1</B> or <B>rINC1</B>.  First,<B> step()</B> calls<B> fetch()</B>, passing it <B>is[]</B>, to obtain the original value of the object to be stepped.  Next the first p-code 
+is generated to either increment or decrement the object in the primary register.  Then<B> store()</B> is called to generate code for storing it back in memory.  It is important to realize that this leaves the adjusted value in the primary register.  If<B> step()</B> is called, as here, by a prefix operator, the third argument is zero.  This means that there is no need to restore the original value of the object in the primary register.  In that case,<B> step()</B> simply returns.  However, if the last 
+argument is not zero, it is taken as the p-code for a follow-up operation which is generated before returning.<P>
+
+<B>--...<P>
+</B>
+The decrement operation is accomplished by equivalent logic (lines 8-14). <P>
+
+<B>...<P>
+</B>
+
+If the operation is a one's complement, the operand is first parsed by calling<B> level13()</B> recursively (line 16).  Then, if it yields an lvalue (line 17), code is generated to fetch it into the primary register (line 18).  Next, code is generated to perform the one's complement (line 19).  Then, if the operand is a constant, its one's complement is performed at compile time in <B>is[CV]</B> (line 20), through which the constant value is passed up the line.  Since this is a unary operation, the su
+bexpression acted on by the operator cannot have the form (left op zero) or (zero op right), so <B>is[SA]</B> is set to zero (line 21) preventing<B> test()</B>--if it is the active lead-in function--from trying to optimize the code in the staging buffer.  Finally, zero is returned to the caller (line 22), indicating that there is no need to fetch anything. <P>
+
+<B>!... </B>and<B> -...<P>
+</B>
+
+The logical NOT and unary minus operators receive analogous treatment in lines 23-30 and 31-38 respectively.<P>
+
+<B>*...<P>
+</B>
+
+The indirection operator can be deceiving because the only code it generates is a fetch (line 42) of what is supposed to be an address, if the operand is an lvalue (line 41).  The real work here is in (1) declaring the operand to be the address for an indirect reference (lines 43-45) and (2) asserting that it points to an lvalue (line 50).  The latter action guarantees that, at a higher point in the analysis, the operand will be fetched (or possibly accepted as the target for an assignment) and 
+the former action guarantees that it will be referenced indirectly.  The data type placed in <B>is[TI]</B> comes from the symbol table if the operand is based on a symbol; otherwise, the type is forced to integer.  Finally, before returning, attributes are passed through <B>is[]</B>, indicating that the result (after the anticipated fetch) is not an address, is not a constant, is not to be fetched if the reference turns out to be a function call (the function address is already in the primary register), and 
+does not have the form (<I>left op zero</I>) or (<I>zero op right</I>). <P>
+
+<B>sizeof(...)<P>
+</B>
+
+The sizeof operator must inspect the data type or symbol on its right and return a constant which is the size of the type data specified or the named object.  First (lines 54-57) it looks for one of the data type specifications <B>unsigned</B>, <B>unsigned int</B>, <B>unsigned int</B> <B>*</B>, <B>unsigned char</B>, <B>unsigned char *</B>, <B>int</B>, <B>int *</B>, <B>char</B>, or <B>char *</B>.  That failing, it tries to interpret the current token as a name in the symbol table (line 58).  In 
+the first case, it sets the size directly.  In the second case, it takes the size from the symbol table where it was placed when the object was declared.  If both cases fail (line 60), then &quot;<B>must be object or type</B>&quot; is issued and zero is returned.  Before returning (lines 62-66), it designates the result to be a constant integer and provides its value in <B>is[CV]</B>.  Other properties are: not an address, no indirect fetch is pending, and no symbol table reference exists for the returned value.
+ Finally, it returns to the caller, indicating that nothing is to be fetched. <P>
+
+<B>&amp;...<P>
+</B>
+
+The address operator is handled by first parsing the operand (line 68).  The operand must be an lvalue (lines 70-72), since things that do not occupy space in memory (like constants) have no addresses.  Next, the data type is copied from the symbol table into<B> is[TA]</B> (line 73), indicating that the result is an address referring to an object of the specified type.  Then, if the object (without the address operator) would have been referenced indirectly, its address is already in the 
+primary register, so there is nothing more to do but return to the caller, asserting that there should not be an attempt to fetch the object.  If the object would have been referenced directly, however, then its address is loaded into the primary register (line 76), the result is declared to be an indirect reference by copying its data type from the symbol table to <B>is[TI]</B>, and control returns to the caller, asserting that nothing is to be fetched.<P>
+
+At this point (line 79), since the previous tests have failed, none of the operators at this level have been recognized, but it is possible that a post increment or decrement exists.  So the operand is first parsed by calling <B>level14()</B>.  This call parses only a primary object (possibly subscripted and/or a function call) or a subexpression in parentheses.  After that, attempts are made to recognize post increment and decrement operations.<P>
+
+<B>...++ and ...--<P>
+</B>
+
+When these operators are recognized (lines 80 and 87), code to place the operand in the primary register has already been generated so it is only necessary to generate code for the operation in question (lines 84 and 91) and to return the primary register to its original value (lines 85 and 92).  As before, zero is returned indicating to the caller that nothing needs to be fetched.<P>
+
+Finally, if none of the operators at this level are recognized, control returns to the caller with whatever fetch request was produced by the parsing of the current subexpression (line 94).<P>
+
+<B>Level14()<P>
+</B>
+
+<B>Level14()</B> is the last (highest) precedence level before <B>primary()</B>. <B> Level14()</B> recognizes only two operations, subscripting and calling functions.  It also handles the case where a function's address is invoked by naming the function without a left parenthesis following.  As before,<B> level14()</B> is presented in pseudocode in Listing 26-3.<P>
+
+<PRE>
+       <B>PSEUDOCODE                                          COMMENTS</B><P> 
+   
+     1 parse primary operand or subexpression              primary() 
+     2 advance to next token 
+     3 if token == [ or ( 
+     4     loop: 
+     5         if token == [                               subscript 
+     6             if operand not in symbol table 
+     7                  issue &quot;can't subscript&quot; 
+     8                  bypass subscript expression        skip() 
+     9                  enforce ] token 
+    10                  return &lt;request no fetch&gt; 
+    11             if operand is an address 
+    12                  FETCH INTO PRIMARY if necessary 
+    13             else 
+    14                  issue &quot;can't subscript&quot; 
+    15                  set &lt;request no fetch&gt; for return  k=0 
+    16             save staging buffer address             setstage() 
+    17             set &lt;not constant&gt; in temporary array   is2[TC]=0 
+    18             parse subscript expression              level1() 
+    19             enforce ] token 
+    20             if subscript is a constant              ...[constant] 
+    21                  purge subscript code               clearstage() 
+    22                  if subscript is not zero 
+    23                       if operand is an integer 
+    24                            double constant 
+    25                            generate GETw2n 
+    26                       else generate GETw2n 
+    27                       generate ADD12 
+    28             else if operand is an integer           ...[variable] 
+    29                       generate DBL1 
+    30                   generate ADD12 
+    31             pass &lt;not an address&gt;                   is[TA]=0 
+    32             pass indirect type from symbol table    is[TI] 
+    33             set &lt;request fetch&gt; for return          k=1 
+    34         else  
+    35             if token == (                           function call 
+    36                  if not symbol table reference 
+    37                       INDIRECT CALL                 callfunc(0) 
+    38                  else if not a function reference 
+    39                            if &lt;request fetch&gt; 
+    40                            and not already fetched  is[CV]==0 
+    41                                FETCH OPERAND        fetch() 
+    42                            INDIRECT CALL            callfunc(0) 
+    43                       else DIRECT CALL              callfunc(ptr) 
+    44                  pass &lt;not symbol table reference&gt;  is[ST]=0 
+    45                  pass &lt;not constant&gt;                is[TC]=0 
+    46                  pass &lt;reference fetched&gt;           is[CV]=0 
+    47                  set &lt;request no fetch&gt; for return  k=0 
+    48             else return &lt;pre-set fetch request&gt; 
+    49     loop back 
+    50 if operand is in symbol table and is a function     no ( 
+    51     generate POINTm 
+    52     pass &lt;not symbol table reference&gt;               is[ST]=0 
+    53     return &lt;request no fetch&gt; 
+    54 return &lt;fetch request from below&gt; 
+</PRE>
+<P>
+<CENTER><B>    Listing 26-3: Pseudocode Representation of Level14()<P>
+</CENTER></B>
+
+First, since the pertinent operators (left bracket and left parenthesis) trail, the operand (address expression or function name) is parsed first.  This is done by calling <B>primary()</B> (line 1).<P>
+
+If the following token is not a left bracket or left a parenthesis (line 3), control drops down to line 50 where the parsed operand is checked for being a function name.  If so, then code to load its address is generated (line 51), the symbol table address in <B>is[ST]</B> is zeroed since the reference has already been made, and control returns to the caller with an indication that the operand has already been fetched.  But if the operand is not a function name, then nothing needs to be done at 
+this level, so control returns to the caller with whatever fetch request<B> primary()</B> returned.<P>
+
+That leaves the cases where either subscripting or function calling is to be done.  In these cases, control falls into a loop in which the left bracket and left parenthesis are recognized separately.  The loop repeats until neither is seen, at which point (line 48) control returns with the fetch request from<B> primary()</B> or possibly a pre-set fetch request (lines 15, 33, and 47).  By looping, the analyzer allows subscripting to be performed as a part of the calculation of a function's address.<P>
+
+The remaining logic breaks down into two parts--subscript analysis (lines 6-33) and analysis of function calls (lines 35-47).<P>
+
+The subscript operator (line 5) must follow a pointer or array name or an expression based on either and yielding an address.  If there is no symbol table reference for the operand (line 6) it cannot be based on a pointer or array name, so the message &quot;<B>can't subscript</B>&quot; (line 7) is issued, the subscript expression is passed over (line 8), the closing bracket is enforced (line 9), and control is returned to the caller (line 10).  That failing, if the operand is a pointer (line 11), code to 
+fetch its content is generated (line 12).  But if it is not an address, it cannot be subscripted, so &quot;<B>can't subscript</B>&quot; is issued and the fetch request is pre-set to zero.<P>
+
+Now it is time to parse the expression comprising the subscript.  In case it turns out to be a constant, the current staging buffer address is saved (line 16) so the generated code can be discarded (line 21).  Then, since a new array <B>is2[]</B> will be receiving the attributes of the subscript expression, element TC is initialized to zero (line 17).  This will change if the expression does in fact yield a constant.  Finally, the expression is parsed 
+by calling<B> level1()</B> by way of<B> down2()</B> (line 18) and the closing bracket is enforced (line 19).<P>
+
+Now, if the subscript is in fact a constant expression (line 20), the code generated for it in the staging buffer is purged by calling<B> clearstage()</B> (line 21).  Furthermore, if the constant subscript has the value zero (line 22), no offset to the base address needs to be made, so no code is generated.  A non-zero value must produce an offset, however.  If the address refers to integers (line 23) then the constant is doubled (line 25) before being loaded into the secondary register.  If 
+characters are being referenced, no doubling is needed so the unaltered constant is loaded.  Finally, the offset, in the secondary register, is added to the address, in the primary register, to produce the effective address.<P>
+
+On the other hand, if the subscript yields a variable quantity, the code that evaluates the subscript expression is retained.  If integers are being referenced (line 28), the doubling takes the form of code that doubles the subscript at run time (line 29).  And, as before, code that adds the base address to the offset is generated (line 30).<P>
+
+Now, all that remains is to set up the side effects in <B>is[</B>] and return.  <B>Is[TA]</B> is zeroed (line 31) to indicate that the object being referenced is not an address, and the data type is copied from the symbol table to <B>is[TI]</B> (line 32) indicating that the reference will be indirect through the effective address in the primary register.  And, finally, before control loops back to look for other operators at the same level, the return value is pre-set to request that the referenced object
+ be fetched (line 33).<P>
+
+Most of the work in parsing function calls is performed in <B>callfunc()</B> which is described next.  In this function, however, the processing is simple.  If the operand which designates the function is not a name in the symbol table (line 36), then it must be an expression that produces the function's address.  In that case,<B> callfunc()</B> is called (line 37) with a zero argument instead of the address of a symbol table entry.  This results in an indirect function call.  However, if the 
+operand is in the symbol table but is not identified as a function (line 38) it is assumed to be an expression involving variables, arrays, and/or pointers.  So, if there is a pending fetch request (lines 39-40), the operand's value is fetched (line 41) before the indirect call is generated (line 42).<P>
+
+<I>Note that the indirection operator in </I><B><I>(*func)(); </B></I><I>is recognized in</I><B><I> level13()</B></I><I> where the fetch operation is generated.  At that point </I><B><I>is[CV]</B></I><I> is set to one, indicating to</I><B><I> level14()</B></I><I> that the fetch is satisfied.  This special use of </I><B><I>is[CV]</B></I><I> is permissible since the indirection operator precludes the possibility of having a constant subexpression, so </I><B><I>is[CV]</B></I><I> is free to be 
+used in this way.  A means of telling</I><B><I> level14()</B></I><I> whether or not to fetch the function address is needed because the indirection operator always returns true for a fetch request.  If it seems strange that</I><B><I> level13()</B></I><I> is passing something up to</I><B><I> level14()</B></I><I>, then notice that the indirection operator is preceded with a left parenthesis, so this instance of</I><B><I> level13()</B></I><I> is reached by way of</I><B><I> primary()</B></I><I> which in turn 
+was called by</I><B><I> level14()</B></I>.<P>
+
+If the operand is a function name in the symbol table, however,<B> callfunc()</B> is called with the address of the symbol table entry as an argument, thus causing a direct call to be generated (line 43).<P>
+
+Now side effects are set up; specifically,<B> is[ST]</B> is zeroed (line 44) to indicate that the value of the function being called has nothing to do with the symbol table, <B>is[TC]</B> is zeroed (line 45) to indicate that the value of the function is variable,<B> is[CV]</B> is zeroed (line 46) to indicate that the function address has already been fetched, and the return value is pre-set to prevent an automatic fetch at a higher level.<P>
+
+Last of all, control loops back to look for other operators at the same precedence level.<P>
+
+<B>Callfunc()<P>
+</B>
+
+As we have just seen,<B> callfunc()</B> is called at three points in <B>level14()</B>.  If its argument is zero, it generates an indirect call through the address in the primary register.  But if it is not zero, it specifies the address of the symbol table entry for the function being called, and a direct call to the label bearing the function's name is generated.<P>
+
+This function must generate code for four tasks: (1) to evaluate each argument and push it onto the stack, (2) to provide an argument count to the called function, (3) to call the target function, and (4) to deallocate the arguments from the stack on return. <P>
+
+On entry, the opening parenthesis for the argument list has been recognized and passed over, so the first argument (if there is one) is next.  The arguments are processed in a loop that terminates when the right parenthesis (or end of the statement or of the input) is reached.  With each iteration, one argument expression is evaluated and pushed.<P>
+
+If an indirect call is being made, then the function address must be preserved as each argument is evaluated.  This is done by placing it on the stack temporarily.  Then, after evaluation, the argument swaps places with the function address.  The steps are:<P>
+
+<OL>
+<LI> push the function address on the stack (PUSH1)
+<LI> evaluate the next argument expression
+<LI> swap the function address with the argument (SWAP1s)<p>
+</OL>
+
+<B>Expression()</B> is the lead-in function for argument evaluation.  Notice that the entire expression analyzer is being called recursively through this function.  Each actual argument is an expression in its own right, while the function call, of which it is a part, represents part or all of another expression.<P>
+
+When the arguments have been exhausted, a right parenthesis is enforced.  Then, if the target function is not<B> ccargc()</B>, <B>ARGCNTn</B> is generated to load a count of the arguments into the CL register.  (Since<B> ccargc()</B> is the function that fetches the count, it would not be a good idea to destroy CL with a count of the arguments passed to it.)<P>
+
+Next, if this is a direct call, <B>CALLm</B> is generated to call the target label.  But if it is indirect, <B>CALL1</B> is generated to call the function pointed to by the primary register.<P>
+
+Finally, <B>ADDSP</B> is generated to restore the stack to its original value before the arguments were pushed onto it. <P>
+
+<B>Primary Operands<P>
+</B>
+
+<B>Primary()<P>
+</B>
+
+At the bottom end of the expression analysis hierarchy is <B>primary()</B> which looks for the simplest possible operand reference.  This may be a variable name, an array name, a pointer name, a character constant, a string constant, or a subexpression in parentheses.<P>
+
+First,<B> primary()</B> looks for a left parenthesis and, finding one, (1) calls<B> level1()</B> to evaluate the enclosed subexpression, (2) enforces the closing parenthesis, and (3) returns the fetch request from<B> level1()</B>.<P>
+
+That failing, the entire <B>is[]</B> array is set to zeroes, thereby establishing the default values for its elements.  Further action is only necessary when zero is not appropriate.<P>
+
+At this point, the current token must be a symbol or a constant.  So<B> symname()</B> is called to determine if it is a symbol.  If so,<B> symname()</B> places it in the local array <B>sname[]</B> and passes over it in the input line.  Three possibilities exist for a legal symbol--it may be a local reference, a global reference, or a reference to an undeclared function.  First, it is sought in the local symbol table; if that fails, the global table is searched; and, if that fails, it is assumed to 
+be an undeclared function.  Searching for locals before globals is critical, since local names must supersede global ones.  Also, recall that the local table is searched sequentially backward, so that &quot;newer&quot; locals (the ones that are nested deeper) mask &quot;older&quot; ones.  If both searches fail, the symbol is added to the global table as a function.  Then, if it never is formally declared, it will be identified to the assembler as an external reference before the compiler quits.<P>
+
+On finding the symbol in the local table, a check is made to verify that it is not a label.  If it is, the message &quot;<B>invalid expression</B>&quot; is issued, since labels cannot be referenced in expressions.  Control then returns indicating no need for an operand fetch.  That failing, we have a proper reference to a local object, so <B>POINT1s</B> is generated which yields<P>
+
+<PRE>		LEA AX,<I>n</I>[BP]<P>
+</PRE>
+
+to calculate in the primary register the address of the object in question.  The letter <I>n</I> stands for the object's distance from the stack frame address in BP, and comes from the symbol table.  It is negative for local objects and positive for arguments.<P>
+
+Next, <B>is[ST]</B> is set to the address of the symbol table entry and <B>is[TI]</B> is set to the data type, so that the reference will be seen as an indirect one.<P>
+
+Then, if the symbol names an array, <B>is[TA]</B> is set to the data type, indicating that the operand is an address, and control returns, requesting no fetch operation.  These actions are appropriate since an unsubscripted array name is supposed produce the address of the array.  Of course, subscripting changes this.<P>
+
+However, if the symbol names a pointer, <B>is[TI]</B> is changed to indicate an unsigned integer operand.  This is done because the data type in the symbol table refers to the type of objects pointed to, whereas <B>is[TI]</B> refers to the object being referenced indirectly--the pointer.  True, a pointer is not an integer, but they are the same size and that is all that matters here.  As before, <B>is[TA]</B> is set to the data type, indicating that the operand (when it is fetched) yields an address.<P>
+
+Finally, whether the symbol is a pointer or a variable, control returns, requesting a fetch operation since the primary register contains the address of the object not its value.<P>
+
+Global references are treated somewhat differently since globals are referenced by their labels and because functions must handled.<P>
+
+First, <B>is[ST]</B> is set to the address of the symbol table entry for the recognized symbol.<P>
+
+Next, if the symbol is an array name, three actions occur.  <B>POINT1m</B> is generated which yields<P>
+
+<PRE>		MOV AX,OFFSET _<I>array</I><P>
+</PRE>
+
+for loading the array's address into the primary register.  <I>Array</I> stands for the name of the array.  Then, since any further reference will be indirect, <B>is[TI]</B> is set to the data type of the symbol.  And, finally, <B>is[TA]</B> is likewise set to the data type, indicating that an address is in the primary register.  Control then returns with no request to fetch an operand.<P>
+
+However, if the symbol is a pointer name, only <B>is[TA]</B> is set to the data type of the symbol.<P>
+
+Then, whether the symbol is a pointer or a variable, control is returned with a request to fetch the operand.  Since <B>is[TI]</B> remains zero, the requested fetch will be direct.<P>
+
+If the symbol is not found in the global symbol table, <B>addsym()</B> is called to create an entry for it as a function.  At this point the symbol is known to be a function and nothing remains to be done but return requesting no fetch operation.  <B>Level14()</B> will take care of calling the function or loading its address.<P>
+
+Finally, if the current token is not a legal symbol, then it must be a constant or else the expression is illegal.  So <B>constant()</B> is called to parse it and tell whether or not it was a constant.  Last of all, control returns, requesting no fetch operation.  Recall that constants are passed back up the line in <B>is[CV]</B> with <B>is[TC]</B> indicating the type of the constant (<B>INT</B> or <B>UINT</B>).<P>
+
+Table 26-4 displays in a matrix the values that<B> primary()</B> returns to higher level functions.  The first six columns correspond to the significant elements of the <B>is[]</B> array.  The last column shows the value actually returned by <B>primary()</B>; <B>no</B> refers to zero and <B>yes</B> refers to one.  The symbol <B>-&gt;st</B> stands for a pointer to the recognized object's entry in the symbol table.  The word <B>type</B> refers to the data type of the object, or to which it 
+refers.  <B>UINT</B> and <B>INT</B> are the unsigned and signed integer data types as defined in <B>CC.H</B>.  And, the unusual looking (<B>U</B>)<B>INT</B> refers to either <B>UINT</B> or <B>INT</B> depending on the value of the constant and whether or not it was written with a minus sign (see Chapter 3).  This table should be of considerable value when studying the logic of the higher level analyzer functions.<P>
+
+<CENTER>
+<img src="tb26-4.gif">
+</CENTER>
+<CENTER><B>Table 26-4: Values Returned by Primary()<P>
+</CENTER></B><B>Constant()<P>
+</B>
+
+This function is called by<B> primary()</B> when it thinks the current token must be a numeric, character, or string constant.  If so, it parses the constant, generates code, and returns true, indicating that a constant was in fact parsed.  On failure, it returns false.<P>
+
+Corresponding to the three valid possibilities,<B> constant()</B> calls<B> number()</B>,<B> chrcon()</B>, and then<B> string()</B> looking for a numeric constant, a character constant, or a string constant respectively.  Each of these functions returns a non-zero value on success, and zero on failure.  If all three fail, false is returned to<B> primary()</B>.  These functions generate no code, they just parse the constant and place the result in either <B>is[CV]</B> (number or character constant) 
+or the literal pool (string constant).  <B>Constant()</B> then generates the code to reference the result.<P>
+
+The functions<B> number()</B> and<B> chrcon()</B> are essentially alike in their effects, whereas<B> string()</B> is distinct because it yields an offset to the string in the literal pool rather than a constant value.<P>
+
+<B>Number()</B> and<B> chrcon()</B> return the type of the constant found on success; that is, <B>INT</B> or <B>UINT</B>.  As we can see from the listing, the return value in these cases, is assigned to <B>is[TC]</B> as the type of the constant, or as zero.  This informs the higher parsing levels that a constant was or was not found and, if so, its type.  They also receive as their only argument the address of <B>is[CV]</B> where they place the binary integer form of the constant they find.<P>
+
+Now, if<B> number()</B> or<B> chrcon()</B> indicates success <B>GETw1n</B> is generated to load the value into the primary register.  This produces<P>
+
+<PRE>		XOR AX,AX<P>
+</PRE>
+
+or<P>
+
+<PRE>		MOV AX,<I>n</I><P>
+</PRE>
+
+depending on whether or not the constant is zero.<P>
+
+String constants are different because they yield an address to the string.  Where will the string be placed in the program?  Recall from the discussion of the literal pool (Chapter 20) that strings are kept there until the end of the function, at which point the pool is dumped into the data segment.  Each compiled function allocates a compiler created label for the dumped pool, and each string is referenced as an offset from that label.<P>
+
+<B>String()</B> receives the address of a local integer <B>offset</B> as an argument which it uses as the target for the string's offset in the literal pool.  When<B> string()</B> indicates success, it has put the string in the literal pool (in the compiler, not in the program) and the offset in <B>offset</B>.  <B>Constant()</B> then generates <B>POINT1l</B> which produces<P>
+
+<PRE>		MOV AX,OFFSET _<I>m</I>+<I>n</I><P>
+</PRE>
+
+where <I>m</I> is the number of the label for the current function's literal pool and <I>n</I> is the offset from the label to the first character of the string.  The assembler produces from this the data segment relative address of the string, and the linker fixes it to an absolute address when all of the modules making up the program are finally joined.<P>
+
+Since a string address is not a constant (it's actual value is not known at compile time), <B>is[TC]</B> and <B>is[CV]</B> are left at zero, as they were initialized by<B> primary()</B>.<P>
+
+To summarize,<B> constant()</B> sees to it that a numeric or character constant is placed in <B>is[CV]</B> and is loaded (at run time) into the primary register.  It ensures that a string constant is copied into the literal pool, and its address is loaded into the primary register at run time.<P>
+
+<B>Number()<P>
+</B>
+
+This function looks for a (possibly signed) decimal, hexadecimal, or octal string and converts it to a signed binary integer.  First it looks for a leading sign.  If a hyphen is seen, <B>minus</B> is set true, otherwise it defaults to false.  A plus sign is simply ignored, leaving <B>minus</B> at its default value of false.<P>
+
+Then, if the next character is not a digit, false is returned.  That failing, the first digit is inspected to see if it is<B> '0'</B>--the lead-in for octal and hexadecimal numbers.<P>
+
+If not, then each digit found (going from left to right) is converted to its binary equivalent and is added to an accumulator <B>k</B>, which is first multiplied by 10.  When the digits are exhausted, <B>k</B> contains the absolute value of the number.  No account is taken of overflow, it simply yields a corrupt value.<P>
+
+Before discussing the application of the sign and what is returned to the caller, lets see what happens when the leading character is<B> '0'</B>.  In that case, the second character is inspected to see if it is an <B>x</B> (uppercase or lowercase).  That being true, a hexadecimal number follows, so the <B>x</B> is bypassed, and a loop is entered which lasts as long as legal hexadecimal digits are found.  In each instance, the digit is converted to its binary value and added to <B>k</B>, after multiplying 
+
+<B>k</B> by 16.  Since the alphabetic digits do not immediately follow the numeric digits in the ASCII code set, separate statements are required for each case.  The result of this loop is the absolute value in binary.  As before, no account is taken of overflow.<P>
+
+If there is no <B>x</B> following the leading zero, then a different loop is entered which lasts as long as legal octal digits are found.  It similarly computes the absolute value in <B>k</B>.<P>
+
+After the absolute value has been computed, if <B>minus</B> is true, the negated value of <B>k</B> is stored at the location indicated by the argument, and <B>INT</B> is returned.  However, if <B>minus</B> is not true, then <B>k</B> is stored without negation.  In that case, its value is tested to see if it should be designated as signed or unsigned.  This version of Small C treats constants that do not have a minus sign, and are larger than 32767, as unsigned quantities (<a href="../chap3/chap3.htm">Chapter 3</a>).  
+
+If that condition holds, <B>UINT</B> is returned, otherwise <B>INT</B>.<P>
+
+<B>Chrcon()<P>
+</B>
+
+This function looks for a character constant of one or two characters enclosed by apostrophes.  First,<B> chrcon()</B> looks for an apostrophe; if that fails, it returns false, indicating failure.<P>
+
+Following the leading apostrophe, control falls into a loop which exits when the trailing apostrophe is found.  With each iteration an accumulator <B>k</B> is shifted left eight bits and the current character is added to the result.  The characters are obtained through a filter function<B> litchar()</B> which recognizes and evaluates escape sequences; so it is possible that two or more characters may reduce to a single character as seen by<B> chrcon()</B>.  Since the loop continues until the trailing 
+apostrophe, if more than two characters are present, the leading characters will be lost and only the last two will contribute to the constant.<P>
+
+At the end, the closing apostrophe is bypassed, <B>k</B> is placed into <B>is[CV]</B>, and <B>INT</B> is returned.<P>
+
+<B>String()<P>
+</B>
+
+This function parses quoted strings.  First, it looks for the leading quote.  If that fails, it returns false.  After seeing the quote, it copies the current value of <B>litptr</B> (the offset to the current end of the literal pool where the new string is about to be copied) to the location which it received as an argument.  It then falls into a loop which exits when the trailing quote is reached.  With each iteration, it filters the next character(s) through<B> litchar()</B> and passes it 
+on to<B> stowlit()</B> for storage in the literal pool.  Finally, the closing quote is bypassed, a terminating zero is put at the end of the string in the literal pool, and true is returned.<P>
+
+<B>Stowlit()<P>
+</B>
+
+<B>Stowlit()</B> places character or integer values in the literal pool.  It receives as arguments the value and its size in bytes.  If an overflow would occur, it issues &quot;<B>literal queue overflow</B>&quot; and aborts the run.  If there is room in the literal pool, however, it places the value (one or two bytes) in the pool at the offset indicated by <B>litptr</B>.  It then increments <B>litptr</B> by the size of the value and returns to the caller.<P>
+
+<B>Litchar()<P>
+</B>
+
+<B>Litchar()</B> returns the current character in the input line after advancing to the next one.  If the current character is a backslash, it is taken as the start of an escape sequence.  The backslash is bypassed and the following character is tested to see if it is one of <B>n</B>, <B>t</B>, <B>b</B>, or <B>f</B>.  If so, that too is passed over and a newline, tab, backspace, or formfeed, respectively, is returned.<P>
+
+That failing,<B> litchar()</B> looks for an octal number to convert to binary.  Up to three digits will be recognized.  Each succeeding character is tested for being an octal digit.  If so, it is converted to binary and added to an accumulator <B>oct</B> which is first shifted left three bits.  The loop ceases when no more octal digits remain or three digits have been processed.  Finally, <B>oct</B> is returned.<P>
+
+However, if no octal digits are seen, then the character following the backslash is returned as is.  This is the case of an escape followed by an unspecified character.  Thus, for instance, a sequence of two backslashes would return the second backslash. <P>
+
+<CENTER>
+Go to <a href="../chap27/chap27.htm">Chapter 27</a>   Return to <a href="../toc1.htm">Table of Contents</a>
+<P>
+</CENTER>
+</HTML>
+

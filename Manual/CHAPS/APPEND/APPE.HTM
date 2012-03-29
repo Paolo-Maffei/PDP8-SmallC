@@ -1,0 +1,113 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>Appendix E:</H1>
+</CENTER></B><P>
+<CENTER><B><H1>Small C Quick Reference Guide<P> </H1>
+</CENTER></B>
+This guide is not a formal definition of the Small C language.  Rather, it is intended to provide quickly accessible information about the syntax of the language.  Generic terms are written as one or more words in italics with the leading letter of each word capitalized.  Keywords and special characters in boldface are required by the syntax.  The word String implies a sequence of characters written together.  The word List implies a series of the preceding item separated by commas and option
+al white space.  The ellipsis (<B>...</B>) implies the optional repetition of occurrences of the preceding type of item.  A question mark at the end of an item means that the item is optional, it may be omitted. <P>
+<B>LANGUAGE SYNTAX </B><P>
+<PRE>
+<I>ArgumentDeclaration</I>: 
+	<I>ObjectDeclaration</I> 
+<I>ArgumentList</I>: 
+	<I>NameList</I> 
+<I>Directive</I>: 
+	#include &quot;<I>Filename</I>&quot; 
+	#include &lt;<I>Filename</I>&gt; 
+	#include <I>Filename</I> 
+	#define <I>Name CharacterString?... </I>
+	#ifdef <I>Name</I> 
+	#ifndef <I>Name</I> 
+	#else 
+	#endif 
+	#asm 
+	#endasm 
+<I>Constant</I>: 
+	<I>Integer</I> 
+	'<I>Character</I> '			(escape sequence allowed) 
+	'<I>Character Character</I>'		(escape sequences allowed) 
+<I>ConstantExpression</I>: 
+	<I>Constant</I> 
+<I>	Operator ConstantExpression 
+	ConstantExpression Operator ConstantExpression</I> 
+	( <I>ConstantExpression</I> ) 
+<I>Declarator</I>: 
+	<I>Object Initializer?</I>		(global initializers only) 
+<I>EscapeSequence</I>: 
+	\n	(newline) 
+	\t	(tab) 
+	\b	(backspace) 
+	\f	(formfeed) 
+	\        <I>OctalInteger</I> 
+	\        <I>OtherCharacter</I> 
+<I>Expression</I>: 
+<I>	Primary 
+	Operator Expression 
+	Expression Operator 
+	Expression Operator Expression</I> 
+<I>FunctionDeclaration</I>: 
+	void? 
+	<I>Name</I> (<I>ArgumentList?</I> )<I>ArgumentDeclaration?..</I>.  <I>CompoundStatement</I> 
+<I>GlobalDeclaration</I>: 
+<I>	ObjectDeclaration 
+	FunctionDeclaration</I> 
+<I>Initializer</I>: 
+	= <I>ConstantExpression</I> 
+	= {<I>ConstantExpressionList</I> } 
+	= <I>StringConstant</I> 
+<I>Object</I>: 
+	<I>Name</I> 
+	 *<I>Name</I> 
+	<I>Name</I> [ <I>ConstantExpression?</I> ] 
+	<I>Name</I> () 
+	(*<I>Name</I> )()			(arguments and locals only) 
+<I>ObjectDeclaration</I>: 
+	<I>Type DeclaratorList</I> ; 
+	extern <I>Type? DeclaratorList</I> ;	(global only) 
+<I>Primary</I>: 
+<I>	Name 
+	Constant 
+	StringConstant 
+	Name</I> [ <I>Expression</I> ] 
+	<I>Primary</I> ( <I>ExpressionList?</I> ) 
+	( <I>Expression</I> ) 
+<I>Program</I>: 
+<I>	Directive... 
+	GlobalDeclaration... 
+Statemen</I>t: 
+	; 
+	<I>ExpressionList</I> ; 
+	return <I>ExpressionList?</I> ; 
+	<I>Name</I> : 
+	goto <I>Name</I> ; 
+	if ( <I>ExpressionList</I> ) <I>Statement</I> 
+	if  ( <I>ExpressionList</I> )<I>Statement</I> else  <I>Statement</I> 
+	switch ( <I>ExpressionList</I> ) <I>CompoundStatement</I> 
+	case <I>ConstantExpression</I> : 
+	default : 
+	break ; 
+	while ( <I>ExpressionList</I> ) <I>Statement</I> 
+	for ( <I>ExpressionList?</I> ; <I>ExpressionList?</I> ; <I>ExpressionList?</I> ) <I>Statement</I> 
+	do <I>Statement</I> while ( <I>ExpressionList</I> ) 
+	; 
+	continue ; 
+	{ <I>ObjectDeclaration?... Statement?...</I> } 
+<I>StringConstant</I>: 
+                 &quot; <I>CharacterString</I> &quot;		(escape sequences allowed) 
+<I>Type</I>: 
+	char 
+	int 
+	unsigned 
+	unsigned char 
+	unsigned int 
+<P>
+</PRE>
+<CENTER>
+Go to <a href="appf.htm">Appendix F</a>      Return to <a href="/../toc1.htm">Table of Contents</a> 
+</CENTER><P>
+</HTML>

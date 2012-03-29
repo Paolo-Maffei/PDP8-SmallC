@@ -1,0 +1,642 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 28:<P>
+FURTHER DEVELOPMENT<P></H1></B>
+</CENTER>
+
+Programs are seldom ever perfect, and the Small C compiler is no exception.  Many of its algorithms can be improved.  Much of its code could be organized better and made more efficient.  No doubt there are bugs lurking in the darkness.  And, of course, many features of the C language have yet to be implemented.  So there is no shortage of improvements that can be made.  You may even want to revise it simply for the experience.<P>
+
+Whatever the reasons, you may find yourself using the compiler to create new versions of itself.  And so, on the chance that you will, I have included this chapter of suggestions and helpful hints.  <a href="../chap17/chap17.htm">Chapter 17</a> explained the procedure for compiling the compiler.  Here we look at some of the things you might want to do to it and how you might do them.<P>
+
+Before proceeding, I must confess that the suggestions which follow are untried.  Had I tested them, they would no doubt be in the compiler already.  In fact, I did install about a quarter of the original recommendations simply because after investigating them, going ahead with the implementation was irresistible.<P>
+
+Furthermore, as every programmer knows, recommending changes is a bit risky.  Plans that look good at first, have a way of turning sour with implementation.  It is hard to think of everything at the beginning.  Some details come to light only when the changes are being made or when testing reveals them.  I must admit to being especially prone to that kind of error.<P>
+
+So as you work through these projects, understand that you are breaking new ground.  Along the way you will learn things about the compiler that I may not have prepared you for.  And you will certainly be challenged to find new solutions--hopefully elegant ones.  But that is what learning by experience is all about.  No amount of talk can replace the lessons learned by actually doing something.<P>
+
+With that disclaimer, I offer the following suggestions for further development. <P>
+
+<B>Test Programs<P>
+</B>
+
+One project that should precede the others is the development of a suite of test programs for the Small C compiler.  A compiler is a complex program.  It is easy to mess up one part of it while working on another.  So it is important to fully test each new generation of the compiler to ensure that nothing but what was supposed to change did in fact change.<P>
+
+The challenge here is to come up with a set of programs that fully exercises the compiler's capabilities.  Every sort of normal and exceptional condition should be tested.  Doing this properly requires a thorough knowledge of the compiler and a large dose of ingenuity.<P>
+
+The test programs should be written in such a way that it is obvious when they fail.  In addition to reporting on their progress, they could also be written keep track of the results for a summary display at the end of the run.  Since a large number of test cases will be tried, this would help the programmer determine quickly whether or not problems occurred.<P>
+
+The test programs should be augmented with additional tests whenever compiler bugs which were not previously detected are discovered. <P>
+
+<B>Eliminate Quote[]<P>
+</B>
+
+This exercise does little more than acquaint you with the process of making revisions.  You might find it a good way to begin.<P>
+
+There is a global character array in <B>CC1.C</B> called <B>quote[]</B> which is made to look like a string containing just a quotation mark.  Originally, Small C did not support the backslash-escape sequences, so this device was used instead.<P>
+
+Eliminate this array and replace the reference to it in <B>string()</B> with <B>&quot;\&quot;&quot;</B>.<P>
+
+<B>Continued Character Strings<P>
+</B>
+
+One of Small C's shortcomings is that it provides no means of continuing character strings which are too long to fit in one line.  The maximum line size is 127 characters, as determined by <B>LINEMAX</B> and <B>LINESIZE</B> in <B>CC.H</B>.  If you have a text editor that supports lines that long, you could easily exceed the width of your screen.  In fact, you could recompile the compiler with larger values for these symbols and thereby handle any length line your editor will allow.  But that is a poor
+ solution since listings of your programs will (depending on the printer) either truncate or wrap around to column one (throwing off the internal line count of whatever print utility you may be using).  This solution is especially bad because it denies you control of your program's appearance.<P>
+
+The standard C solution to this problem is to place a single backslash (<B>\</B>) at the physical end of the source line (without trailing white space).  In that case, the Backslash and the newline are ignored and the string continues with the first character of the next line.  Thus, <P>
+
+<PRE>		&quot;This is the first part a\
+		nd this is the last part.&quot;<P>
+</PRE>
+
+(where the leading quote is in column one) is the same as<P>
+
+<PRE>		&quot;This is the first part and this is the last part.&quot;<P>
+</PRE>
+
+Obviously, this solution is crude and gives the programmer very little control over the appearance of his program.  To overcome that limitation, some implementors have deviated by having the compiler also discard leading white space on the continuation line.  In that case, the line is continued with the first graphic character on the continuation line.<P>
+
+Current practice, however, is to have compilers concatenate into a single string any series of strings that are separated by nothing but white space (newlines included).  Thus,<P>
+
+<PRE>		&quot;Part one, &quot;
+		&quot;part two, &quot; &quot;part three.&quot;<P>
+</PRE>
+
+would be seen by the compiler as<P>
+
+<PRE>		&quot;Part one, part two, part three.&quot;<P>
+</PRE>
+
+Clearly this approach is much better than the previous two.  For one thing, it gives the programmer complete control; and for another, it makes the programmer's intentions explicit.  There is no guessing as to whether or not the compiler is overlooking leading white space in a continuation line.<P>
+
+Finally, and best of all for Small C, this solution is the easiest to implement.  You may recall that the Small C preprocessor operates on a line by line basis.  When it finds a string's leading quote, it searches for the trailing quote in the same line and complains if it does not find it.  Making the front end of the compiler able to deal with a single string that spans source lines would be difficult.<P>
+
+Therefore, since it is easier and is in keeping with modern practice, I recommend the string concatenation approach.  To implement it, only one small function<B> string()</B> should require alteration.  Presently, it contains a single loop in which it obtains the characters of a string and stores them in the literal pool.  On exit from the loop, it caps the string with a null terminator.  Prior to entering the loop, it passes the initial value of the literal pool offset <B>litptr</B> back to the caller as
+ a side effect.  This will be used in locating the string in the pool when it is dumped at the end of the current function.<P>
+
+String concatenation can be easily added by enclosing the current loop in an outer loop.  This loop might best be written as a do...while statement.  The <B>...</B> includes the existing loop, as well as the<B> gch()</B> that bypasses the trailing quote.  The <B>while</B> condition could be the expression <B>(match(quote))</B>.<P>
+
+On completing the first string and bypassing its trailing quote, any white space (including newlines) would be skipped and the next token would be tested.  If it turns out to be another quote, then it is bypassed by<B> match()</B> and the expression yields true which restarts the inner loop.  Be sure that the passing of <B>litptr</B> occurs before the outer loop, and the terminating of the string with a zero byte occurs after it.<P>
+
+Testing this change should be extremely simple.  Just execute the compiler without parameters so that it inputs from the keyboard and outputs to the screen.  Then initialize some character arrays and pointers with simple and concatenated strings.  After that, start a function in which you reference character strings.  If the generated code is right, you are finished.  Remember to try boundary conditions like empty strings, no white space between concatenated strings, and so on. <P>
+
+<B>Better Code for Integer Address Differences<P>
+</B>
+
+When the compiler subtracts one address from another, the result must be interpreted as the number of objects (not necessarily bytes) lying between the addresses.  Subtracting one character pointer from another automatically yields the desired result; but subtracting one integer address from another would yield twice the desired value if it were not scaled down by a factor of two.  As an example, consider<P>
+
+<PRE>		int *ip1, *ip2;
+			main() {
+			ip2-ip1;
+			}<P>
+</PRE>
+
+The code produced by the expression is<P>
+
+<PRE>		                        MOV BX,_IP1
+					MOV AX,_IP2
+					SUB AX,BX
+		SWAP12  0	-&gt;	XCHG AX,BX
+		GETw1n  1	-&gt;	MOV AX,1
+		ASR12     0	-&gt;	MOV CX,AX
+					MOV AX,BX
+					SAR AX,CL<P>
+</PRE>
+
+where the p-codes that perform the division by two are shown on the left, together with their respective values.  Five assembly language instructions are used to shift the answer right by one bit to accomplish the division.  This is clearly wasteful.  How much better it would be to generate<P>
+
+<PRE>					MOV BX,_IP1
+					MOV AX,_IP2
+					SUB AX,BX
+		ASR12    1	-&gt;	MOV CL,1
+					SAR AX,CL<P>
+</PRE>
+
+instead.  This improvement can be achieved easily by modifying <B>down2()</B> and the translation string for ASR12.<P>
+
+Whereas<B> down2()</B> now generates<P>
+
+<PRE>		SWAP12 0
+		GETw1n  
+		ASR12    0<P>
+</PRE>
+
+The first two p-codes can be dropped if the translation string for <B>ASR12</B> is changed appropriately.  Currently, <B>ASR12</B> translates through<P>
+
+<PRE>		\011MOV CX,AX\nMOV AX,BX\nSAR AX,CL\n<P>
+</PRE>
+
+which makes no use of the p-code's value.  By changing this to<P>
+
+<PRE>		\011?MOV CL,&lt;n&gt;?MOV CX,AX?\n??MOV AX,BX\n?SAR AX,CL\n<P>
+</PRE>
+
+the translation will take into account whether or not the p-code's value is zero.  If it is, then the shift count is assumed to be in AX as usual.  However, a value of one will be taken as a constant shift count, and only<P>
+
+<PRE>		MOV CL,1
+		SAR AX,CL<P>
+</PRE>
+
+will be produced.  Besides dropping the first two p-codes generated in<B> down2()</B>, the value that goes with ASR12 must be changed to one.<P>
+
+Be advised that this revision of the <B>ASR12</B> p-code usage and translation string conflicts with the advice given in Long Integers below.  If you intend to carry out that project, then you should simply define a new p-code for use here.<P>
+
+Test this with code like that above.  This relatively easy project can be used as a warm up for the ones that follow. <P>
+
+<B>Better Code for Logical AND and OR Operators<P>
+</B>
+
+The code generated by the logical AND and logical OR operators can be improved somewhat.  The expression <P>
+
+<PRE>		i &amp;&amp; j
+</PRE>
+
+where <B>i</B> and <B>j</B> are globals, generates<P>
+
+<PRE>			MOV AX,_I
+			OR AX,AX
+			JNE $+5
+			JMP _2
+			MOV AX,_J
+			OR AX,AX
+			JNE $+5
+			JMP _2
+			MOV AX,1
+			JMP _3
+		_2:
+			XOR AX,AX      &lt;--
+		_3:<P>
+</PRE>
+
+and the expression <P>
+
+<PRE>		i || j <P>
+</PRE>
+
+generates<P>
+
+<PRE>			MOV AX,_I
+			OR AX,AX
+			JE $+5
+			JMP _4
+			MOV AX,_J
+			OR AX,AX
+			JE $+5
+			JMP _4
+			XOR AX,AX      &lt;--
+			JMP _5
+		_4:
+			MOV AX,1
+		_5:<P>
+</PRE>
+
+Notice in each case that an unnecessary <B>XOR AX,AX</B> instruction is generated.  When control reaches these instructions, AX is already known to be zero.  These can be eliminated by revising <B>skim()</B> appropriately.  By testing the argument <B>tcode</B> for <B>EQ10f</B> or <B>NE10f</B>, it can be determined which of these instructions (<B>GETw1n</B>, where n == 0) should be eliminated.<P>
+
+In the first case, the resulting code<P>
+
+<PRE>			...
+			MOV AX,1
+			JMP _3		&lt;--
+		_2:
+		_3			&lt;--<P>
+</PRE>
+
+can be improved further by eliminating the jump to label 3 as well as the label itself.<P>
+
+Likewise, in the second case<P>
+
+<PRE>			...
+			JE $+5
+			JMP _4		&lt;--
+			JMP _5		&lt;--
+		_4:
+			MOV AX,1
+		_5:			&lt;--<P>
+</PRE>
+
+can be improved further by eliminating the two adjacent jumps to labels 4 and 5 as well as label 5.  In this case, since <B>MOV AX,1</B> occupies 3 bytes, just like <B>JMP _4, JE $+5</B> (2 bytes) will transfer control directly to label 5, but without referring to the label.  Eliminating the first of these jumps is complicated by the fact that<B> dropout()</B>, which is called from other contexts too, must be modified.  Eliminating the unused labels is not a priority item since they have no effect on 
+the final <B>EXE</B> file.  They simply take up a little space in the <B>ASM</B> file.<P>
+
+Test this from the keyboard first.  Then create an exhaustive test program.  Remember to test all cases that call<B> dropout()</B>, not just the logical AND and OR.  This is probably a nice semester-long project for someone who is new to Small C. <P>
+
+<B>Consolidated Type Recognition<P>
+</B>
+
+There are three places in the compiler where data declarations are parsed.  Global declarations are parsed by <B>dodeclare()</B>, formal arguments are parsed by<B> dofunction()</B>, and local declarations are parsed by<B> statement()</B>.  Each of these functions has essentially identical logic for recognizing the lead-in syntax to a declaration--the data type specification.  They must each recognize<P>
+
+<PRE>		char
+		int
+		unsigned
+		unsigned char
+		unsigned int<P>
+</PRE>
+
+to determine one of four data types--<B>CHR</B>, <B>INT</B>, <B>UCHR</B>, or <B>UINT</B>.  This redundancy is not good, but its cost is relatively slight now since so few data types are supported.  However, if other data types are added to the compiler, then the cost in code size would become less acceptable.  And, of course, there is the inconvenience of having to apply essentially the same revision to three different places.<P>
+
+To improve this situation, I suggest a project in which you consolidate this recognition logic into a single function (say<B> dotype()</B> ).  Have it return one of the four data types on success and zero on failure.  Then call the new function from the three places in question.  Notice that<B> dodeclare()</B> has to handle the special case of <B>extern</B> declarations.  Is that really a problem?<P>
+
+Testing is simply a matter of throwing all possible syntax variations at the compiler, and verifying that it defines or declares items properly, and making sure that references to them see them properly--as integers or characters, signed or unsigned.  This latter test will require devising expressions with operators that have different signed and unsigned versions.<P>
+
+This as basically a warm up project.  If you have learned how to recompile the compiler, this should take only a day or two. <P>
+
+<B>Eliminating the While Queue<P>
+</B>
+
+You may have wondered, as you studied<B> dowhile()</B>,<B> dofor()</B>, <B>dodo()</B>, and<B> doswitch()</B>, why they each maintain a local copy of their current entry in the while queue.  The answer is that it makes referencing the fields in the entry more efficient.  <B>Addwhile()</B> might have returned a pointer to the new entry in the in the global queue.  These four functions could then save it in a local pointer and make their references by subscripting that pointer.  But in that case, there 
+would be a local reference (relative to BP) for the pointer and then a subscripted reference from the pointer to the item in the queue.  So while it looks wasteful, it is not really all that bad.  It runs faster and saves space in the code segment, but takes three more words of space on the stack.<P>
+
+But a more significant problem with the present arrangement is the fact that the global while queue restricts the nesting of loops and switches to 10 levels.  Why not eliminate the while queue altogether and that limitation with it?  Each function that creates a new entry in the queue (the four listed above) already has its own new entry allocated locally on the stack.  So, why not let the stack frames that nest with these function serve the purpose of the global queue?<P>
+
+The purpose of having a global queue is so that the <B>break</B> and <B>continue</B> statements can find the proper stack level, exit label, and loop label for the level of nesting at which they occur.  <B>Dobreak()</B> calls<B> readwhile()</B> for a pointer to the lowest entry in the queue; and<B> docont()</B> calls it for the lowest level with a loop label (excludes <B>switch</B> entries).<P>
+
+This purpose can be served by having<B> addwhile()</B> and <B>readwhile()</B> work with the local <B>wq[]</B> arrays.  <B>Addwhile()</B> does this already in addition to establishing an new entry in the global queue and loading it.  It would simply need to have some code removed so that it only loads the local array.  But <B>readwhile()</B> must be able to scan the queue backward.  This can be accomplished by imbedding a backward pointer chain in the individual <B>wq[]</B> arrays of the 
+four <B>do...()</B> functions.<P>
+
+First, in <B>CC.H</B>, delete the definitions for <B>WQTABSZ</B>, <B>WQSIZ</B>, and <B>WQMAX</B>, define <B>WQLINK</B> with an offset value of zero, and increase the offset values of <B>WQSP</B>, <B>WQLOOP</B>, and <B>WQEXIT</B> by one each.<P>
+
+Then, in <B>CC1.C</B>, delete the global declarations for <B>*wq</B> and <B>*wqptr</B>.  Add a global declaration for a head of chain integer pointer.  This will be zero when there are no active loops or switches, and will point to the last <B>wq[]</B> when there are.<P>
+
+Delete the statement in<B> main()</B> that allocates space for the while queue.  Modify<B> addwhile()</B> to load <B>wq[WQLINK]</B> (the current local array) with the global pointer, and then move the address of the current <B>wq[]</B> to the global pointer.  This will establish the chain which ends with a null link.  Next modify<B> readwhile()</B> to follow the chain rather than stepping backward in the global array.  This would mean passing it the new head of chain 
+pointer instead of <B>wqptr</B> in <B>dobreak()</B>.  Modify<B> docont()</B> in a similar way.  Then delete<B> delwhile()</B> and modify the four <B>do...()</B> functions to replace their call to<B> delwhile()</B> with an assignment of their own <B>wq[WQLINK]</B> to the global pointer.  This will shorten the chain.<P>
+
+The end result will be a slightly smaller compiler and one less restriction.<P>
+
+Be sure to think your way through this revision until you are convinced that it will work in every situation.  Test this revision first by throwing various nested loops and switches at the compiler and verifying that they all continue and exit properly.  Also verify that the stack gets adjusted properly.  You will need to declare local variables within the nested blocks to check that out.  Next compile a program, like <B>AR.C</B> on the distribution diskette, and verify that it runs.  If 
+there are problems in this patch, they will most certainly show up by the program going berserk.  Finally, recompile the compiler as the acid test. <P>
+
+<B>Nesting Include Files<P>
+</B>
+
+As you may recall from the description of<B> inline()</B> in <a href="../chap22/chap22.htm">Chapter 22</a>, only a single include file can be active at one time.  That is because there is only one variable for holding the file descriptor of include files--<B>input2</B>.  <B>Doinclude()</B> processes #include ... directives by simply opening the named file, assigning its file descriptor to <B>input2</B>, and killing the line containing the include directive.  Thereafter, <B>inline()</B>, seeing that <B>input2</B> is not equal to
+
+<B>EOF</B>, reads from it instead of <B>input</B> (the primary file's descriptor).  When <B>input2</B> expires,<B> inline()</B> resets it to <B>EOF</B> and reverts back to using <B>input</B> again.<P>
+
+So what happens when an included file contains an <B>#include ...</B> directive?  That's right, <B>input2</B> gets overlaid with the new include file's descriptor and the original include file is completely forgotten.  In effect, two include files have been chained, just as MS-DOS batch files can be chained.  In this case, however, it just happens to work that way.<P>
+
+Now, how can we make Small C honor <B>#include ...</B> directives properly?  How can we make it resume with the first include file when the one it includes is finished?  The two obvious approaches are (1) to replace <B>input2</B> with an array of file descriptors, and (2) use recursion.  Recursion is desirable because it would impose no limitation on the levels of nesting.  But, as it turns out, Small C's front end is not designed for easy implementation of that idea.  Therefore, I suggest the 
+array approach.<P>
+
+You will need to declare a global array with as many levels as the number of active include files you wish to allow, say ten.  Also declare a global subscript (say <B>inest</B>) into the array that designates the level of include nesting; you might initialize it to -1 so that it can be used directly as a subscript once it has been incremented.  Anytime it is greater than or equal to zero, one or more include files have temporarily superseded the primary input file, and <B>inest</B> locates the 
+current file descriptor.<P>
+
+Obviously, you will need to delete <B>input2</B>.  <B>Doinclude()</B> will need revision to: (1) detect nesting overflow, (2) increment <B>inest</B> to the next nesting level, and (3) put the new file descriptor in the array.  <B>Inline()</B> will have to be changed to: (1) test <B>inest</B> instead of <B>input2</B> to determine whether or not an include file is active, (2) subscript into the array for the include file descriptor, and (3) decrement <B>inest</B> when the end of an include file is reached.<P>
+
+These changes will endow the compiler with the ability to nest include files.  By now, however, it has probably occurred to you that the logic in<B> inline()</B> can be streamlined further by not treating the primary file and the include files differently.  Why not go all the way and eliminate <B>input</B> too?  Let the first element of the descriptor array refer to the primary file, and the higher lying elements the include files.  In that case, <B>inest</B> would still be initialized 
+to -1 to tell <B>inline()</B> that the primary file has not yet been opened.  When it is greater than zero, an include file is to be used.  Finally, another global variable <B>eof</B> can also be eliminated by letting a negative value in <B>inest</B> indicate the end of input text.  You will need to use your text editor to search for all references to <B>eof</B> in the compiler and fix them up appropriately.<P>
+
+Study <B>inline()</B> and other front end functions to decide whether -1 in <B>inest</B> can serve both to indicate that the primary file is not open initially and to indicate the end of file condition.  If not, then perhaps -2 can serve for the end of file condition.<P>
+
+Testing these changes should also be easy.  You might try keyboard input initially, then verify with files that everything works properly.  Again, try boundary conditions like null include files, primary file with nothing but an <B>#include</B>, and so on. <P>
+
+<B>Void Argument Lists<P>
+</B>
+A trend in the current movement toward a standardized C language is to use the keyword <B>void</B> in places where, by design, no value is to be found.  This compiler already accepts <B>void</B> in front of function definitions to document the fact that the function is not supposed to return a value.  But another use of the keyword is in the parentheses that normally contain the list of formal arguments.  When that list is intentionally empty, the word <B>void</B> can be written to make it clear that 
+the omission is by design.<P>
+
+The function to be modified for this feature is<B> dofunction()</B>.  You will find there a loop controlled by<P>
+
+<PRE>		while(match(&quot;)&quot;) == 0)<P>
+</PRE>
+
+where the formal argument list is processed.  All that is required is to make the loop conditional on not finding <B>void</B>.  If <B>void</B> is found, then you must enforce the closing parenthesis.  Consider using<B> match()</B> and<B> need()</B> in your new code.  This project should be easy to test with keyboard input to the compiler. <P>
+
+<B>Prototype Function Declarations<P>
+</B>
+Another trend in modern C compilers is to have the compiler verify that the actual arguments passed to functions are of the correct type and number.  Failure to properly pass arguments is probably the most frequent error committed by C programmers.  So this enhancement goes a long way in helping programmers avoid wasted time.<P>
+
+In order to do this, of course, the compiler must know, at the point of a function's call, what arguments it requires.  And, since C allows forward references, that information is not always available.  In such cases, the compiler could not police the programmer's arguments.<P>
+
+To overcome this limitation, modern compilers support a feature called <I>function prototyping</I>.  The idea is that a function may be declared early in the source file even though it may be defined later.  The declaration would specify, in place of formal argument names, the types of the arguments.  The result is a prototype (or template) of the way the function is to be called.  Of course, the same device could also be used with external functions.<P>
+
+So, at two points the necessary information should be collected.  If a prototype declaration comes first, then it specifies the number and type of the arguments.  But if there is no prototype declaration, then the function's definition provides the information.  If both are present, then the function's definition should be policed according to the prototype declaration.  Finally, function calls are policed only if the information has been collected--whether from the prototype or the definition.<P>
+
+The first problem is to decide how to store the argument information.  Obviously, it must either be in or tied to global symbol table entries.  The problem is that, since the number of arguments is variable, a variable length list is needed.  Therefore it would be best to have a pointer in the symbol table designate the head of a list of data descriptors which are stored in a buffer somewhere.  The descriptors can be small non-zero numeric values, and a zero value could terminate the list.  Byte strings 
+would suffice.  As it turns out, there are two unused fields in symbol table entries for functions--<B>SIZE</B> and <B>OFFSET</B>.  The latter is already named appropriately for use as an offset into a buffer of argument types.<P>
+
+To implement the buffer, you will need to declare a global character pointer (say <B>argtype</B>) that points to the buffer, for which you must allocate memory in<B> main()</B>.  In addition, you will need an integer (say <B>argnext</B>) to keep track of the next available position in the buffer.  And, you will need a constant (say <B>ARGTSZ</B>) to specify the size of the buffer and designate its end.  In addition, you will need a series of constants for the values that will be stored in the buffer.<P>
+
+At this point you must decide how strictly you will police the programmer.  If you are too strict, he will not want to use the compiler.  If you are too easy, you will miss true errors.  For instance, if an argument is declared to be a character variable, should an integer be acceptable?  After all, characters are promoted to integers when referenced, and both appear as integers when they are passed on the stack.  Why shouldn't the programmer be allowed to pass integers to a function that is written for 
+characters and vice versa?  On the other hand, isn't it likely that such a mismatch is an oversight?<P>
+
+One way to handle such decisions is to throw them back on the programmer, as many compiler writers do.  Provide a command line switch that lets the programmer override the checking, or control its severity.  Personally, I never use those options.  They are too much trouble to remember; I prefer to have one way of invoking the compiler which I use routinely.  Therefore, I recommend making the checks fairly lenient, and flagging only those errors that would most likely cause a program to blow up.  
+After all, even with exact matching, you will not catch all of the programmers errors.  He can still pass the wrong integer as an integer argument, for instance.  I suggest that you debate this issue and justify your decision.<P>
+
+In any case, I recommend defining the following symbolic constants<P>
+
+<PRE>
+	ARG_C	1     /* character */
+	ARG_CU	1     /* unsigned character */
+	ARG_I	1     /* integer */
+	ARG_IU	1     /* unsigned integer */
+	ARG_CA	2     /* character array */
+	ARG_CAU	2     /* unsigned character array */
+	ARG_CP	2     /* character pointer */
+	ARG_CPU	2     /* unsigned character pointer */
+	ARG_IA	3     /* integer array */
+	ARG_IAU	3     /* unsigned integer array */
+	ARG_IP	3     /* integer pointer */
+	ARG_IPU	3     /* unsigned integer pointer */
+	ARG_F	4     /* function address */<P>
+</PRE>
+
+where those symbols with the same values are accepted as a match.  You can make the rules stricter simply by renumbering the symbols.  Notice that arrays and pointers of the same type match; that is because arrays are passed as addresses on the stack and so are effectively pointers as far as the called function is concerned.<P>
+
+Now comes the hard part--revising the logic.  To support prototype declarations, you must work on<B> declglb()</B>.  At the point where it recognizes a function, it sets <B>id</B> to <B>FUNCTION</B> and calls<B> need()</B> to enforce the closing parenthesis.  Between these, you must insert a loop that (1) recognizes a list of declarators without names--for example, (<B>char, int *</B>, <B>unsigned</B>, <B>char []</B>)--(2) deciphers them, and (3) stores one of the symbolic constants in <B>argtype</B>.  In
+ each case <B>argnext</B> must be incremented.  And, at the end, a null value must be stored.  Also, the initial value of <B>argnext</B> must be preserved so it can be fed to<B> addsym()</B> as the offset value (currently zero for functions).  The loop must also verify that <B>argtype</B> does not overflow.  Consider, in this loop, calling a function (say<B> declarg()</B> ) to perform the recognizing and storing operations for each argument.  Not only will it keep<B> declglb()</B> cleaner, but you 
+will have use for it shortly.<P>
+
+Now, you must perform a similar task in<B> dofunction()</B>.  And here a decision must be made.  Modern C compilers support a simpler way of declaring formal arguments than the method now supported by Small C.  While still supporting the original syntax, they also permit functions to be written like<P>
+
+<PRE>		func(char ch, int *ip, unsigned u, char ca[]) {
+			...
+			}<P>
+</PRE>
+
+where each formal argument is written as a declaration.  Now, we have just written a function<B> declarg()</B> that will recognize everything about these arguments except their names.  It could be upgraded to either look for a name or not depending on an argument it receives.  It could then be called from<B> declglb()</B> or<B> dofunction()</B>.  Basically, this would involve adding to it the functionality found in the argument loop of<B> dofunction()</B> and in<B> doargs()</B>.  To determine whether 
+the old or new style syntax is being used, this function could return a success or failure indication.  If it fails on the first argument, the old style syntax could be assumed.  On success, the rest of the arguments could be parsed using the new function.  I leave the details to you.<P>
+
+With this arrangement, the programmer would call for argument verification either by writing a prototype declaration or by using the modern syntax.  In addition, however, the existing function<B> doargs()</B> could be extended to store information into <B>argtype</B>.  That would cover all of the bases.<P>
+
+At the other extreme, the validation information could be collected only in prototype declarations.  That would save a lot of revising of the compiler.  It would also give the programmer a lot of control; but, it would require every validated function to have a prototype declaration.  Since most C programs are written in a &quot;forward reference&quot; style, prototype declarations would be needed anyway, so not much additional work would be demanded of the programmer.  You might first try 
+gathering the validation data only in <B>declglb()</B>.  Then, after you have argument validation working, decide whether also having<B> dofunction()</B> gather validation information is worth the trouble.  Or you could do the new style of formal arguments as a separate project, and at that time gather validation information.<P>
+
+At this point you are ready to do the actual validating.  There are two candidates for this operation.  First, if a prototype declaration created a symbol table entry and collected validation information in <B>argtype</B>, then when the function is defined by<B> dofunction()</B> the compiler should complain about differences.  And, of course, function calls which are handled by<B> callfunc()</B> should definitely verify arguments.<P>
+
+The verification process should simply be a matter of stepping down the function's string in <B>argtype</B> as each argument is parsed.  In each case, if the identity and data type do not match the stored code, then<B> error()</B> is called to complain.  If the end of the string is reached before the arguments run out, then too many arguments are being passed.  Conversely, if unreferenced codes remain in the string after the arguments end, then too few arguments are being passed.<P>
+
+If no validation data exists for a function, then no validating should be attempted.  This can be detected by making the offset in the symbol table entry zero in that case.  But be sure to skip the first byte in <B>argtype</B> so as to guarantee that the first function will be checked.  Another approach would be to let the offset be an actual address instead of an offset into the buffer.  Since all addresses are guaranteed by the compiler to be non-zero, that should work fine.  In addition, it would 
+reduce subscripted references to the buffer to simple pointer references.<P>
+
+Finally, there is the problem of how to gracefully handle functions which take a variable number of arguments.  The simplest solution is to gather validation data only in protocol declarations, then avoid writing such declarations for those functions--that is, never validate them at all.  Microsoft handles this by allowing the trailing argument in a prototype declaration to be written as <B>...</B> .  This tells the compiler that an unspecified number of additional arguments may follow.  Of course, 
+they could not be verified.<P>
+
+The error messages generated by this mechanism should be treated as warnings only; that is, the error message should be generated, but the compiler should function just as though no verifying was being done.  The generated code should not be affected.  If <B>argtype</B> overflows, then after complaining once, the compiler should simply verify those functions for which data was gathered and quit gathering data for the functions that remain.<P>
+
+As you can see, this is a sizable revision.  And, for obvious reasons, I have left a lot of the design decisions and details to you.<P>
+
+In my opinion, this project is a bit much for a semester.  It might be broken into two parts--support for prototype declarations with argument verification of function calls and definitions, and support for the new formal argument syntax. <P>
+
+<B>Backward Jumps with Block Locals<P>
+</B>
+
+The restriction that local declarations in nested blocks cannot coexist in the same function with <B>goto</B> statements can be relaxed somewhat.  Backward <B>goto</B> references can be allowed.  This can be done by having<B> addlabel()</B> save <B>csp</B> in the symbol table in either the <B>TYPE</B>, <B>SIZE</B>, or <B>CLASS</B> field, all of which are unused by labels.  To distinguish between backward and forward references, another unused field could be used as a flag.  Set the flag one way 
+when the label is added to the table by<B> dogoto()</B>, and the other way when the label itself is parsed by<B> dolabel()</B>, regardless of whether or not the entry already exists.  Then, before generating <B>JMPm</B>, have<B> dogoto()</B> generate <B>ADDSP</B> (passing it the saved value of <B>csp</B>).<P>
+
+If <B>csp</B> is saved in the symbol table in both cases, then a forward reference will produce an adjustment of zero (see <B>gen()</B> ) which will simply be ignored when <B>ADDSP</B> is translated to ASCII by<B> outcode()</B>.  Therefore, there is no need to avoid generating <B>ADDSP</B> for forward references.<P>
+
+If the reference is forward and if <B>nogo</B> is true (set by <B>statement()</B> because block locals were declared), issue an error message.  In<B> dogoto()</B> the original error message must be eliminated, and <B>nogo</B> must be set only if the reference is forward.  In<B> declloc()</B> the error message should be changed to better describe the violation.<P>
+
+Before installing this revision, think it through.  Be sure you understand why <B>ADDSP</B> has to be generated, why it works with backward references, and why forward references cannot be allowed.  And, as usual, convince yourself that the changes you plan will cover all the bases.  This is probably a half semester project. <P>
+
+<B>Word Alignment<P>
+</B>
+
+Machines with 16 or 32 bit data buses, are able to fetch or store word length objects with a single memory access provided the objects are aligned on word boundaries.  However, words with odd addresses always require two accesses in machines with 16 bit buses, and require two accesses in about half the cases in machines with 32 bit buses.  Obviously, a performance bonus can be obtained in these machines by ensuring that 16 bit objects fall on word boundaries in memory.  Currently, the Small C compiler
+ makes no effort do this.  Aside from declaring global pointers, integers, and integer arrays first, the programmer has no means of ensuring word alignment.  He can do nothing about function arguments and locals.<P>
+
+Word alignment can be achieved easily by inserting an extra byte before each 16 bit object that would otherwise fall on a byte boundary.  But there are three cases to consider--global objects, arguments, and local objects.<P>
+
+In the first case, a global integer (say <B>glc</B> for global location counter) can be defined which increments by the size of every global object that gets defined.  Then when an integer, an integer array, or a pointer (to integer or character) is about to be defined, <B>glc</B> is first checked.  If it is found to be odd (low bit set), a byte is defined by calling<P>
+
+<PRE>		gen(BYTEn, 0);<P>
+</PRE>
+
+first.  Put this fix in<B> declglb()</B> before it calls<B> initials()</B>.  Don't forget to bump <B>glc</B> for the filler byte too.<P>
+
+Arguments are passed on the stack.  Since all arguments are 16 bits long the only thing to do is ensure that the stack pointer is on a word boundary before starting to evaluate the actual arguments in<B> callfunc()</B>.  In this case, we already have a location counter, the compiler-relative stack pointer <B>csp</B>.  If it is found to be odd on entering<B> callfunc()</B> then call<P>
+
+<PRE>		gen(ADDSP, csp - 1);<P>
+</PRE>
+
+<B>Gen()</B> takes care of adjusting <B>csp</B> for you.<P>
+
+Now, notice that the last statement in<B> callfunc()</B> restores the stack to its original value which it calculates as <B>csp + nargs</B>.  That fails to take the alignment byte into consideration; so perhaps we should save <B>csp</B> on entry to <B>callfunc()</B>, then restore it from the saved value instead.<P>
+
+The last case deals with local declarations of integers, integer arrays, and pointers.  The pertinent function is <B>declloc()</B>.  This change is easy since the stage is already set.  There is already a counter called <B>declared</B> which determines the stack frame offset for each local and also accumulates the total number of bytes allocated.  When <B>statement()</B> finds its first executable statement in a block, it generates <B>ADDSP</B> to adjust SP for the number of bytes 
+indicated by <B>declared</B>.  So all that needs to be done is to find the place in<B> declloc()</B> after the object's identity and data type have been determined and before <B>declared</B> is adjusted to reflect the offset for the current object, and make an alignment adjustment if necessary.  Just before<P>
+
+<PRE>		declared += sz;<P>
+</PRE>
+
+test <B>id</B> and <B>type</B> to make the decision.  Then if alignment is desired and <B>declared</B> is odd, bump it by one.  Notice that aligning locals this way only works if arguments are also aligned on the stack.<P>
+
+Since alignment is somewhat wasteful of space, you could define a no alignment command line switch <B>-NA</B> to disable this feature at the programmer's discretion.  Alternatively (or in addition) you could look for a defined symbol in the program (say <B>NOALIGN</B>) to override alignment.  This has the advantage of allowing the programmer to specify once in a program that there is to be no alignment.  Different choices can be made for different programs without the programmer having to remember 
+at compile time.<P>
+
+As always, before making the source changes, convince yourself that the revision will work and that all the bases are covered.  You should know, for instance, why the stack is on a word boundary on entry to a function and why <B>declared</B> contains zero at the same point.  But do not stop there.  What about entry to inner blocks.  Is <B>declared</B> zero?  Is the stack on a word boundary.  If not, how can you guarantee that it will be?  (Hint: Look at the point where<B> statement()</B> uses 
+<B>declared</B>.)<P>
+
+Testing this revision is a bit more difficult than most of the others.  If your changes do not work, test programs will most likely run anyway--just slower than they should.  First, use keyboard entry to catch the gross errors.  Then write a small test program that exercises all three cases (globals, arguments, and locals), with and without alignment adjustments.  Compile the program, inspect its <B>ASM</B> file, and run it to verify that it has not been corrupted.  Finally, obtain a linker map of 
+the program so you know where the globals and functions are.  Verify that the globals are properly aligned.  Then execute the program with <B>DEBUG</B>, or other debugger, and verify that references to locals generate even numbered addresses.  Be sure to write code in your program that will definitely force some word length objects (in each of the three cases) to fall on an odd boundary without alignment; after all, you could walk away satisfied, having verified nothing but happy coincidences.<P>
+
+One final consideration should not be overlooked.  The memory allocation routine<B> _alloc()</B> in <B>CSYSLIB.C</B> should be modified to ensure that each dynamically allocated block of memory begins on a double word boundary.  That way, the user has the option of improving efficiency by organizing heap memory structures in the order: double words, words, bytes.<P>
+
+This would probably be a nice semester project. <P>
+
+<B>Restarting the Optimizer Loop<P>
+</B>
+
+In <a href="../chap27/chap27.htm">Chapter 27</a> it was pointed out that each time<B> peep()</B> applies an optimization, the list of potential optimizations is rescanned from the beginning, in an effort to improve the optimized code.  It was pointed out that it would be more efficient to arrange the optimization cases so that optimized code is fully covered by optimizations that follow in the sequence, allowing the optimizing loop in<B> dumpstage()</B> to simply continue on with a single pass through <B>seq[]</B>.  The 
+justification for restarting the loop was given as ease of maintaining of the compiler's optimizer.  In this project, you should remake that decision for yourself.  Find out how much performance is improved by not restarting the loop and balance that against the difficulty of keeping the optimization cases in sequence so that optimizations are not lost on optimized code.<P>
+
+First, compile a version of the compiler with <B>DISOPT</B> defined in <B>CC4.C</B>.  Then devise a test program which forces every possible optimization case.  This will be used to verify that optimizations are not being missed.  Also acquire some typical nontrivial programs for use in testing performance under realistic circumstances.  <B>AR.C</B> is a good choice, you could even use the compiler itself.<P>
+
+Compile the first program and note which optimizations were applied.  Revise the program until you have forced every one to occur.  This will be a learning experience.  Are there any cases that cannot be forced?<P>
+
+Now, time the compiles of the conventional programs.  And make a record of the compiler's speed.<P>
+
+Next, reorder the optimization cases.  This can be done either by renumbering the <B>seq##[]</B> arrays, or by changing the way <B>seq[]</B> is initialized in<B> setseq()</B>.  Which is easier?  Then, revise<B> dumpstage()</B> so that its inner loop is not restarted after successful optimizations.  All of this can be done by working with <B>CC4.C</B> alone.  If you have already recompiled the compiler and saved the four <B>OBJ</B> files, then only <B>CC4.C</B> needs to be recompiled and assembled.<P>
+
+Now compile the special test program to verify that all of the optimizations are still taking.  If not, revise <B>CC4.C</B> again.  Is it always possible find a sequence that covers every case?  Could a cyclical situation develop?<P>
+
+Now, time the revised compiler on the conventional test programs.  Is it faster?  How much faster?  Is it worth the trouble?<P>
+
+This is probably a semester-long project. <P>
+
+<B>Stack Probes<P>
+</B>
+
+One of the risks associated with CPUs that have stacks is that the stack may overrun its allotted space.  Since the amount of space needed by the stack depends on the program's algorithm and the data upon which it operates, it is usually not possible to predict with accuracy exactly how much stack space is needed.  Recursive algorithms are especially susceptible to erratic, data dependent stack behavior.  Of course, if the stack is allowed to overflow, it will corrupt whatever lies 
+above it (toward lower numbered addresses) in memory.  And, as a result, unpredictable program behavior will likely occur.<P>
+
+To prevent this, some compiler writers implement a <B>stack</B> probe routine which, on entry to every function, checks to make sure that some reasonable amount of stack space remains.  Since this necessarily involves a penalty in performance, it is implemented as a compile-time option.  Typically, a program will compile with stack probes during testing, then when the programmer thinks the program is robust, he does the production compile without the safety net.<P>
+
+Since programs are usually compiled many times for just one production compile, stack probing should be a default which can be overridden with an <B>-NSP</B> switch, for example.<P>
+
+Two things are needed to implement stack probes--a tight little library routine for doing the checking, and a change to<B> dofunction()</B> to strategically place a call to the routine in each function.  As it turns out, there is already such a function in the Small C library.  It is called<B> avail()</B>.  When called with a true argument, if the stack has overflowed, the program aborts with an exit code of 1.  While the needed functionality is there, this routine probably carries too much baggage 
+for something to be called with every function call.<P>
+
+I suggest using <B>avail()</B> as a pattern for another function, <B>_probe()</B> for instance.  This function would not be passed an argument.  And would not return a value.  But it would check the stack and abort with an exit code of say 3 (an unused Small C disaster code); this value would distinguish stack overflows from other insufficient memory problems.<P>
+
+Before leaving <B>avail()</B>, notice how it determines the value of SP.  It declares a local character then takes its address with the address operator (<B>&amp;</B>).  Since the character is the last thing on the stack, its address is the value of SP.  Looking at this, it is apparent that a more efficient way to do this would be to use the address of the argument <B>abort</B> instead.  That would avoid the need to adjust SP to allocate the local variable.  But it would also introduce an error of four 
+bytes in the checking since the return address and original BP are &quot;above&quot; (lower numbered address) it on the stack.  Is that error significant?  Should<B> avail()</B> be revised?<P>
+
+Notice that you could declare a formal argument for<B> _probe()</B> even though no actual argument is passed.  After all, the only thing you want is the address of where<B> _probe()</B> thinks the argument is.  It does not actually have to be there.<P>
+
+With these modifications, a lean<B> _probe()</B> function can be written.  For the ultimate in efficiency, however, you could write<B> _probe()</B> in assembly language.  Then you could avoid the push of BP and its restoration on exit.  You could also directly refer to SP.  And, calling<B> abort()</B> with an argument of 3 is just a matter of<P>
+
+<PRE>		MOV AX,3
+		PUSH AX
+		CALL _abort<P>
+</PRE>
+
+in assembly language.<P>
+
+Looking now at<B> dofunction()</B>, we must decide where to generate the call to<B> _probe()</B>.  It could go just after generating <B>ENTER</B> which saves BP and then sets it for the new stack frame.  At that point, if <B>-NSP</B> has not been specified, generate the call.  Do you have a p-code for calling a function that is not in the symbol table?  Should you put<B> _probe()</B> in the symbol table when <B>-NSP</B> is not given, or should you define another p-code for calling literal labels?<P>
+
+<I>Note: If you should decide to define another p-code, don't forget to recompile all of the parts of the compiler that may be affected.</I><P>
+Finally, since Small C allocates all locals in a block at one time, wouldn't it be better to wait until the locals are declared, then probe the stack?  That way account is taken of the amount of local space used by the function.  If that is done, then<B> statement()</B> should generate the call.  But the code in<B> statement()</B> that allocates locals, executes within very nested block.  Should care be taken to ensure that<B> _probe()</B> is called only the first time in a function, or should you call 
+probe every time a nested block is entered?  Or perhaps, the first time for sure, then subsequently only if additional locals are being allocated?  How accurately should the stack be checked anyway?<P>
+
+Testing this revision, could be done with an infinite recursive function that calls<B> avail()</B> with each nesting level, in order to report progress by displaying the amount of free memory remaining.  You can define a moderate size local array to gobble up stack space in reasonable chunks.  Don't forget to test your revision to<B> ask()</B> which handles <B>-NSP</B>.<P>
+
+If done thoughtfully, this is probably a semester project.  The decisions made along the way should be justified. <P>
+
+<B>Long Integers<P>
+</B>
+
+One of the most obvious enhancements to Small C is support for additional data types.  Logically, the first step in that direction is to implement long integers.  This would break the ice and set the stage for other more complex data types.<P>
+
+This step is a very major undertaking, affecting virtually every part of the compiler--one that I shall not, therefore, describe in detail.<P>
+
+Before starting this project, you should do Consolidated Type Recognition (described earlier).  That will create a single function<B> dotype()</B> for parsing data type specifications.  Having done that, you will need to revise that function to accept<P>
+
+<PRE>		long
+		long int
+		unsigned long
+		unsigned long int<P>
+</PRE>
+
+in addition to the types it already recognizes.  For these cases it should return <B>LONG</B> or <B>ULONG</B> which should be defined with<P>
+
+<PRE>		#define LONG (BPW &lt;&lt; 3)
+		#define ULONG (BPW &lt;&lt; 3) + 1<P>
+</PRE>
+
+in <B>CC.H</B>.  This specifies the length (4) in the upper 14 bits and differentiates between the two in the lower two bits.<P>
+
+Next, <B>dodeclare()</B>,<B> dofunction()</B>, and<B> statement()</B> must be revised to accept the new data types and properly represent them in the symbol table.<P>
+
+A new p-code will be needed for defining longs with the <B>DD</B> (define double word) assembler directive.<P>
+
+The primary register will need to be extended to take in DX for the high order 16 bits of long objects.  It would consist of DX,AX together, in that order.  Similarly, the secondary register must also be extended as CX,BX.<P>
+
+In memory, the low order word should be stored first (with the lowest address).  If the <B>Word Alignment</B> project has been performed, then it must be modified to recognize long types and to provide double word alignment in their cases.  The choice of double (instead of single) word alignment would not improve performance on machines with 16 bit buses, but it would on those with 32 bit buses.<P>
+
+Function arguments and return values must be generalized to allow the passing and returning of double word values.  When passing a long argument<B> callfunc()</B> must generate<P>
+
+<PRE>		PUSH DX
+		PUSH AX<P>
+</PRE>
+
+instead of a single push.  This can be handled easily by having PUSH1 make use of its value to differentiate between single and double word pushes.  Make use of the <B>?...?...?</B> device in the translation string.  This suggests a parallel revision to <B>POP2</B> that will produce<P>
+
+<PRE>		POP BX
+		POP CX<P>
+</PRE>
+
+<B>Dofunction()</B> can no longer assume that all functions return integers.  It must set the <B>TYPE</B> field in the symbol table to whatever type specification precedes the function name.  This in turn will require a rewrite of<B> parse()</B> which now assumes it has a function definition when the type lead-in syntax is not seen by<B> dodeclare()</B>.  <B>Doreturn()</B> must be revised to return the correct type of value, and to convert the return value to the correct type if necessary.<P>
+
+Until now, conversion of data from one type to another has not been a problem for Small C.  Now it must be done, not only here but during expression analysis when binary operators are applied by<B> down2()</B>.  See <a href="../append/biblio.htm">Kernighan and Ritchie[10]</a> for details about the rules for data conversion.<P>
+
+Long objects must be fetched and stored like other objects, so<B> fetch()</B> and<B> store()</B> must take them into account.  New p-codes will be needed for these purposes too.<P>
+
+This may seem like a lot of changes, but the largest one by far is the revision to the expression analyzer.  Double length constants should be supported, so<B> is[CV]</B> will have to become a sequence of two entries, and every reference to it must take that into account.  <B>Number()</B> must be modified to recognize long constants and return their data types correctly.<P>
+
+<B>Test()</B> must be able to test double length expression results.  This also will require additional p-codes.<P>
+
+A major decision regarding revisions to p-codes must be made.  How should precision be reflected in p-codes?  The options appear to be (1) define additional p-codes for the new double word precision, (2) associate with each p-code and additional value that tells the precision, and (3) take advantage of the unused value that many of the affected p-codes already have.  Option (1) is not good because it forces additional decisions to be made in the analyzer when a specific p-code must be chosen, and 
+it multiplies the cases that the optimizer must deal with.  Option (2) is bad because it requires 50% more space for the staging buffer.  And, option (3) cannot be applied uniformly because some multi-precision p-codes already use their values for other purposes.<P>
+
+A compromise solution might be to use the unused high order bits of the p-code itself.  P-codes are treated as 16 bit values throughout the compiler, and the high order byte is always zero.  That byte could be superimposed with the precision of the operation at the time the code is generated in the staging buffer.  Care must be taken to avoid a conflict in the use of these same bits by the optimizer commands.  This can be handled by using the high order nibble for the precision.  The recognition phase of 
+<B>peep()</B> could mask off those bits when it performs its matching operation.  The optimizing phase must also be revised so that it will know what precision to apply to literal p-codes that it writes into the buffer.<P>
+
+Finally, there is the problem of how to translate p-codes according to their precision.  Two approaches come to mind, (1) let the precision designate a substring (null separated) in the translation string, and (2) add the precision to the p-code proper to derive the subscript into<B> code[]</B>.  Approach (1) has the disadvantage that translating p-codes will be slowed down by having to bypass unwanted substrings.  Also, long strings will result; but, that can be dealt with easily if the 
+Continued Character Strings revision has been installed in the compiler.  Approach (2) would require that you leave gaps in the p-code numbers (as they are assigned in <B>CC.H</B>) to account for the higher precision cases.  The nuisance of this can be reduced by separating these p-codes from the others and placing them at the end of the list with appropriate comments.<P>
+
+These methods of dealing with the proliferation of p-codes need more thought.  But, perhaps these ideas will help guide you in the right direction.  One last point to think of is that your solution should yield gracefully to additional precision data items.  Having taken this step, they will certainly follow.<P>
+
+The analyzer will have to be scrutinized thoroughly to ensure that objects of different precision will be properly handled.  Also, numeric constants larger than 32767 should be converted to double length values, instead of being designated unsigned as they are now.<P>
+
+It should be obvious that provision must be made to pass the data type to<B> gen()</B> so that it can be properly associated with the p-code.  Where does the data type originate?  That's right, in the symbol table where<B> primary()</B> finds it.  Fortunately, it looks as though<B> primary()</B> requires little revision, if any.<P>
+
+The place where unmatched data types will have to be reconciled is in<B> down2()</B>.  Before applying a binary operator, <B>down2()</B> must generate code to convert the lower precision data type to the larger precision one if they differ.  And it must make sure that the precision is properly passed on to <B>gen()</B>.  In planning for the generation of type conversion code, look toward the possibility of doing <B>The Cast Operator</B> project below.<P>
+
+<B>Down2()</B> will have to scale values added to or subtracted from <B>long</B> addresses by four instead of two.  This implies changes to<B> double()</B>.  It must likewise generalize the way it scales the difference of two addresses.<P>
+
+Adding longs can be performed by generating in-line code like<P>
+
+<PRE>		ADD AX,BX
+		ADC DX,CX<P>
+</PRE>
+
+where the second addition includes the carry from the first one.  Likewise,<P>
+
+<PRE>		SUB AX,BX
+		SBB DX,CX<P>
+</PRE>
+
+will handle <B>long</B> subtraction.<P>
+
+Multiplication and division are not so easy.  In these cases, you will need to write library routines which are declared external only if they are actually used.  <a href="../append/biblio.htm">Morgan[7]</a> gives examples of multi-precision arithmetic routines from which you might get some ideas.  Morgan's routines are more generalized than you will need.<P>
+
+Finally, the run time library will need to be upgraded to deal with long integers.  The library presently contains 12 functions that convert numbers between integer and ASCII string representations (signed decimal, unsigned decimal, hexadecimal, octal, and any base).  For each of these, there should be a corresponding long integer equivalent.  The new functions should be named <B>atol()</B>, <B>atolb()</B>, <B>dtol()</B>, <B>ltoa()</B>, <B>ltoab()</B>, <B>ltod()</B>, <B>ltoo()</B>, 
+<B>ltou()</B>, <B>ltox()</B>, <B>otol()</B>, <B>utol()</B>, and <B>xtol()</B>.  Having written these, they can be used in revising <B>printf()</B>,<B> fprintf()</B>,<B> scanf()</B>, and<B> fscanf()</B> to handle conversions between ASCII and long integers.  This really involves only two functions, since the <B>f...()</B> version of these functions uses the same logic as the other version.<P>
+
+Having installed support for long integers, the stage will be set for other data types.  At this point Small C will be very nearly a mature compiler.<P>
+
+Obviously, this project should not be attempted unless you already have a comprehensive understanding of all parts of the compiler.  This might do for a graduate level project. <P>
+
+<B>The Cast Operator<P>
+</B>
+
+The <B>Long Integers</B> project put the compiler in the business of performing data conversions and set the stage for the cast (or coercion) operator.  A cast is really just a data conversion on demand.  The idea is that by writing a data type in parentheses before any (sub)expression, the result is &quot;coerced&quot; into the designated type.  The hard part was done in the Long Integers project.  It should only be necessary here to have<B> level13()</B> recognize<P>
+
+<PRE>		( <I>Type</I> )<P>
+</PRE>
+
+as a unary operator.  It should not, however, confuse the open parenthesis with a precedence altering parenthesis.  This can be verified by the presence of a valid type specification following the opening parenthesis.<P>
+
+Since this small project depends on the Long Integers project, it could be used to supplement that project for extra credit or to help fulfill the requirements of a graduate project. <P>
+
+<B>Floating Point Numbers<P>
+</B>
+
+This project too could be viewed as a follow-on to the Long Integers project.  But this one is hefty enough to serve as a separate assignment.<P>
+
+The first question to decide is what internal representation will be used for floating point numbers.  With Intel's introduction of the 8087 family of numeric data processors (NDPs), any floating point compiler that targets the 8086 family processors should use the NDP if one is present.  And, if one is not present, then the necessary operations should be simulated in by library functions that provide comparable precision.  I leave to you the task of obtaining specific information about the Intel NDPs and
+ algorithms for manipulating floating point numbers.  Suffice it here to say that doing the necessary research and writing the library routines for addition, subtraction, multiplication, and division is a significant project.<P>
+
+Having done that, you must then make the compiler recognize and properly handle floating point numbers.  This is basically a matter of dealing with the same issues you encountered in the Long Integers project.  The difference is that the major design decisions (about p-codes, etc.) have been made and a framework now exists for handling various data types.  You will only be expanding on what is already in place. <P>
+
+<B>Other Ideas<P>
+</B>
+
+I could go on endlessly, describing other projects based on the Small C compiler.  But at this point I will close by simply listing other ideas that come to mind.<P>
+
+<OL>
+<LI>Add support of structures and unions.  For specific information on these, see <a href="../append/biblio.htm">Kernighan and Ritchie[10]</a>.  This, together with the preceding projects would essentially elevate Small C to full C status. 
+<LI>Add <b>fseek()</b> and <b>ftell()</b> to the library.  There are already nonstandard versions of these functions that work with integer offsets.  But after implementing longs, these standard functions should be added.  Use the existing seek and tell functions as a patterns. 
+<LI>Enhance the Small C run-time library with <b>sprintf()</b> and <b>sscanf()</b>.  These versions of <b>printf()</b> and <b>scanf()</b> work with character strings instead of files.  Pattern your functions after those in a professional package like Microsoft C. 
+<LI>Enhance the Small C run-time library with a set of functions that give full access to the facilities of operating system.  Pattern your functions after those in a professional package like Microsoft C.
+<LI>Enhance the Small C run-time library with a full set of math functions.  This is an appropriate project to follow the implementation of floats.  Pattern your functions after those in a professional package like Microsoft C.
+<LI>Upgrade the sophistication of the Small C memory management routines so as to support the deallocation of memory blocks in any sequence.  Reallocate embedded blocks of free memory before enlarging the heap.  Combine adjacent blocks of released memory into a single block so that future requests will more likely find embedded space.
+<LI>Have the compiler put the stack in a segment of its own so that the data segment can have all 64K bytes if it needs them.  This is not a difficult thing to do.  The start-up routine in CALL.ASM module will have to be revised.  Also, the stack probe logic (above) will have to be revised.
+<LI>Provide support for multiple memory models.  Read the documentation for a professional C package, like Microsoft C, and follow their terminology and segment naming conventions.  This should follow the Long Integers project since that project sets the stage for handling double length pointers.  Pointers of two sizes must be handled--near pointers (single word) and far pointers (double word).  Having done this, you can compile Small C in a larger memory model to open it up for further development.
+<LI>Provide support for arrays of pointers.  This can be done by fixing the symbol table to handle the additional information.  But this is really only part of the general problem of having the compiler deal with multiple declaration modifiers.  It should, for instance, be able to handle pointers to pointers.  To do this properly, the declaration handling logic will have to be expanded into a kind of expression analysis, and symbol table entries must be tied to variable length chains of attributes.
+<LI>Revise the preprocessor to support nesting of comments.  This is a relatively simple, self-contained change.  Take your ideas from the method the preprocessor already uses to handle <b>#if...</b> nesting.
+<LI>Add support for local data initializers.  Instead of always waiting for the first executable instruction in a block before allocating space for locals, when an initializer is found, allocate pending locals, then evaluate the initializing expression and push the result onto the stack as the current object.  Whereas global initializers must be constant expressions, local initializers are not so restricted.  Originally, C did not support initializing local arrays, current compilers tend 
+to allow it, however.  Is this something you want to support?  Don't forget that the element values must be pushed from right to left so the first element will have the lowest address.  Also, uninitialized elements should be set to zero.
+<LI>Port the compiler to other operating systems on the same family of Intel processors.  UNIX, XENIX, MINIX, and ZINU are possibilities.  Essentially, this should be a matter of finding a suitable assembler, and adapting the run-time library to the new operating system calls.
+<LI>Port Small C to another processor.  This involves all of the issues of the previous project plus having to reshape the output code to the demands of a different processor.  The assignment of the primary and secondary registers to physical registers must be decided.  Problems will arise from different word lengths, different storage sequence for multi-precision data items, and so on. <p>
+</OL>
+
+<P>
+<CENTER>
+Go to <a href="../append/appa.htm">Appendix A</a>  Return to <a href="../toc1.htm">Table of Contents</a>
+</CENTER>
+<P>
+</HTML>

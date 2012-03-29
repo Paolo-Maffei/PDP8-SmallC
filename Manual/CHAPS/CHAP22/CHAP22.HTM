@@ -1,0 +1,184 @@
+<HTML>
+<!--
+ 	Dr. Dobb's Small C Resource CD-ROM Compilation (c) 1997 Dr. Dobb's Journal, M&T Publishing, Inc., a subsidiary of Miller Freeman, Inc. All rights reserved.
+	A Small C Compiler: Language, Usage, Theory, and Design, by James E. Hendrix (c) 1986 James E. Hendrix. All rights reserved.
+-->
+<CENTER>
+<B><H1>CHAPTER 22:<P>
+THE FRONT END</H1><P>
+</CENTER></B>
+
+In this chapter we show how the source code is obtained, preprocessed, and scanned before going to the parser.  We refer to these functions collectively as the front end of the compiler because they stand on the input side of the parser. <P>
+
+With most C compilers, the preprocessor is separate from the compiler itself.  It makes its own pass on the input, changing its form for input to the compiler.  With Small C, however, the preprocessor is integrated into the compiler so that it operates between the reading and scanning of the source code.  This arrangement saves a pass on the program, but more importantly for Small C, it preserves the single pass design which enables the compiler to respond immediately to program fragments. <P>
+
+Because of this integration and certain efficiency considerations, the distinction between preprocessing and parsing is blurred in the Small C compiler.  For instance, two standard preprocessor directives, <B>#define</B> and <B>#include</B>, are handled by the parser, as are the Small C directives <B>#asm</B> and <B>#endasm</B>.  Conversely, two of the scanning functions,<B> match()</B> and<B> streq()</B>, are also used by the preprocessor. <P>
+
+As we saw in <a href="../chap2/chap2.htm">Chapter 2</a>, the term <I>token</I> refers to instances of the smallest language elements.  Individual characters are not necessarily tokens; however, things like names, expression operators, constants, keywords, and punctuation marks are.  It is important to realize that tokens may comprise one or more characters, and that they may, or may not, be separated by white space.  <P>
+
+<B>The Input Buffers<P>
+</B>
+
+Before proceeding with the front end functions, it might help to review the data structures which they use.  Recall from <a href="../chap20/chap20.htm">Chapter 20</a> that there are two input buffers--pointed to by <B>pline</B> and <B>mline</B>.  Input is read, one line at a time, into <B>mline</B> from which it is preprocessed into <B>pline</B>.<P>
+
+The global pointer <B>line</B> points to one or the other of these in order to direct the scanning routines, which are shared by the parser and the preprocessor, to the correct buffer.  The global pointer <B>lptr</B> points the scanning functions to the current character of <B>line</B> and the global integer <B>ch</B> holds a copy of that character.  This use of <B>ch</B> makes many references to the current character more efficient. <P>
+
+Three functions look for tokens in the input line; they are <B>symname()</B>,<B> match()</B>, and<B> amatch()</B>.  These functions exhibit similar behavior in that they advance <B>lptr</B> past the current token if they find what they are looking for, but only if they find it.  This allows the parser to make repeated attempts at recognizing the current token without passing it until it is finally accepted.  These functions are described more fully below.  <P>
+
+<B>Front End Functions<P>
+</B>
+
+Figure 22-1 diagrams the relationships among the major front end functions.  Specifically, it shows the paths by which control flows from the three scanning functions, at the top, down to the library function<B> fgets()</B> which reads lines from the current input file.  A vertical line connecting two functions means that the higher function calls the lower function.  Notice that<B> preprocess()</B> fits midway between the matching functions at the top and the I/O function at the bottom.  
+
+Other, miscellaneous front end functions exist, but these suffice to show how program code filters from the input file up to the parser. <P>
+
+We look first at the miscellaneous functions, and then follow Figure 22-1 from top to bottom.<P>
+
+<CENTER>
+<img src="fg22-1.gif">
+</CENTER>
+<P>
+<CENTER><B>Figure 22-1: Major Front End Functions<P>
+</CENTER></B>
+
+<B>Keepch()<P></B>
+
+<B>Keepch()</B> serves<B> preprocess()</B> by placing one character at a time into <B>pline</B>.  It first verifies that the character will fit.  If not, it does nothing.  In that case the character is lost and when<B> preprocess()</B> reaches the end of the line it issues an error message.  <P>
+
+<B>Inbyte()<P></B>
+
+<B>Inbyte()</B> returns the current character of the input line after advancing to the next one.  It calls<B> gch()</B> to do this; however, it differs from<B> gch()</B> in that it calls<B> preprocess()</B> to fetch a new line if the end of the current one has been reached.  Furthermore, if the new line is empty it goes for yet another, and so on until the next source character is found or the end of the last input file is reached.  In the latter case, it returns zero.  <P>
+
+<B>Gch()<P></B>
+
+<B>Gch()</B> returns the current character of the input line, advances <B>lptr</B> to the next one, and places it in <B>ch</B>.  If the current character is the null terminator, then<B> gch()</B> does not attempt to advance further, but does return the null character to the caller.  <B>Gch()</B> calls<B> bump()</B> to advance to the next character.  <P>
+
+<B>Bump()<P></B>
+
+<B>Bump()</B> either advances the current position in the input line (indicated by <B>lptr</B>) a specified number of positions beyond the current character, or it sets it to the beginning of the line.  It accepts an integer <B>n</B> which may be zero or a positive value.  If <B>n</B> is zero, <B>lptr</B> is set to <B>line</B>; otherwise, it is increased by <B>n</B>.  Then <B>ch</B> is assigned the value of the new character.  Finally, if the new character is not the null terminator, <B>nch</B> (next 
+character) is assigned the value of the following character; otherwise, is as assigned the null value.  <B>Bump()</B> does not verify that <B>n</B> will not advance beyond the end of the line.  It relies on the calling functions to ensure this.  <P>
+
+<B>Blanks()<P></B>
+
+<B>Blanks()</B> advances the input past white space to the beginning of the next token or until the end of the input is reached.  If necessary, it calls<B> preprocess()</B> to obtain new, preprocessed source lines.  It calls<B> white()</B> to determine whether or not a character is to be skipped, and<B> gch()</B> to advance to the next character.  <P>
+
+<B>White()<P></B>
+
+<B>White()</B> returns true if the current input character is a space or a control character and false otherwise.  <P>
+
+<B>Alpha()<P></B>
+
+<B>Alpha()</B> returns true if the character passed to it is alphabetic or an underscore, and false otherwise.  <P>
+
+<B>An()<P></B>
+
+<B>An()</B> returns true if the character passed to it is alphabetic, an underscore, or numeric, and false otherwise.  <P>
+
+<B>Streq()<P></B>
+
+<B>Streq()</B> indicates whether or not the current substring in the source line matches a literal string.  It accepts the address of the current character in the source line and the address of the a literal string, and returns the substring length if a match occurs and zero otherwise.  While repeatedly matching characters from left to right, if an inequality is found, failure is indicated.  Otherwise, when the end of the literal is reached, success is indicated.  Obviously, the end of the 
+literal must determine the length of the comparison since the substring may be followed by anything and so cannot terminate the comparison.  <P>
+
+<B>Astreq()<P></B>
+
+<B>Astreq()</B> indicates whether or not two alphanumeric strings or substrings match.  It serves two purposes--to compare symbol names extracted from the source line with names in the symbol table, and to compare alphanumeric tokens in the source line with literal strings.  In the latter case, it would seem to overlap the function of<B> streq()</B>; but, there is a difference.  <B>Streq()</B> will match a literal with the beginning of a token, whereas<B> astreq()</B> ensures that the entire token is 
+examined.  The term <I>string</I> is used now to refer to either an alphanumeric string with its own terminator, or an alphanumeric substring which is terminated by any non-alphanumeric character.  <B>Astreq()</B> accepts three arguments--the addresses of two strings and the maximum number of characters to match on.  It returns either the length of the matched strings or zero according to whether or not a match occurred.  It loops, matching characters from the strings, from left to right, 
+until (1) inequality is found, (2) the end of the first string is reached, (3) the end of the second string is reached, or (4) the maximum length is exceeded.  Then if the end of both strings have been reached simultaneously, success is indicated; otherwise, failure.  <P>
+
+<B>Symname()<P></B>
+
+<B>Symname()</B> is the first of the major front end functions in Figure 22-1.  It is called whenever the parser thinks a name fits the syntax.  It's purpose is to indicate whether or not a legal symbol is next in the input line and, if so, to copy it to a designated buffer and skip over it in the source line.  <B>Symname()</B> first calls<B> blanks()</B> to advance past any white space at the current position in the line and, if necessary, to input and preprocess another line.  If the first non-white
+ character is not alphabetic (or an underscore) it returns false since that is a requirement for C names.  Otherwise, it copies the symbol to the buffer pointed to by its only argument <B>sname</B>.  If the symbol exceeds eight characters, only the first eight are copied and the rest are bypassed.  Finally, it terminates the destination string with a null byte and returns true.  <B>Symname()</B> calls<B> alpha()</B> to determine if the first character is alphabetic (or an underscore),<B> an()</B> to deter
+mine if other characters are alphanumeric (including underscore), and<B> gch()</B> to accept the current character from the input line and advance to the next one.  <P>
+
+<B>Match()<P></B>
+
+<B>Match()</B> is one of two scanning functions that looks for a match between a literal string and the current token in the input line.  It skips over the token and returns true if a match occurs; otherwise, it retains the current position in the input line and returns false.  First, however, it calls <B>blanks()</B> to skip over white space to the next token, preprocessing a new line if necessary.  It calls<B> bump()</B> to advance over the matched token.  It is important to notice that since 
+<B>match()</B> calls<B> streq()</B> it matches the literal with the same number of characters in the source line and there is no verification that all of the token was matched.  <P>
+
+<B>Amatch()<P></B>
+
+<B>Amatch()</B> is roughly equivalent to<B> match()</B> except that it assumes that an alphanumeric (including underscore) comparison is being made and guarantees that all of the token in the source line is scanned in the process.  It uses <B>astreq()</B> to do the comparing.  <P>
+
+<B>Nextop()<P></B>
+
+<B>Nextop()</B> is called by the expression analyzer to determine if the next token in the source line is one of a list of expression operators.  The address of the string containing the list is received as an argument.  Each operator in the string is separated from the others by a single space, and, as usual, the string is terminated with a null byte.  With each iteration of an infinite loop,<B> nextop()</B> extracts into the local character array<B> op[]</B> the next operator from the list.  It then
+ calls<B> streq()</B> to match it to the current token.  If there is a match, further tests are made to ensure that, for instance, <B>&lt;</B> did not match <B>&lt;=</B>.  If a match did indeed occur, then true is returned.  However, if the list is exhausted without a match, then false is returned.  On success, the global integer <B>opindex</B> is set to the offset of the matched operator in the list; that is, its subscript.  Later, in the expression analyzer, this will be adjusted so that it 
+will correctly subscript the matched operator in the two global arrays <B>op[]</B> and <B>op2[]</B>.  <P>
+
+<B>Preprocess()<P></B>
+
+<B>Preprocess()</B> is a rather large function that fetches and preprocesses a line of source code.  It executes the following steps: <P>
+
+<OL>
+<LI>Set line to <b>mline</b>.
+<LI>Call <b>ifline()</b> to obtain the next line that is not excluded by <b>#ifdef</b> or <b>#ifndef</b> directives.
+<LI>Return immediately if the end of the last source file has been reached.
+<LI>Copy <b>mline</b> to <b>pline</b> with special treatment given to white space, character strings, character constants, comments, and macro names.
+<LI>Determine if pline has overflowed and, if so, issue the message "line too long."
+<LI>Set <b>line</b> to <b>pline</b> for subsequent parsing.
+<LI>Establish the first character as the current character for parsing.<p>
+</OL>
+
+The cases receiving special treatment are:<P>
+
+<OL>
+<LI>White space, of any length, is reduced to a single blank character.
+<LI>Character strings are checked to ensure that there is a closing quote in the same line as the opening quote.
+<LI>Character constants are checked to ensure that there is a closing apostrophe.
+<LI>Comments are eliminated entirely from the preprocessed code.  If necessary, additional lines are obtained until the end of a comment is reached.<p>
+</OL>
+
+Macro names are recognized and replaced by their substitution text.  A token is suspected of being a macro name if it begins with an alphanumeric character (or underscore).  It is then copied into a short character array and passed on to<B> search()</B> for a check against the macro name table.  If it is not found in the table, it is simply copied directly to <B>pline</B>.  However, if it is found, then its offset is taken from the table and used to locate the start of its replacement 
+text in the macro text queue.  From there, everything is copied to <B>pline</B> until a null character is reached.  Finally, the remainder (beyond eight characters) of the macro name in <B>mline</B> is passed over.<P>
+
+<B>Gch()</B> is called to advance to the next character in <B>mline</B> and<B> keepch()</B> is called to place characters into <B>pline</B>.<P>
+
+<B>Ifline()<P></B>
+
+<B>Ifline()</B> handles all matters pertaining to conditional compilation.  Since it is called only by<B> preprocess()</B>, it should be viewed as part of the preprocessor.  Standing between the source file(s) and<B> preprocess()</B>, it obtains source lines from<B> inline()</B>, looks for <B>#ifdef</B>, <B>#ifndef</B>, <B>#else</B>, and<B> #endif</B> directives, and decides the fate of the lines which they control--whether or not they are passed up to<B> preprocess()</B>. <P>
+
+<B>Ifline()</B> contains one large infinite loop in which<B> inline()</B> is called at the top, followed by tests for the conditional compilation directives.  If reached, a <B>break</B> at the bottom discontinues the loop and returns control to the preprocessor with a new line.  If a conditional compilation directive is seen, it is duly noted and the loop is continued.  Conditional compilation directives, therefore, never make it to the preprocessor. <P>
+
+The global integer <B>iflevel</B> serves to match each #<B>else</B> and<B> #endif</B> with its antecedent <B>#if...</B> .  Each<B> #if... </B>increases it by one, and each <B>#endif</B> decreases it by one.  Therefore, it reflects the nesting level of <B>#if...</B> directives. <P>
+
+Another global integer <B>skiplevel</B> indicates whether or not source lines are being skipped, and at what level the skipping was initiated.  A segment of code being skipped is delimited by the next<B> #else</B> or <B>#endif</B> at the same level as the <B>#if...</B> which started the skipping. <P>
+The crucial statement in<B> ifline()</B> is<P>
+
+<PRE>		if(skiplevel) continue;<P>
+</PRE>
+
+located before the <B>break</B> at the bottom of the loop.  If <B>skiplevel</B> is not zero the loop is continued and the current line is skipped.  However, if it is zero the <B>break</B> is reached and the current line is passed to the preprocessor. <P>
+
+At this point the following explanations should make sense:<P>
+
+<UL>
+<LI>An <b>#ifdef</b> advances <b>iflevel</b> by one then checks <b>skiplevel</b> to see if it is currently skipping text.  If so, it continues the loop.  However, if it is not already skipping and if the specified symbol has not been defined, it should initiate skipping.  Therefore, it calls <b>symname</b>() to extract the macro name from <b>#ifdef</b>, then it calls <b>search()</b> to look for the name in the macro name table.  If the search fails, <b>skiplevel</b> is set to <b>iflevel</b> to 
+initiate skipping and to record the nesting level at which it began.  Finally, the loop is continued.
+<LI>An <b>#ifndef</b> is handled exactly like an <b>#ifdef</b> except that skipping is initiated if the specified symbol is found in the macro name table. 
+<LI>An <b>#else</b> directive first checks iflevel to see if an antecedent <b>#if</b>... exists; that failing, the message "no matching #if..." is issued and the loop is continued.  Assuming no such error, the <b>#else</b> must either initiate skipping, terminate skipping, or do nothing at all.  It initiates skipping, regardless of its nesting level, if skipping has not already been initiated (<b>skiplevel</b> is zero).  As with the previous two directives,
+ this involves assigning <b>iflevel</b> to <b>skiplevel</b>.  It terminates skipping only if skipping is already in progress and the nesting level matches the level at which skipping was initiated (<b>skiplevel</b> equals iflevel).  This is done by assigning zero to <b>skiplevel</b>.  Finally, if neither condition exists, the loop is continued without change. 
+<LI>An <b>#endif</b> directive also checks iflevel for an antecedent <b>#if</b>..., issuing "no matching #if..." if there is not one.  Assuming no such error, the <b>#endif</b> must either terminate skipping, or do nothing at all.  It terminates skipping only if skipping is already in progress and the nesting level matches the level at which skipping was initiated (<b>skiplevel</b> equals <b>iflevel</b>).  As before, this is done by assigning zero to <b>skiplevel</b>.
+Finally, <b>iflevel</b> is decremented by one and the loop is continued.<p>
+</UL>
+
+One last check is made before returning to the preprocessor.  If the new line is null, the loop is continued in an attempt to obtain a significant line.  <P>
+
+<B>Inline()<P></B>
+
+<B>Inline()</B> fetches the next line of code from a source file and optionally lists it.  Two global file descriptors direct it to input files; <B>input</B> designates the current primary file, and <B>input2</B> designates the current<B> #include</B> file. (Since only one file descriptor is used for include files, nesting of include statements is not supported.  See <a href="../chap28/chap28.htm">Chapter 28</a> for suggestions on making the compiler support nested include files.) Both descriptors are initially set to <B>EOF</B>, 
+indicating that no input file has yet been opened.  On entry,<B> inline()</B> checks <B>input</B> for <B>EOF</B> and, finding it, calls<B> openfile()</B> to prepare a file for input.  Should that fail, <B>eof</B> would be set true and<B> inline()</B> would simply exit.  Next, it decides which descriptor to use.  A local integer <B>unit</B> is set to <B>input</B> or <B>input2</B> depending on whether or not <B>input2</B> equals <B>EOF</B>.  <B>Unit</B> is then passed to<B> fgets()</B> to get the next line from 
+the source file.  In other words, if <B>input2</B> is not set to <B>EOF</B>, it contains the file descriptor of an active include file, and so it preempts the primary input file designated by <B>input</B>. <P>
+
+If the end-of-file condition is met, then the file designated by <B>unit</B> is closed, either <B>input</B> or <B>input2</B> (which ever pertains) is set to <B>EOF</B>, the input line is nulled by assigning zero to the first character, which is made current, and control is returned to the calling function.  When this happens, a higher level function will eventually go for another line and<B> inline()</B> will again receive control.  If the end-of-file occurred on <B>input</B>,<B> openfile()</B> will again
+ be called to open the next source file, as described above.  However, if it occurred on <B>input2</B>, then the include file will no longer preempt the primary input file and <B>input</B> will be used to fetch the next line from the current source file. <P>
+
+After successfully fetching a line,<B> inline()</B> tests <B>listfp</B> to see if a listing has been requested.  If so, it writes the line to <B>listfp</B>.  First, however, it checks to see if <B>listfp</B> is the same as the output file descriptor <B>output</B>.  In that case, source lines are being interleaved with generated code, so each source line must be made to look like a comment by placing a semicolon before it. <P>
+
+Finally, before returning,<B> bump()</B> is called to establish the first character in the new line as the current character. <P>
+<P>
+<CENTER>
+Go to <a href="../chap23/chap23.htm">Chapter 23</a>   Return to <a href="../toc1.htm">Table of Contents</a><P>
+</CENTER>
+<P>
+</HTML>
