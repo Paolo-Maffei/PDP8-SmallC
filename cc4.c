@@ -236,7 +236,7 @@ setcodes() {
   code[ADD2n]   = "\010?JMS I __addd2n\n? <n>\n??";
   code[ADDbpn]  = "\001JMS I __addbpn\n <n>\n";
   code[ADDwpn]  = "\001JMS I __addwpn\n <n>\n";
-  code[ADDm_]   = "\000JMS I __addm_\n <m>"; /* only with COMMAn! */
+  code[ADDm_]   = "\000JMS I __addm_\n <m>\n"; /* only with COMMAn! */
   code[ADDSP]   = "\000?JMS I __addsp\n <n>\n??";
   code[AND12]   = "\211JMS I __and12\n";
   code[ANEG1]   = "\010JMS I __aneg1\n";
@@ -735,6 +735,7 @@ outdec(number)  int number; {
     number = -number;
     fputc('-', output);
     }
+  number &= 0xFFFF; /* VRS */
   while (k >= 1) {
     q = 0;
     r = number;
